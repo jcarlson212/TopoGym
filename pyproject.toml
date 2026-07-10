@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "topogym"
+version = "0.1.0"
+description = "Gridworld environments and benchmarks for topological exploration in reinforcement learning"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+authors = [{ name = "Jason Carlson" }]
+keywords = [
+    "reinforcement-learning",
+    "gymnasium",
+    "topology",
+    "exploration",
+    "benchmark",
+    "gridworld",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["gymnasium>=0.29", "numpy>=1.21"]
+
+[project.optional-dependencies]
+testing = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/jcarlson212/TopoGym"
+Repository = "https://github.com/jcarlson212/TopoGym"
+"Bug Tracker" = "https://github.com/jcarlson212/TopoGym/issues"
+
+[tool.setuptools.packages.find]
+include = ["topogym*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E741"]
