@@ -1,0 +1,130 @@
+"""Directed transition-graph analysis for the asymmetry metadata block.
+
+Homology sees the undirected shape of the free space; one-way doors and
+trapdoors live in the *directed* transition graph instead. We analyze the
+"optimistic" graph — bump-doors open, trapdoors not yet used, one-way doors
+directed — and report its strongly-connected-component condensation.
+"""
+
+from __future__ import annotations
+
+
+def build_directed_adjacency(free_set, doors, neighbors_fn):
+    """Directed movement edges over free cells.
+
+    ``doors`` maps cell -> DoorSpec. A one-way door cell may only be
+    *entered* from its ``allowed_from`` neighbor; all other mechanics are
+    treated optimistically (bump doors open, trapdoors intact).
+    """
+    adj = {}
+    for u in free_set:
+        outs = []
+        seen = set()
+        for v in neighbors_fn(u):
+            if v not in free_set or v in seen:
+                continue
+            seen.add(v)
+            d = doors.get(v)
+            if d is not None and d.kind == "one_way" and u != d.allowed_from:
+                continue
+            outs.append(v)
+        adj[u] = outs
+    return adj
+
+
+def reachable_from(adj, start):
+    seen = {start}
+    stack = [start]
+    while stack:
+        u = stack.pop()
+        for v in adj[u]:
+            if v not in seen:
+                seen.add(v)
+                stack.append(v)
+    return seen
+
+
+def strongly_connected_components(adj):
+    """Kosaraju's algorithm, iterative. Returns a list of sets."""
+    order = []
+    seen = set()
+    for root in adj:
+        if root in seen:
+            continue
+        stack = [(root, iter(adj[root]))]
+        seen.add(root)
+        while stack:
+            node, it = stack[-1]
+            advanced = False
+            for v in it:
+                if v not in seen:
+                    seen.add(v)
+                    stack.append((v, iter(adj[v])))
+                    advanced = True
+                    break
+            if not advanced:
+                order.append(node)
+                stack.pop()
+
+    radj = {u: [] for u in adj}
+    for u, outs in adj.items():
+        for v in outs:
+            radj[v].append(u)
+
+    comps = []
+    assigned = set()
+    for root in reversed(order):
+        if root in assigned:
+            continue
+        comp = {root}
+        assigned.add(root)
+        stack = [root]
+        while stack:
+            u = stack.pop()
+            for v in radj[u]:
+                if v not in assigned:
+                    assigned.add(v)
+                    comp.add(v)
+                    stack.append(v)
+        comps.append(comp)
+    return comps
+
+
+def asymmetry_block(free_set, doors, neighbors_fn, start, goal) -> dict:
+    """The canonical ``asymmetry`` metadata block (see core.metadata)."""
+    mechanisms = set()
+    n_trapdoors = 0
+    for d in doors.values():
+        if d.kind == "one_way":
+            mechanisms.add("one_way_door")
+        elif d.kind == "trapdoor":
+            mechanisms.add("trapdoor")
+            n_trapdoors += 1
+
+    adj = build_directed_adjacency(free_set, doors, neighbors_fn)
+    comps = strongly_connected_components(adj)
+    comp_of = {}
+    for i, comp in enumerate(comps):
+        for u in comp:
+            comp_of[u] = i
+    out_degree = [0] * len(comps)
+    for u, outs in adj.items():
+        cu = comp_of[u]
+        for v in outs:
+            if comp_of[v] != cu:
+                out_degree[cu] += 1
+    n_absorbing = (
+        0 if len(comps) == 1 else sum(1 for d in out_degree if d == 0)
+    )
+    return {
+        "is_symmetric": not mechanisms,
+        "mechanisms": tuple(sorted(mechanisms)),
+        "n_sccs": len(comps),
+        "largest_scc_frac": max(len(c) for c in comps) / max(1, len(free_set)),
+        "n_absorbing_sccs": n_absorbing,
+        "goal_in_start_scc": comp_of.get(goal) == comp_of.get(start),
+        "n_consumable_transitions": n_trapdoors,
+        # feature_counts is filled in by the generator, which knows which
+        # room kind each door belongs to.
+        "feature_counts": {},
+    }
