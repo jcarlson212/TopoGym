@@ -90,6 +90,7 @@ class TopoGrid2DEnv(TopoEnvCore):
         r = self.view_radius
         base = self.layout.base
         view = np.full((2 * r + 1, 2 * r + 1), C.OBS_OUT_OF_WORLD, np.uint8)
+        cell_at = {}
         for a in range(-r, r + 1):  # forward steps
             s = _translate(base, self._state, a)
             if s is None:
@@ -100,7 +101,12 @@ class TopoGrid2DEnv(TopoEnvCore):
                 if t is None:
                     continue
                 view[r - a, r + b] = self._obs_code(t.cell)
-        return self._occlude(view, (r, r), self._BLOCKING)
+                cell_at[(r - a, r + b)] = t.cell
+        out = self._occlude(view, (r, r), self._BLOCKING)
+        for idx, cell in cell_at.items():
+            if out[idx] != C.OBS_UNSEEN:
+                self._note_observed(cell, int(out[idx]))
+        return out
 
     def _global_obs(self):
         base = self.layout.base
@@ -109,7 +115,9 @@ class TopoGrid2DEnv(TopoEnvCore):
         agent = np.zeros((h, w), np.uint8)
         for cell in base.cells():
             x, y = base.layout_coords(cell)
-            grid[y, x] = self._obs_code(cell)
+            code = self._obs_code(cell)
+            grid[y, x] = code
+            self._note_observed(cell, code)
         ax, ay = base.layout_coords(self._state.cell)
         agent[ay, ax] = C.OBS_AGENT
         return np.stack([grid, agent])

@@ -13,6 +13,25 @@ Door mechanics
 Episode dynamics never change the free space's homology (a door cell is a
 free cell either way) — doors gate *coverage* and *reversibility*, which is
 exactly what the metadata's ``asymmetry`` block describes.
+
+Observed-region tracking
+------------------------
+Sight and movement differ: walls are opaque, but HOLE cells (pits/moats)
+block movement while remaining transparent. The env therefore tracks the
+*observed* region — every cell the agent has seen and believes free — as a
+monotone filtration. Discovering a passage is exactly one of:
+
+- frontier growth (the far side was unknown),
+- an **H0 merge** (two known-but-separate regions join —
+  ``info["h0_merges"]`` counts these exactly, incrementally), or
+- an **H1 birth** (a loop closure between already-connected regions —
+  visible as a jump in ``observed_betti()[1]``, sample it at your
+  evaluation cadence).
+
+Hidden doors participate naturally: a closed bump-door is believed to be a
+wall, so opening it *is* the discovery event. Tracking is cumulative and
+optimistic (a sealed trapdoor stays in the observed region) — what
+persistence needs.
 """
 
 from __future__ import annotations
@@ -23,7 +42,7 @@ import gymnasium as gym
 import numpy as np
 
 from topogym.core import constants as C
-from topogym.core.homology import analyze_2d, analyze_3d
+from topogym.core.homology import _UnionFind, analyze_2d, analyze_3d
 from topogym.generation.generator import generate_2d, generate_3d
 
 
@@ -88,6 +107,11 @@ class TopoEnvCore(gym.Env):
         self._steps = 0
         n_free = len(self.layout.free_cells)
         self._max_steps = self._max_steps_cfg or max(64, 6 * n_free)
+        # Observed-region filtration (see module docstring).
+        self._observed_free = set()
+        self._known_uf = _UnionFind()
+        self._known_components = 0
+        self._h0_merges = 0
 
     @property
     def topology(self):
@@ -95,18 +119,47 @@ class TopoEnvCore(gym.Env):
         return self.layout.metadata
 
     def visited_betti(self):
-        """Z/2 Betti numbers of the region visited so far — useful for
-        tracking how much of the environment's topology an agent has
-        discovered."""
+        """Z/2 Betti numbers of the region *physically visited* so far.
+
+        A trajectory is path-connected, so b0 stays 1 here; use
+        :meth:`observed_betti` for H0-merge / loop-closure analysis."""
+        return self._betti_of(self._visited)
+
+    def observed_betti(self):
+        """Z/2 Betti numbers of the region the agent has *seen and believes
+        free*. Its b0 drops on H0 merges; jumps in its b1 are loop
+        closures. Compute at your evaluation cadence (it builds the
+        complex); ``info["known_components"]`` and ``info["h0_merges"]``
+        are maintained incrementally and are free."""
+        return self._betti_of(self._observed_free)
+
+    def _betti_of(self, cells):
         if self.DIM == 2:
-            s = analyze_2d(
-                self.layout.base.face_cycle(c) for c in self._visited
-            )
+            s = analyze_2d(self.layout.base.face_cycle(c) for c in cells)
         else:
-            s = analyze_3d(
-                self.layout.base.cube_corners(c) for c in self._visited
-            )
+            s = analyze_3d(self.layout.base.cube_corners(c) for c in cells)
         return s.betti_z2
+
+    _KNOWN_FREE_CODES = (C.OBS_EMPTY, C.OBS_GOAL, C.OBS_DOOR_OPEN,
+                         C.OBS_DOOR_ONEWAY, C.OBS_TRAPDOOR)
+
+    def _note_observed(self, cell, code):
+        """Add a sighted cell to the observed-region filtration."""
+        if code not in self._KNOWN_FREE_CODES or cell in self._observed_free:
+            return
+        self._observed_free.add(cell)
+        self._known_uf.find(cell)
+        self._known_components += 1
+        merged = 0
+        for n in self.layout.base.neighbors(cell):
+            if n in self._observed_free and n != cell:
+                if self._known_uf.find(n) != self._known_uf.find(cell):
+                    self._known_uf.union(n, cell)
+                    self._known_components -= 1
+                    merged += 1
+        # Joining one existing region just extends it; joining two or more
+        # previously-separate regions is a genuine H0 merge event.
+        self._h0_merges += max(0, merged - 1)
 
     # -- door mechanics -----------------------------------------------------
 
@@ -178,7 +231,9 @@ class TopoEnvCore(gym.Env):
         out[~visible] = C.OBS_UNSEEN
         return out
 
-    _BLOCKING = (C.OBS_WALL, C.OBS_HOLE, C.OBS_OUT_OF_WORLD,
+    # Sight blockers. HOLE cells are pits/moats: impassable but transparent,
+    # so the far side of a moat is visible before it is reachable.
+    _BLOCKING = (C.OBS_WALL, C.OBS_OUT_OF_WORLD,
                  C.OBS_DOOR_ONEWAY, C.OBS_TRAPDOOR)
 
     # -- reward / bookkeeping -------------------------------------------------
@@ -194,10 +249,14 @@ class TopoEnvCore(gym.Env):
         return reward, terminated, truncated
 
     def _step_info(self, agent_cell):
+        n_free = len(self.layout.free_cells)
         return {
             "position": agent_cell,
             "steps": self._steps,
-            "coverage": len(self._visited) / len(self.layout.free_cells),
+            "coverage": len(self._visited) / n_free,
+            "observed_frac": len(self._observed_free) / n_free,
+            "known_components": self._known_components,
+            "h0_merges": self._h0_merges,
             "doors_opened": len(self._open),
             "trapdoors_used": len(self._sealed),
         }

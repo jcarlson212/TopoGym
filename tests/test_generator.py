@@ -251,3 +251,117 @@ def test_3d_determinism():
     cfg = TopoGenConfig3D(base="box")  # default size fits all default features
     a, b = generate_3d(cfg, seed=42), generate_3d(cfg, seed=42)
     assert layout_signature(a) == layout_signature(b)
+
+
+# ---------------------------------------------------------------------------
+# Partitions (bridge-finding) + connectivity block
+# ---------------------------------------------------------------------------
+
+def test_dumbbell_is_bottlenecked_not_homological():
+    cfg = TopoGenConfig2D(base="square", size=17, n_holes=0, n_chambers=0,
+                          n_decoys=0, n_partitions=1, partition_gaps=(1, 1),
+                          partition_hidden_gaps=(0, 0))
+    md = generate_2d(cfg, seed=1).metadata
+    assert md.betti_z2 == (1, 0, 0)  # a bridge is contractible
+    assert md.n_partitions == 1
+    conn = md.connectivity
+    assert conn["n_bridges"] >= 2  # the edges into and out of the gap cell
+    assert conn["n_articulation_points"] >= 1
+    # A real bottleneck: the smaller side is a sizable fraction of space.
+    assert conn["max_bridge_split"] > md.n_free_cells // 4
+    assert md.certified["connectivity"] is True
+
+
+def test_twin_passages_close_a_loop():
+    cfg = TopoGenConfig2D(base="square", size=17, n_holes=0, n_chambers=0,
+                          n_decoys=0, n_partitions=1, partition_gaps=(2, 2),
+                          partition_hidden_gaps=(0, 0))
+    md = generate_2d(cfg, seed=2).metadata
+    assert md.betti_z2 == (1, 1, 0)  # two bridges between two regions = loop
+    assert md.connectivity["n_bridges"] == 0  # 2-edge-connected now
+
+
+def test_hidden_bridge_is_a_bump_door():
+    cfg = TopoGenConfig2D(base="square", size=19, n_holes=0, n_chambers=0,
+                          n_decoys=0, n_partitions=1, partition_gaps=(2, 2),
+                          partition_hidden_gaps=(1, 1), door_tries=(3, 3),
+                          partition_material="moat")
+    layout = generate_2d(cfg, seed=3)
+    assert layout.metadata.door_tries == (3,)
+    (spec,) = layout.doors.values()
+    assert spec.kind == "bump"
+    partition = next(f for f in layout.features if f.kind == "partition")
+    assert partition.meta["material"] == "moat"
+    assert len(partition.meta["gaps"]) == 2
+    from topogym.core.constants import HOLE
+    assert all(layout.cell_types[c] == HOLE for c in partition.cells)
+
+
+def test_floating_partitions():
+    md = generate_2d(
+        TopoGenConfig2D(base="torus", size=15, n_holes=0, n_chambers=0,
+                        n_decoys=0, n_partitions=1, partition_gaps=(1, 1),
+                        partition_hidden_gaps=(0, 0)), seed=4,
+    ).metadata
+    assert md.betti_z2 == (1, 2, 0)  # cut torus + gap: b1 stays 2
+    md = generate_2d(
+        TopoGenConfig2D(base="sphere", size=6, n_holes=0, n_chambers=0,
+                        n_decoys=0, n_partitions=1, partition_gaps=(2, 2),
+                        partition_hidden_gaps=(0, 0)), seed=5,
+    ).metadata
+    assert md.betti_z2 == (1, 1, 0)  # belt with two passages
+
+
+def test_partition_target_b1_interplay():
+    cfg = TopoGenConfig2D(base="square", size=21, target_b1=3, n_chambers=0,
+                          n_decoys=0, n_partitions=1, partition_gaps=(2, 2),
+                          partition_hidden_gaps=(0, 0))
+    md = generate_2d(cfg, seed=6).metadata
+    assert md.betti_z2[1] == 3  # partition gives 1; solver adds 2 holes
+    assert md.n_holes == 2
+
+
+def test_rp2_admits_no_partitions():
+    with pytest.raises(GenerationError):
+        generate_2d(
+            TopoGenConfig2D(base="rp2", size=15, n_partitions=1), seed=0,
+        )
+
+
+def test_3d_partitions():
+    md = generate_3d(
+        TopoGenConfig3D(base="box", size=11, n_rings=0, n_blobs=0,
+                        n_chambers=0, n_decoys=0, n_partitions=1,
+                        partition_gaps=(1, 1), partition_hidden_gaps=(0, 0)),
+        seed=7,
+    ).metadata
+    assert md.betti_z2 == (1, 0, 0, 0)
+    assert md.connectivity["max_bridge_split"] > md.n_free_cells // 4
+    md = generate_3d(
+        TopoGenConfig3D(base="box", size=11, n_rings=0, n_blobs=0,
+                        n_chambers=0, n_decoys=0, n_partitions=1,
+                        partition_gaps=(2, 2), partition_hidden_gaps=(0, 0)),
+        seed=8,
+    ).metadata
+    assert md.betti_z2 == (1, 1, 0, 0)  # two tunnels = one loop
+    with pytest.raises(GenerationError):
+        generate_3d(
+            TopoGenConfig3D(base="torus3", size=8, n_partitions=1), seed=0,
+        )
+
+
+def test_maze_connectivity_is_a_tree():
+    md = generate_2d(
+        TopoGenConfig2D(base="square", size=15, style="maze"), seed=9,
+    ).metadata
+    conn = md.connectivity
+    assert conn["n_bridges"] == md.n_free_cells - 1
+    assert conn["n_biconnected_components"] == md.n_free_cells
+
+
+def test_connectivity_present_on_all_envs():
+    md = generate_2d(TopoGenConfig2D(base="square", size=15), seed=10).metadata
+    assert set(md.connectivity) == {
+        "n_bridges", "n_articulation_points", "n_biconnected_components",
+        "max_bridge_split",
+    }

@@ -9,12 +9,28 @@ from topogym import benchmarks as bench
 
 def test_collections_present():
     names = bench.benchmark_names()
-    assert "2d_bench_grid_small" in names
-    assert "3d_bench_grid_small" in names
-    assert "2d_bench_grid_small_directed" in names
-    assert "3d_bench_grid_small_directed" in names
+    for name in (
+        "2d_bench_grid_small", "3d_bench_grid_small",
+        "2d_bench_grid_small_directed", "3d_bench_grid_small_directed",
+        "2d_bench_grid_small_bridges", "3d_bench_grid_small_bridges",
+    ):
+        assert name in names
     assert len(bench.get_benchmark("2d_bench_grid_small")) == 16
     assert len(bench.get_benchmark("3d_bench_grid_small")) == 8
+    assert len(bench.get_benchmark("2d_bench_grid_small_bridges")) == 8
+    assert len(bench.get_benchmark("3d_bench_grid_small_bridges")) == 4
+
+
+def test_bridge_benchmarks_are_bottlenecked():
+    for entry in bench.get_benchmark("2d_bench_grid_small_bridges"):
+        md = entry.metadata()
+        assert md.n_partitions >= 1
+        conn = md.connectivity
+        # Bottlenecked either by graph bridges (single passages) or by
+        # passages that pair up into loops (b1 > 0), or hidden doors.
+        assert (
+            conn["n_bridges"] > 0 or md.betti_z2[1] > 0 or md.door_tries
+        ), entry.name
 
 
 @pytest.mark.parametrize(

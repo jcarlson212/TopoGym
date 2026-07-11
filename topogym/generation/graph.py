@@ -1,9 +1,17 @@
-"""Directed transition-graph analysis for the asymmetry metadata block.
+"""Transition-graph analysis for the asymmetry and connectivity blocks.
 
 Homology sees the undirected shape of the free space; one-way doors and
 trapdoors live in the *directed* transition graph instead. We analyze the
 "optimistic" graph — bump-doors open, trapdoors not yet used, one-way doors
 directed — and report its strongly-connected-component condensation.
+
+This module also computes the ``connectivity`` block: bridges and
+articulation points of the *undirected* free-cell graph. These are not a
+separate kind of topology — during exploration, discovering a passage is
+either frontier growth, an H0 merge, or an H1 birth of the observed-region
+filtration — but they are certified **difficulty descriptors**: they say
+how bottlenecked the space is, i.e. how rare and late those homological
+events will be under naive exploration.
 """
 
 from __future__ import annotations
@@ -127,4 +135,111 @@ def asymmetry_block(free_set, doors, neighbors_fn, start, goal) -> dict:
         # feature_counts is filled in by the generator, which knows which
         # room kind each door belongs to.
         "feature_counts": {},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Undirected bridge / articulation analysis (the connectivity block)
+# ---------------------------------------------------------------------------
+
+def build_undirected_adjacency(free_set, neighbors_fn):
+    """Undirected movement edges over free cells (doors passable both ways;
+    directedness is the asymmetry block's business)."""
+    adj = {}
+    for u in free_set:
+        outs = []
+        seen = set()
+        for v in neighbors_fn(u):
+            if v in free_set and v not in seen and v != u:
+                seen.add(v)
+                outs.append(v)
+        adj[u] = outs
+    return adj
+
+
+def _bridge_dfs(adj):
+    """Iterative Tarjan low-link DFS.
+
+    Returns (bridges, articulation_points) where each bridge is
+    ``(parent, child, child_subtree_size)``.
+    """
+    disc, low, subtree = {}, {}, {}
+    bridges, artics = [], set()
+    timer = 0
+    for root in adj:
+        if root in disc:
+            continue
+        disc[root] = low[root] = timer
+        timer += 1
+        subtree[root] = 1
+        root_children = 0
+        stack = [(root, None, iter(adj[root]))]
+        while stack:
+            u, pu, it = stack[-1]
+            advanced = False
+            for v in it:
+                if v == pu:
+                    continue
+                if v not in disc:
+                    disc[v] = low[v] = timer
+                    timer += 1
+                    subtree[v] = 1
+                    stack.append((v, u, iter(adj[v])))
+                    if u == root:
+                        root_children += 1
+                    advanced = True
+                    break
+                low[u] = min(low[u], disc[v])
+            if not advanced:
+                stack.pop()
+                if pu is not None:
+                    low[pu] = min(low[pu], low[u])
+                    subtree[pu] += subtree[u]
+                    if low[u] > disc[pu]:
+                        bridges.append((pu, u, subtree[u]))
+                    if pu != root and low[u] >= disc[pu]:
+                        artics.add(pu)
+        if root_children >= 2:
+            artics.add(root)
+    return bridges, artics
+
+
+def connectivity_block(free_set, neighbors_fn) -> dict:
+    """The canonical ``connectivity`` metadata block.
+
+    Computed on the undirected free-cell graph with all doors passable:
+
+    - ``n_bridges``: edges whose removal disconnects the graph
+    - ``n_articulation_points``: cut cells
+    - ``n_biconnected_components``: connected components left after
+      deleting all bridges (a tree maze has one per cell)
+    - ``max_bridge_split``: over all bridges, the largest "smaller side"
+      — a bridge splitting the space 200/190 scores 190 (a real
+      bottleneck); a dead-end stub scores 1
+    """
+    adj = build_undirected_adjacency(free_set, neighbors_fn)
+    bridges, artics = _bridge_dfs(adj)
+    n = len(free_set)
+    max_split = max((min(sz, n - sz) for _, _, sz in bridges), default=0)
+
+    bridge_set = {frozenset((u, v)) for u, v, _ in bridges}
+    seen = set()
+    n_bicomp = 0
+    for start in adj:
+        if start in seen:
+            continue
+        n_bicomp += 1
+        seen.add(start)
+        stack = [start]
+        while stack:
+            u = stack.pop()
+            for v in adj[u]:
+                if v not in seen and frozenset((u, v)) not in bridge_set:
+                    seen.add(v)
+                    stack.append(v)
+    return {
+        "n_bridges": len(bridges),
+        "n_articulation_points": len(artics),
+        "n_biconnected_components": n_bicomp,
+        "max_bridge_split": max_split,
     }
