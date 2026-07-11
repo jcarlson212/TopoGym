@@ -26,8 +26,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
-
 
 # ---------------------------------------------------------------------------
 # GF(2) linear algebra
@@ -85,10 +83,10 @@ class Surface2DSummary:
     n_edges: int
     n_faces: int
     is_manifold: bool
-    n_boundary_components: Optional[int]  # None if non-manifold
-    orientable: Optional[bool]  # None if non-manifold or empty
-    genus: Optional[int]  # orientable genus; requires connected + manifold
-    demigenus: Optional[int]  # crosscap number; requires connected + manifold
+    n_boundary_components: int | None  # None if non-manifold
+    orientable: bool | None  # None if non-manifold or empty
+    genus: int | None  # orientable genus; requires connected + manifold
+    demigenus: int | None  # crosscap number; requires connected + manifold
 
 
 def _regularize_2d(cycles):

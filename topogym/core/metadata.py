@@ -46,7 +46,6 @@ graph (with bump-doors treated as open and trapdoors as not yet used — the
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Optional
 
 
 def homology_strings(betti_q, h1_torsion, betti_z2) -> dict:
@@ -92,15 +91,15 @@ class TopologyMetadata:
     # -- certified topology of the free space ------------------------------
     betti_z2: tuple
     euler_characteristic: int
-    orientable: Optional[bool]  # 2D only
-    genus: Optional[int]  # 2D, orientable free space
-    demigenus: Optional[int]  # 2D, non-orientable free space
-    n_boundary_components: Optional[int]  # 2D only
+    orientable: bool | None  # 2D only
+    genus: int | None  # 2D, orientable free space
+    demigenus: int | None  # 2D, non-orientable free space
+    n_boundary_components: int | None  # 2D only
 
     # -- integral homology (see module docstring for certification) --------
-    betti_q: Optional[tuple]
+    betti_q: tuple | None
     betti_q_expected: tuple
-    h1_torsion: Optional[tuple]
+    h1_torsion: tuple | None
 
     # -- directional asymmetry (see module docstring) -----------------------
     asymmetry: dict = field(default_factory=dict)
