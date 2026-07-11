@@ -104,6 +104,16 @@ class TopologyMetadata:
     # -- directional asymmetry (see module docstring) -----------------------
     asymmetry: dict = field(default_factory=dict)
 
+    # -- bottleneck structure (certified difficulty descriptors) -------------
+    # Bridges are not extra topology: discovering a passage is frontier
+    # growth, an H0 merge, or an H1 birth of the observed-region filtration.
+    # This block says how bottlenecked the free-cell graph is, i.e. how rare
+    # and late those events are under naive exploration. Doors count as
+    # passable; direction is the asymmetry block's business.
+    connectivity: dict = field(default_factory=dict)
+
+    n_partitions: int = 0  # dividing walls/moats with bridge passages
+
     certified: dict = field(default_factory=dict)
     homology: dict = field(default_factory=dict)
 

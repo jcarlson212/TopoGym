@@ -155,6 +155,32 @@ cell either way. Doors gate *coverage* and *reversibility*, and that is
 exactly what the metadata separates: Betti numbers describe the undirected
 shape; the `asymmetry` block describes the directed dynamics.
 
+### Bridges and the observed region
+
+**Partitions** divide the world with narrow passages: dumbbells (one gap),
+passage pairs (two gaps close a loop: b₁ + 1), hidden bridges (bump-door
+gaps), on any base — a meridian wall on a torus makes closing the loop
+require the wraparound. Partitions come in two materials: **wall** (opaque)
+and **moat** (a pit — blocks movement but *not sight*, so the far side is
+visible before it is reachable).
+
+Bridges are not a separate kind of topology. During exploration, every
+passage discovery is exactly one of: **frontier growth** (far side
+unknown), an **H₀ merge** (two known regions join), or an **H₁ birth** (a
+loop closure between already-connected regions). The envs track the
+*observed region* — everything seen and believed free — as a monotone
+filtration: `info["known_components"]` and `info["h0_merges"]` are
+maintained incrementally, and `env.observed_betti()` gives the full
+picture (its b₁ jumps are loop closures). Hidden doors participate
+naturally: a closed bump-door is believed to be a wall, so opening it *is*
+the discovery event.
+
+What the metadata certifies instead is **difficulty**: the `connectivity`
+block reports graph bridges, articulation points, biconnected components,
+and `max_bridge_split` (the largest "smaller side" any single bridge
+separates) of the free-cell graph — how rare and late the homological
+events will be under naive exploration.
+
 ## Base manifolds
 
 Every 2D base except the sphere is one rectangular fundamental domain plus
@@ -207,6 +233,8 @@ feature's contribution:
 | ring | — | +1 b₁, +1 b₂ |
 | chamber / decoy / trap room | +1 b₁ | +1 b₂ |
 | airlock / trapdoor room | +2 b₁ | +1 b₁, +1 b₂ |
+| partition, K gaps (attached) | +(K−1) b₁ | +(K−1) b₁ |
+| partition, K gaps (ring/belt) | +K b₁ | — |
 
 ## Certified metadata
 
@@ -229,8 +257,13 @@ dict) — designed to be swept over programmatically:
     "goal_in_start_scc": true, "n_consumable_transitions": 0,
     "feature_counts": {"trap_room": 0, "airlock": 0, "trapdoor_room": 0}
   },
+  "connectivity": {
+    "n_bridges": 0, "n_articulation_points": 0,
+    "n_biconnected_components": 1, "max_bridge_split": 0
+  },
+  "n_partitions": 0,
   "certified": {"betti_z2": true, "betti_q": true, "h1_torsion": true,
-                "asymmetry": true, "genus": true},
+                "asymmetry": true, "connectivity": true, "genus": true},
   "base": {"name": "torus", "orientable": true, "genus": 1, "...": "..."}
 }
 ```
@@ -249,6 +282,8 @@ classification) and obstacle-free 3D bases; 3D-with-obstacles reports
 | `3d_bench_grid_small` | 8 | rings (b₁), voids (b₂), rooms, solid torus, 3-torus, shell, control |
 | `2d_bench_grid_small_directed` | 8 | trap rooms, airlocks, trapdoor rooms on 4 bases |
 | `3d_bench_grid_small_directed` | 4 | the same mechanics in 3D |
+| `2d_bench_grid_small_bridges` | 8 | dumbbells, passage pairs, moats, hidden bridges, torus meridian, sphere belt |
+| `3d_bench_grid_small_bridges` | 4 | tunnel dumbbells, tunnel pairs, hidden tunnels, solid-torus gate |
 
 Each entry pins `(config, layout_seed)` — everyone runs byte-identical
 environments — and is registered as a Gymnasium id

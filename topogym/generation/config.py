@@ -36,6 +36,13 @@ class TopoGenConfig2D:
     chamber_size: tuple = (4, 6)  # outer side length range
     door_tries: tuple = (1, 4)  # bumps to open a hidden door, inclusive range
 
+    # -- partitions (bridge-finding) ------------------------------------------
+    n_partitions: int = 0  # dividing lines across the world, with passages
+    partition_gaps: tuple = (1, 2)  # passages per partition, inclusive range
+    partition_hidden_gaps: tuple = (0, 1)  # of which, hidden bump-doors
+    partition_material: str = "wall"  # "wall" (opaque) | "moat" (a pit:
+    # blocks movement but not sight, so the far side is visible)
+
     # -- directed features (asymmetric traversability) -----------------------
     n_trap_rooms: int = 0  # one-way door inward: absorbing region
     n_airlocks: int = 0  # one-way in + one-way out: directed circuit
@@ -71,6 +78,12 @@ class TopoGenConfig3D:
     ring_size: tuple = (3, 5)
     chamber_size: tuple = (4, 5)
     door_tries: tuple = (1, 4)
+
+    # -- partitions (bridge-finding) -------------------------------------------
+    n_partitions: int = 0  # dividing planes across the world, with tunnels
+    partition_gaps: tuple = (1, 2)
+    partition_hidden_gaps: tuple = (0, 1)
+    partition_material: str = "wall"  # "wall" | "moat" (see 2D config)
 
     # -- directed features ---------------------------------------------------
     n_trap_rooms: int = 0

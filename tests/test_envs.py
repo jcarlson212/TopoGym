@@ -176,3 +176,117 @@ def test_config_object_and_overrides():
     env.reset(seed=0)
     assert env.cfg.base == "klein"
     assert env.cfg.n_decoys == 0
+
+
+# ---------------------------------------------------------------------------
+# Observed-region tracking (H0 merges, loop closures)
+# ---------------------------------------------------------------------------
+
+def _moat_env(**kw):
+    env = gym.make(
+        "TopoGym/Grid2D-v0", base="square", size=17, n_holes=0,
+        n_chambers=0, n_decoys=0, n_partitions=1, partition_material="moat",
+        layout_seed=kw.pop("layout_seed", 21), **kw,
+    ).unwrapped
+    env.reset(seed=0)
+    return env
+
+
+def test_holes_are_transparent_walls_are_not():
+    env = _moat_env(partition_gaps=(1, 1), partition_hidden_gaps=(0, 0))
+    partition = next(
+        f for f in env.layout.features if f.kind == "partition"
+    )
+    moat_cell = partition.cells[len(partition.cells) // 2]
+    # Stand next to the moat, facing it: the far side must be visible.
+    base = env.layout.base
+    nbr_state = next(
+        s for s in base.neighbor_states(moat_cell)
+        if env.layout.cell_types.get(s.cell, 0) == 0
+    )
+    env._state = base.turn_left(base.turn_left(nbr_state))  # face the moat
+    obs = env._obs()
+    r = env.view_radius
+    from topogym.core import constants as C
+    assert obs[r - 1, r] == C.OBS_HOLE  # the moat itself
+    assert obs[r - 2, r] != C.OBS_UNSEEN  # the far side, seen across it
+
+
+def test_h0_merge_on_seeing_across_a_moat():
+    env = _moat_env(partition_gaps=(1, 1), partition_hidden_gaps=(0, 0))
+    partition = next(f for f in env.layout.features if f.kind == "partition")
+    base = env.layout.base
+    # Fresh episode state, then look across the moat far from the gap:
+    # two known regions.
+    env._reset_runtime()
+    moat_cell = partition.cells[0]
+    nbr_state = next(
+        s for s in base.neighbor_states(moat_cell)
+        if env.layout.cell_types.get(s.cell, 0) == 0
+    )
+    env._state = base.turn_left(base.turn_left(nbr_state))
+    env._obs()
+    assert env._known_components >= 2
+    assert env._h0_merges == 0
+    assert env.observed_betti()[0] >= 2
+    # Now look at the gap: the two regions connect through it — an H0 merge.
+    (gap_cell,) = partition.meta["gaps"]
+    gap_nbr = next(
+        s for s in base.neighbor_states(gap_cell)
+        if env.layout.cell_types.get(s.cell, 0) == 0
+    )
+    env._state = base.turn_left(base.turn_left(gap_nbr))
+    env._obs()
+    assert env._h0_merges >= 1
+    assert env.observed_betti()[0] < 2 or env._known_components == 1
+
+
+def test_hidden_bridge_merge_happens_on_door_open():
+    env = _moat_env(partition_gaps=(1, 1), partition_hidden_gaps=(1, 1),
+                    door_tries=(2, 2), layout_seed=22)
+    (door_cell, spec), = env.layout.doors.items()
+    base = env.layout.base
+    env._reset_runtime()
+    # See both sides across the moat; the hidden door reads as a wall.
+    nbr_state = next(
+        s for s in base.neighbor_states(door_cell)
+        if env.layout.cell_types.get(s.cell, 0) == 0
+    )
+    env._state = base.turn_left(base.turn_left(nbr_state))
+    env._obs()
+    assert env._known_components >= 2
+    before = env._h0_merges
+    # Bump it open; on re-observation the passage joins the two regions.
+    outside = nbr_state.cell
+    env._try_enter(outside, door_cell)
+    env._try_enter(outside, door_cell)
+    assert door_cell in env._open
+    env._obs()
+    assert env._h0_merges == before + 1
+
+
+def test_observed_info_fields():
+    env = _moat_env(partition_gaps=(2, 2), partition_hidden_gaps=(0, 0))
+    _, info = env.reset(seed=1)
+    for key in ("observed_frac", "known_components", "h0_merges"):
+        assert key in info
+    assert 0 < info["observed_frac"] <= 1
+    obs, _, _, _, info2 = env.step(2)
+    assert info2["observed_frac"] >= info["observed_frac"]  # monotone
+
+
+def test_global_obs_observes_everything():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_chambers=0, n_decoys=0, obs_mode="global",
+                   layout_seed=8).unwrapped
+    _, info = env.reset(seed=0)
+    assert info["known_components"] == 1
+    assert info["observed_frac"] == 1.0
+
+    # With a chamber, its interior is visibly free but its hidden door
+    # reads as a wall: a second known component until the door opens.
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_holes=0, n_chambers=1, n_decoys=0, obs_mode="global",
+                   layout_seed=8).unwrapped
+    _, info = env.reset(seed=0)
+    assert info["known_components"] == 2
