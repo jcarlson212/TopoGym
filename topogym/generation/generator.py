@@ -29,7 +29,6 @@ trapdoor_room      trapdoor entrance + hidden high-tries escape door
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 
@@ -57,7 +56,7 @@ class DoorSpec:
     cell: tuple
     kind: str
     tries: int = 1  # bump doors: bumps required to open
-    allowed_from: Optional[tuple] = None  # one_way: sole entry neighbor
+    allowed_from: tuple | None = None  # one_way: sole entry neighbor
 
 
 @dataclass(frozen=True)
@@ -80,7 +79,7 @@ class Layout:
     goal: tuple
     features: list = field(default_factory=list)
     free_cells: list = field(default_factory=list)
-    metadata: Optional[TopologyMetadata] = None
+    metadata: TopologyMetadata | None = None
 
     def neighbors(self, cell):
         return self.base.neighbors(cell)

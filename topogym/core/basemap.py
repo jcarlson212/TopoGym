@@ -39,8 +39,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import Optional
+from functools import cache
 
 
 class Boundary:
@@ -71,8 +70,8 @@ class BaseMapInfo:
     dim: int
     orientable: bool
     closed: bool  # closed surface (no boundary)
-    genus: Optional[int]  # orientable genus (None if non-orientable)
-    demigenus: Optional[int]  # non-orientable genus / crosscap number
+    genus: int | None  # orientable genus (None if non-orientable)
+    demigenus: int | None  # non-orientable genus / crosscap number
     euler_characteristic: int
     betti_z2: tuple  # of the fully-free base complex
     betti_q: tuple
@@ -93,7 +92,7 @@ class BaseMap2D(ABC):
         """A canonical agent state at ``cell``."""
 
     @abstractmethod
-    def forward(self, state: AgentState) -> Optional[AgentState]:
+    def forward(self, state: AgentState) -> AgentState | None:
         """One step along the frame's forward vector, transporting the
         frame across seams. ``None`` if blocked by a WALL-type boundary."""
 
@@ -201,7 +200,7 @@ class RectGluing2D(BaseMap2D):
         fx, fy, rx, ry = state.frame
         return AgentState(state.cell, (rx, ry, -fx, -fy))
 
-    def forward(self, state: AgentState) -> Optional[AgentState]:
+    def forward(self, state: AgentState) -> AgentState | None:
         (x, y), (fx, fy, rx, ry) = state.cell, state.frame
         nx, ny = x + fx, y + fy
         w, h = self.width, self.height
@@ -252,7 +251,7 @@ class RectGluing2D(BaseMap2D):
                 out.append((w - x, 0))
         return out
 
-    @lru_cache(maxsize=None)
+    @cache
     def canonical_vertex(self, v):
         """Lexicographically-smallest member of the vertex's gluing orbit."""
         orbit = {v}
@@ -371,7 +370,7 @@ class CubeSphere2D(BaseMap2D):
         n = self._normal(state.cell)
         return AgentState(state.cell, _cross(state.frame, n))
 
-    def forward(self, state: AgentState) -> Optional[AgentState]:
+    def forward(self, state: AgentState) -> AgentState | None:
         c, f = state.cell, state.frame
         m = 2 * self.n
         cand = _add(c, (2 * f[0], 2 * f[1], 2 * f[2]))
@@ -479,7 +478,7 @@ class RectGluing3D:
             (x, y, z) for z in range(d) for y in range(h) for x in range(w)
         ]
 
-    def step_dir(self, cell, direction) -> Optional[tuple]:
+    def step_dir(self, cell, direction) -> tuple | None:
         nxt = list(cell)
         for k in range(3):
             nxt[k] += direction[k]

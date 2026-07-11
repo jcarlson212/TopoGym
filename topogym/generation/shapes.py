@@ -8,7 +8,6 @@ on a square, a torus seam, or across a cube-sphere edge.
 
 from __future__ import annotations
 
-
 # ---------------------------------------------------------------------------
 # 2D hole shapes
 # ---------------------------------------------------------------------------
