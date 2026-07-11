@@ -73,15 +73,23 @@ environments** that are hard to explore but topologically trivial.
 ## Install
 
 ```bash
-# directly from GitHub (no clone needed):
-pip install git+https://github.com/jcarlson212/TopoGym.git
+pip install topogym
+```
 
-# or for development:
+If that doesn't work (or you want the unreleased main branch), install
+directly from GitHub — no clone needed:
+
+```bash
+pip install git+https://github.com/jcarlson212/TopoGym.git
+```
+
+For development:
+
+```bash
 git clone https://github.com/jcarlson212/TopoGym.git && cd TopoGym
 pip install -e ".[testing]"
 ```
 
-`pip install topogym` from PyPI lands with the first tagged release.
 Dependencies: `gymnasium`, `numpy`. Nothing else.
 
 ## Quick start
