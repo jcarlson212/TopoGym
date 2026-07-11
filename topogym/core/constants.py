@@ -17,5 +17,7 @@ OBS_GOAL = 4
 OBS_OUT_OF_WORLD = 5  # beyond a WALL-type boundary of the base map
 OBS_UNSEEN = 6  # occluded by walls in the local view
 OBS_AGENT = 7  # only used in "global" observations / rendering
+OBS_DOOR_ONEWAY = 8  # a one-way door (valve); passable side discoverable by trying
+OBS_TRAPDOOR = 9  # a passage that seals permanently after one use
 
-OBS_MAX = 7
+OBS_MAX = 9
