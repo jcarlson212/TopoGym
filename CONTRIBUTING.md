@@ -46,6 +46,31 @@ ruff check .
 - [ ] SVG gallery regenerated if benchmarks changed
 - [ ] docs updated (README tables, gallery, or the environments guide)
 
+## Releasing (maintainers)
+
+Publishing to PyPI is automated via
+[`.github/workflows/release.yml`](.github/workflows/release.yml) using PyPI
+trusted publishing (no tokens). To cut a release:
+
+1. Bump the version in all three places (keep them identical):
+   - `pyproject.toml` → `version`
+   - `topogym/__init__.py` → `__version__`
+   - `CITATION.cff` → `version` (and `date-released`)
+2. Make sure `pytest -q` and `ruff check .` pass and the SVG gallery is
+   current (`python scripts/generate_assets.py`); commit and push.
+3. Create a GitHub release with a matching tag, e.g.:
+
+   ```bash
+   gh release create v0.2.0 --title "TopoGym v0.2.0" --notes "..."
+   ```
+
+   Publishing the release triggers the workflow, which builds the sdist +
+   wheel and uploads them to PyPI. Verify with
+   `pip install topogym==<version>` in a fresh environment.
+
+The workflow can also be re-run manually from the Actions tab
+(`workflow_dispatch`) if a publish fails after the release exists.
+
 ## Reporting issues
 
 Use the issue templates — for proposing environments there is a dedicated
