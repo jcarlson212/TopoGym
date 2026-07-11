@@ -39,6 +39,56 @@ ruff check .
 4. **Regenerate assets** when benchmark definitions change:
    `python scripts/generate_assets.py`.
 
+## Submitting changes (fork → branch → PR)
+
+TopoGym uses the standard GitHub fork workflow — you don't need write
+access to contribute:
+
+1. **Fork** the repo on GitHub (the *Fork* button on
+   [jcarlson212/TopoGym](https://github.com/jcarlson212/TopoGym), or
+   `gh repo fork jcarlson212/TopoGym --clone`).
+2. **Clone your fork** and add the main repo as `upstream`:
+
+   ```bash
+   git clone https://github.com/<you>/TopoGym.git
+   cd TopoGym
+   git remote add upstream https://github.com/jcarlson212/TopoGym.git
+   pip install -e ".[testing]"
+   ```
+
+3. **Create a branch** off an up-to-date `main` — never work on `main`
+   itself:
+
+   ```bash
+   git fetch upstream
+   git checkout -b feat/my-change upstream/main
+   ```
+
+   Prefixes we use: `feat/`, `fix/`, `env/` (new environments), `docs/`.
+4. **Make your changes**, keeping commits focused; run the checks locally
+   (`pytest -q`, `ruff check .`, and `python scripts/generate_assets.py`
+   if benchmarks changed).
+5. **Push to your fork** and open the PR against `jcarlson212/TopoGym`'s
+   `main`:
+
+   ```bash
+   git push -u origin feat/my-change
+   gh pr create --fill   # or use the "Compare & pull request" button
+   ```
+
+   The PR template checklist will guide you; CI runs the same tests and
+   lint on every PR.
+6. **Keep it up to date** if `main` moves under you:
+
+   ```bash
+   git fetch upstream && git rebase upstream/main
+   git push --force-with-lease
+   ```
+
+For new environments specifically, follow
+[docs/contributing_environments.md](docs/contributing_environments.md) —
+it walks the same fork → generate → verify → PR flow with the env tooling.
+
 ## PR checklist
 
 - [ ] `pytest -q` and `ruff check .` pass
