@@ -52,6 +52,28 @@ of the revealed information.
 | **shell**<br>spherical shell: a big void you can never enter | <img src="3d_bench_grid_small/shell.svg" width="220"/> | `b = [1, 0, 1, 0]` |
 | **control-maze3d**<br>control: perfect 3D maze, b1 = b2 = 0 | <img src="3d_bench_grid_small/control-maze3d.svg" width="220"/> | `b = [1, 0, 0, 0]` |
 
+## `2d_bench_grid_small_bridges`
+
+| env | preview | certified topology |
+|---|---|---|
+| **square-dumbbell**<br>two rooms, one narrow passage: b1 = 0, all bottleneck | <img src="2d_bench_grid_small_bridges/square-dumbbell.svg" width="220"/> | `b = [1, 0, 0]` |
+| **square-twin-passages**<br>two passages through one wall: the loop closure env | <img src="2d_bench_grid_small_bridges/square-twin-passages.svg" width="220"/> | `b = [1, 1, 0]` |
+| **square-moat-hidden**<br>a moat you can see across; one open bridge, one hidden | <img src="2d_bench_grid_small_bridges/square-moat-hidden.svg" width="220"/> | `b = [1, 1, 0]` |
+| **square-triple-rooms**<br>two dividing walls, three regions | <img src="2d_bench_grid_small_bridges/square-triple-rooms.svg" width="220"/> | `b = [1, 2, 0]` |
+| **cylinder-ring-gate**<br>a gate across the cylinder | <img src="2d_bench_grid_small_bridges/cylinder-ring-gate.svg" width="220"/> | `b = [1, 1, 0]` |
+| **torus-meridian**<br>a meridian wall on the torus: close the loop through the wrap | <img src="2d_bench_grid_small_bridges/torus-meridian.svg" width="220"/> | `b = [1, 3, 0]` |
+| **sphere-belt**<br>an equatorial belt with two passages | <img src="2d_bench_grid_small_bridges/sphere-belt.svg" width="220"/> | `b = [1, 1, 0]` |
+| **square-bridge-gauntlet**<br>a moat with a hidden bridge, plus a chamber and a decoy | <img src="2d_bench_grid_small_bridges/square-bridge-gauntlet.svg" width="220"/> | `b = [1, 3, 0]` |
+
+## `3d_bench_grid_small_bridges`
+
+| env | preview | certified topology |
+|---|---|---|
+| **box-dumbbell**<br>two chambers of space, one tunnel | <img src="3d_bench_grid_small_bridges/box-dumbbell.svg" width="220"/> | `b = [1, 0, 0, 0]` |
+| **box-two-tunnels**<br>two tunnels through one wall: b1 = 1 | <img src="3d_bench_grid_small_bridges/box-two-tunnels.svg" width="220"/> | `b = [1, 1, 0, 0]` |
+| **box-hidden-tunnel**<br>one tunnel open, one hidden | <img src="3d_bench_grid_small_bridges/box-hidden-tunnel.svg" width="220"/> | `b = [1, 1, 0, 0]` |
+| **solid-torus-gate**<br>a gate disc across the solid torus: the wrap loop passes it | <img src="3d_bench_grid_small_bridges/solid-torus-gate.svg" width="220"/> | `b = [1, 1, 1, 0]` |
+
 ## `3d_bench_grid_small_directed`
 
 | env | preview | certified topology |

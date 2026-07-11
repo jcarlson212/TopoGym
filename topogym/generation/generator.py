@@ -41,6 +41,7 @@ from topogym.generation.config import TopoGenConfig2D, TopoGenConfig3D
 from topogym.generation.graph import (
     asymmetry_block,
     build_directed_adjacency,
+    connectivity_block,
     reachable_from,
 )
 
@@ -65,6 +66,7 @@ class Feature:
     cells: tuple  # obstacle cells
     interior: tuple  # enterable interior (empty for holes/decoys)
     doors: tuple  # DoorSpecs
+    meta: dict | None = None  # feature-specific facts (e.g. partition gaps)
 
 
 @dataclass
@@ -221,7 +223,302 @@ _ROOM_LOOPS_3D = {"chamber": 0, "decoy": 0, "trap_room": 0,
                   "airlock": 1, "trapdoor_room": 1}
 
 
-def _solve_target_2d(cfg, base_info):
+# ---------------------------------------------------------------------------
+# Partitions (bridge-finding)
+# ---------------------------------------------------------------------------
+#
+# A partition is a dividing line (2D) or plane (3D) across the world with K
+# gap cells — the bridges. A line whose ends attach to WALL boundaries
+# merges with them, so its K+1 segments contribute K-1 obstacle components
+# (K=1 is a pure dumbbell: no homology change, only a bottleneck). A
+# *floating* line (a ring around a wrap axis or a cube-sphere belt) has no
+# boundary to attach to: its K arcs contribute K components. In 3D a plane
+# with K tunnel holes stays one attached piece and contributes K-1 loops.
+# Material "moat" uses HOLE cells: impassable but transparent, so the far
+# side is visible before it is reachable (observed-region H0 events).
+
+def _partition_axes_2d(base):
+    """Allowed (axis, floating) choices for a partition line on ``base``.
+
+    The line runs along ``axis``; it may not run across a flip seam (the
+    line would not close onto itself). ``None`` axis means cube-sphere belt.
+    """
+    from topogym.core.basemap import Boundary, CubeSphere2D, RectGluing2D
+
+    if isinstance(base, CubeSphere2D):
+        return [(None, True)]
+    assert isinstance(base, RectGluing2D)
+    out = []
+    for axis, rule in ((0, base.rule_x), (1, base.rule_y)):
+        if rule == Boundary.WRAP:
+            out.append((axis, True))
+        elif rule == Boundary.WALL:
+            out.append((axis, False))
+    return out
+
+
+def _plan_partitions_2d(cfg, base, rng):
+    """Pre-sample each partition's axis, gap count, and hidden-gap count so
+    that target-Betti solving can account for them exactly."""
+    if cfg.n_partitions == 0:
+        return []
+    axes = _partition_axes_2d(base)
+    if not axes:
+        raise GenerationError(
+            f"base {cfg.base!r} admits no partitions (every axis crosses a "
+            "flip seam)"
+        )
+    plan = []
+    for _ in range(cfg.n_partitions):
+        axis, floating = axes[int(rng.integers(len(axes)))]
+        k = _sample_tries(rng, cfg.partition_gaps)
+        if k < 1:
+            raise GenerationError("partitions need at least one gap")
+        n_hidden = min(k, _sample_tries(rng, cfg.partition_hidden_gaps))
+        plan.append({"axis": axis, "floating": floating, "n_gaps": k,
+                     "n_hidden": n_hidden})
+    return plan
+
+
+def _partition_axes_3d(base):
+    """Axes whose transverse plane attaches to WALL boundaries."""
+    from topogym.core.basemap import Boundary
+
+    out = []
+    for axis in range(3):
+        others = [k for k in range(3) if k != axis]
+        if all(base.rules[k] == Boundary.WALL for k in others):
+            out.append(axis)
+    return out
+
+
+def _plan_partitions_3d(cfg, base, rng):
+    if cfg.n_partitions == 0:
+        return []
+    axes = _partition_axes_3d(base)
+    if not axes:
+        raise GenerationError(
+            f"base {cfg.base!r} admits no partitions (a partition plane "
+            "must attach to wall boundaries on both transverse axes)"
+        )
+    plan = []
+    for _ in range(cfg.n_partitions):
+        axis = axes[int(rng.integers(len(axes)))]
+        k = _sample_tries(rng, cfg.partition_gaps)
+        if k < 1:
+            raise GenerationError("partitions need at least one gap")
+        n_hidden = min(k, _sample_tries(rng, cfg.partition_hidden_gaps))
+        plan.append({"axis": axis, "floating": False, "n_gaps": k,
+                     "n_hidden": n_hidden})
+    return plan
+
+
+def _partition_components_2d(partition_plan):
+    return sum(
+        p["n_gaps"] if p["floating"] else p["n_gaps"] - 1
+        for p in partition_plan
+    )
+
+
+def _partition_loops_3d(partition_plan):
+    return sum(p["n_gaps"] - 1 for p in partition_plan)
+
+
+def _choose_gap_positions(rng, length, k, floating, tries=80):
+    """K positions along the line, pairwise distance >= 2 (circular for
+    floating lines), keeping end segments non-empty on attached lines."""
+    candidates = list(range(length)) if floating else list(range(1, length - 1))
+    for _ in range(tries):
+        perm = list(rng.permutation(len(candidates)))
+        picked = []
+        for idx in perm:
+            pos = candidates[idx]
+            ok = True
+            for q in picked:
+                d = abs(pos - q)
+                if floating:
+                    d = min(d, length - d)
+                if d < 2:
+                    ok = False
+                    break
+            if ok:
+                picked.append(pos)
+            if len(picked) == k:
+                return sorted(picked)
+    return None
+
+
+def _partition_line_2d(base, rng, spec):
+    """The ordered cells of a partition line, or None to retry."""
+    from topogym.core.basemap import CubeSphere2D
+
+    if isinstance(base, CubeSphere2D):
+        cells = base.cells()
+        anchor = cells[int(rng.integers(len(cells)))]
+        state = base.initial_state(anchor)
+        for _ in range(int(rng.integers(4))):
+            state = base.turn_left(state)
+        line = []
+        s = state
+        for _ in range(4 * base.n):  # a straight belt closes after 4n steps
+            line.append(s.cell)
+            s = base.forward(s)
+        if s.cell != anchor or len(set(line)) != len(line):
+            return None
+        return line
+    axis = spec["axis"]
+    other = 1 - axis
+    length = (base.width, base.height)[axis]
+    span_other = (base.width, base.height)[other]
+    if span_other < 5:
+        return None
+    c = int(rng.integers(2, span_other - 2))
+    line = []
+    for i in range(length):
+        cell = [0, 0]
+        cell[axis] = i
+        cell[other] = c
+        line.append(tuple(cell))
+    return line
+
+
+def _ring_around_2d(base, cells_line):
+    """Chebyshev-1 neighborhood of the line (via the movement graph, so it
+    is correct across seams and cube edges)."""
+    line = set(cells_line)
+    near = set()
+    for c in cells_line:
+        for n in base.neighbors(c):
+            near.add(n)
+            for m in base.neighbors(n):
+                near.add(m)
+    return near - line
+
+
+def _place_partition_2d(cfg, base, rng, spec, cell_types, doors, features,
+                        reserved, n_tries=120):
+    from topogym.core.constants import DOOR as DOOR_CODE
+    from topogym.core.constants import HOLE as HOLE_CODE
+    from topogym.core.constants import WALL as WALL_CODE
+
+    material = HOLE_CODE if cfg.partition_material == "moat" else WALL_CODE
+    for _ in range(n_tries):
+        line = _partition_line_2d(base, rng, spec)
+        if line is None:
+            continue
+        gaps = _choose_gap_positions(
+            rng, len(line), spec["n_gaps"], spec["floating"]
+        )
+        if gaps is None:
+            continue
+        footprint = set(line)
+        if footprint & reserved:
+            continue
+        hidden = set(
+            gaps[int(i)] for i in rng.permutation(len(gaps))[: spec["n_hidden"]]
+        )
+        wall_cells, door_specs, gap_cells = [], [], []
+        for i, cell in enumerate(line):
+            if i in hidden:
+                d = DoorSpec(cell, "bump", tries=_sample_tries(rng, cfg.door_tries))
+                cell_types[cell] = DOOR_CODE
+                doors[cell] = d
+                door_specs.append(d)
+                gap_cells.append(cell)
+            elif i in gaps:
+                gap_cells.append(cell)  # an open bridge: stays EMPTY
+            else:
+                cell_types[cell] = material
+                wall_cells.append(cell)
+        features.append(Feature(
+            kind="partition", cells=tuple(wall_cells), interior=(),
+            doors=tuple(door_specs),
+            meta={"n_gaps": spec["n_gaps"], "floating": spec["floating"],
+                  "gaps": tuple(gap_cells),
+                  "material": cfg.partition_material},
+        ))
+        reserved.update(footprint | _ring_around_2d(base, line))
+        return
+    raise _RetryAttempt("could not place a partition")
+
+
+def _place_partition_3d(cfg, base, rng, spec, cell_types, doors, features,
+                        reserved, n_tries=120):
+    from topogym.core.constants import DOOR as DOOR_CODE
+    from topogym.core.constants import HOLE as HOLE_CODE
+    from topogym.core.constants import WALL as WALL_CODE
+
+    material = HOLE_CODE if cfg.partition_material == "moat" else WALL_CODE
+    axis = spec["axis"]
+    others = [k for k in range(3) if k != axis]
+    from topogym.core.basemap import Boundary
+
+    lo, hi = (0, base.size[axis]) if base.rules[axis] == Boundary.WRAP else (
+        2, base.size[axis] - 2
+    )
+    if hi <= lo:
+        raise _RetryAttempt("domain too small for a partition")
+    for _ in range(n_tries):
+        c = int(rng.integers(lo, hi))
+        plane = []
+        for i in range(base.size[others[0]]):
+            for j in range(base.size[others[1]]):
+                cell = [0, 0, 0]
+                cell[axis] = c
+                cell[others[0]] = i
+                cell[others[1]] = j
+                plane.append(tuple(cell))
+        footprint = set(plane)
+        if footprint & reserved:
+            continue
+        # Gap cells: pairwise Chebyshev >= 2 within the plane so each is an
+        # independent tunnel.
+        k = spec["n_gaps"]
+        gap_cells = []
+        for _ in range(200):
+            cand = plane[int(rng.integers(len(plane)))]
+            if all(
+                max(abs(a - b) for a, b in zip(cand, g)) >= 2
+                for g in gap_cells
+            ):
+                gap_cells.append(cand)
+            if len(gap_cells) == k:
+                break
+        if len(gap_cells) < k:
+            continue
+        hidden = set(
+            tuple(gap_cells[int(i)])
+            for i in rng.permutation(k)[: spec["n_hidden"]]
+        )
+        wall_cells, door_specs = [], []
+        for cell in plane:
+            if cell in hidden:
+                d = DoorSpec(cell, "bump", tries=_sample_tries(rng, cfg.door_tries))
+                cell_types[cell] = DOOR_CODE
+                doors[cell] = d
+                door_specs.append(d)
+            elif cell in set(gap_cells):
+                pass  # open tunnel
+            else:
+                cell_types[cell] = material
+                wall_cells.append(cell)
+        features.append(Feature(
+            kind="partition", cells=tuple(wall_cells), interior=(),
+            doors=tuple(door_specs),
+            meta={"n_gaps": k, "floating": False,
+                  "gaps": tuple(gap_cells),
+                  "material": cfg.partition_material},
+        ))
+        margin = set()
+        for cell in plane:
+            for n in base.neighbors(cell):
+                margin.add(n)
+        reserved.update(footprint | margin)
+        return
+    raise _RetryAttempt("could not place a 3D partition")
+
+
+def _solve_target_2d(cfg, base_info, partition_k=0):
     """Resolve n_holes from target_b1 if requested."""
     if cfg.target_b1 is None:
         return cfg.n_holes
@@ -230,6 +527,7 @@ def _solve_target_2d(cfg, base_info):
         + 2 * cfg.n_airlocks + 2 * cfg.n_trapdoor_rooms
         + (1 if cfg.base == "annulus" else 0)
         + (cfg.n_base_holes if cfg.base == "x_holes" else 0)
+        + partition_k
     )
     if rooms_k == 0 and cfg.target_b1 == expected_betti_2d(base_info, 0)[1]:
         return 0
@@ -290,7 +588,12 @@ def _attempt_2d(cfg: TopoGenConfig2D, rng) -> Layout:
         for c in walls:
             cell_types[c] = WALL
     elif cfg.style == "rooms":
-        plan = _feature_plan_2d(cfg, base, rng)
+        partition_plan = _plan_partitions_2d(cfg, base, rng)
+        for spec in partition_plan:
+            _place_partition_2d(
+                cfg, base, rng, spec, cell_types, doors, features, reserved,
+            )
+        plan = _feature_plan_2d(cfg, base, rng, partition_plan)
         for kind, shape_fn in plan:
             _place_feature_2d(
                 cfg, base, rng, kind, shape_fn, cell_types, doors, features,
@@ -302,9 +605,11 @@ def _attempt_2d(cfg: TopoGenConfig2D, rng) -> Layout:
     return _finalize_layout(cfg, base, cells, cell_types, doors, features, rng)
 
 
-def _feature_plan_2d(cfg, base, rng):
+def _feature_plan_2d(cfg, base, rng, partition_plan=()):
     """Ordered (kind, shape_fn) list; big/constrained features first."""
-    n_holes = _solve_target_2d(cfg, base.info)
+    n_holes = _solve_target_2d(
+        cfg, base.info, _partition_components_2d(partition_plan)
+    )
 
     def hole_shape(rng_):
         name = cfg.hole_shapes[int(rng_.integers(len(cfg.hole_shapes)))]
@@ -419,9 +724,9 @@ def generate_3d(cfg: TopoGenConfig3D, seed: int) -> Layout:
     )
 
 
-def _solve_targets_3d(cfg, base_info):
+def _solve_targets_3d(cfg, base_info, partition_loops=0):
     n_rings, n_blobs = cfg.n_rings, cfg.n_blobs
-    extra_loops = cfg.n_airlocks + cfg.n_trapdoor_rooms
+    extra_loops = cfg.n_airlocks + cfg.n_trapdoor_rooms + partition_loops
     if cfg.target_b1 is not None:
         n_rings = cfg.target_b1 - base_info.betti_z2[1] - extra_loops
         if n_rings < 0:
@@ -463,7 +768,14 @@ def _attempt_3d(cfg: TopoGenConfig3D, rng) -> Layout:
         for c in controls.maze_walls_3d(rng, *base.size):
             cell_types[c] = WALL
     elif cfg.style == "rooms":
-        n_rings, n_blobs = _solve_targets_3d(cfg, base.info)
+        partition_plan = _plan_partitions_3d(cfg, base, rng)
+        for spec in partition_plan:
+            _place_partition_3d(
+                cfg, base, rng, spec, cell_types, doors, features, reserved,
+            )
+        n_rings, n_blobs = _solve_targets_3d(
+            cfg, base.info, _partition_loops_3d(partition_plan)
+        )
 
         def blob_shape(rng_):
             name = cfg.blob_shapes[int(rng_.integers(len(cfg.blob_shapes)))]
@@ -645,12 +957,19 @@ def _finalize_metadata(cfg, layout: Layout, seed: int) -> TopologyMetadata:
         counts[f.kind] = counts.get(f.kind, 0) + 1
     get = counts.get
 
+    partitions = [f for f in layout.features if f.kind == "partition"]
+    partition_components = sum(
+        f.meta["n_gaps"] if f.meta["floating"] else f.meta["n_gaps"] - 1
+        for f in partitions
+    )
+
     if dim == 2:
         summary = analyze_2d(layout.base.face_cycle(c) for c in free)
         n_components = (
             get("hole", 0) + get("base_hole", 0) + get("chamber", 0)
             + get("decoy", 0) + get("trap_room", 0)
             + 2 * get("airlock", 0) + 2 * get("trapdoor_room", 0)
+            + partition_components
         )
         expected = expected_betti_2d(base_info, n_components)
         if cfg.style == "rooms" and summary.betti_z2 != expected:
@@ -679,7 +998,10 @@ def _finalize_metadata(cfg, layout: Layout, seed: int) -> TopologyMetadata:
             + get("chamber", 0) + get("decoy", 0) + get("trap_room", 0)
             + get("airlock", 0) + get("trapdoor_room", 0)
         )
-        n_loops = get("ring", 0) + get("airlock", 0) + get("trapdoor_room", 0)
+        n_loops = (
+            get("ring", 0) + get("airlock", 0) + get("trapdoor_room", 0)
+            + partition_components  # attached planes: K-1 loops each
+        )
         expected = expected_betti_3d(base_info, n_components, n_loops)
         if cfg.style == "rooms" and summary.betti_z2 != expected:
             raise _RetryAttempt(
@@ -711,6 +1033,8 @@ def _finalize_metadata(cfg, layout: Layout, seed: int) -> TopologyMetadata:
         "trapdoor_room": get("trapdoor_room", 0),
     }
 
+    connectivity = connectivity_block(set(free), layout.base.neighbors)
+
     bump_tries = tuple(sorted(
         d.tries for d in layout.doors.values() if d.kind == "bump"
     ))
@@ -738,11 +1062,14 @@ def _finalize_metadata(cfg, layout: Layout, seed: int) -> TopologyMetadata:
         betti_q_expected=betti_q_expected,
         h1_torsion=torsion,
         asymmetry=asym,
+        connectivity=connectivity,
+        n_partitions=len(partitions),
         certified={
             "betti_z2": True,
             "betti_q": certified_q,
             "h1_torsion": certified_q,
             "asymmetry": True,
+            "connectivity": True,
             "genus": dim == 2,
         },
         homology=homology_strings(betti_q, torsion or (), betti_z2),

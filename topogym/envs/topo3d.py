@@ -88,20 +88,29 @@ class TopoGrid3DEnv(TopoEnvCore):
         r = self.view_radius
         n = 2 * r + 1
         view = np.full((n, n, n), C.OBS_OUT_OF_WORLD, np.uint8)
+        cell_at = {}
         for dx in range(-r, r + 1):
             for dy in range(-r, r + 1):
                 for dz in range(-r, r + 1):
                     cell = self._offset_cell((dx, dy, dz))
                     if cell is not None:
-                        view[dx + r, dy + r, dz + r] = self._obs_code(cell)
-        return self._occlude(view, (r, r, r), self._BLOCKING)
+                        idx = (dx + r, dy + r, dz + r)
+                        view[idx] = self._obs_code(cell)
+                        cell_at[idx] = cell
+        out = self._occlude(view, (r, r, r), self._BLOCKING)
+        for idx, cell in cell_at.items():
+            if out[idx] != C.OBS_UNSEEN:
+                self._note_observed(cell, int(out[idx]))
+        return out
 
     def _global_obs(self):
         base = self.layout.base
         grid = np.full(base.size, C.OBS_OUT_OF_WORLD, np.uint8)
         agent = np.zeros(base.size, np.uint8)
         for cell in base.cells():
-            grid[cell] = self._obs_code(cell)
+            code = self._obs_code(cell)
+            grid[cell] = code
+            self._note_observed(cell, code)
         agent[self._agent_cell] = C.OBS_AGENT
         return np.stack([grid, agent])
 
