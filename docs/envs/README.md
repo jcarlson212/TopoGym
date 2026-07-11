@@ -16,7 +16,7 @@ of the revealed information.
 | **plane-6holes**<br>plane with 6 large holes: b1 = 6 | <img src="2d_bench_grid_small/plane-6holes.svg" width="220"/> | `b = [1, 6, 0]` |
 | **cylinder-rooms**<br>cylinder: one loop is the world itself | <img src="2d_bench_grid_small/cylinder-rooms.svg" width="220"/> | `b = [1, 4, 0]` |
 | **mobius-rooms**<br>Mobius band: crossing the seam mirrors you | <img src="2d_bench_grid_small/mobius-rooms.svg" width="220"/> | `b = [1, 4, 0]` |
-| **torus-holes**<br>torus with 2 holes: b1 = 4 | <img src="2d_bench_grid_small/torus-holes.svg" width="220"/> | `b = [1, 3, 0]` |
+| **torus-holes**<br>torus with 2 holes: b1 = 3 | <img src="2d_bench_grid_small/torus-holes.svg" width="220"/> | `b = [1, 3, 0]` |
 | **torus-rooms**<br>torus with chambers and a decoy | <img src="2d_bench_grid_small/torus-rooms.svg" width="220"/> | `b = [1, 5, 0]` |
 | **torus-goal-in-chamber**<br>the goal hides inside a chamber: doors must be found | <img src="2d_bench_grid_small/torus-goal-in-chamber.svg" width="220"/> | `b = [1, 5, 0]` |
 | **klein-rooms**<br>Klein bottle: torus-like but non-orientable | <img src="2d_bench_grid_small/klein-rooms.svg" width="220"/> | `b = [1, 4, 0]` |

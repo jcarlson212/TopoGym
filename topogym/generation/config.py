@@ -6,8 +6,7 @@ the reproducibility unit used everywhere (benchmarks pin both).
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from typing import Optional, Union
+from dataclasses import asdict, dataclass
 
 #: 2D base maps and presets accepted by :class:`TopoGenConfig2D.base`.
 #: Presets: "annulus" = square + one large central hole; "x_holes" =
@@ -24,7 +23,7 @@ class TopoGenConfig2D:
     """Configuration for the 2D environment generator."""
 
     base: str = "square"
-    size: Union[int, tuple] = 15
+    size: int | tuple = 15
     style: str = "rooms"  # "rooms" | "maze" | "zigzag" (controls)
 
     # -- undirected features ------------------------------------------------
@@ -44,7 +43,7 @@ class TopoGenConfig2D:
     trapdoor_escape_tries: tuple = (3, 6)
 
     # -- targets (override counts) ------------------------------------------
-    target_b1: Optional[int] = None  # solves n_holes if set
+    target_b1: int | None = None  # solves n_holes if set
 
     # -- task ----------------------------------------------------------------
     goal_in_chamber: bool = False
@@ -59,7 +58,7 @@ class TopoGenConfig3D:
     """Configuration for the 3D environment generator."""
 
     base: str = "box"
-    size: Union[int, tuple] = 12
+    size: int | tuple = 12
     style: str = "rooms"  # "rooms" | "maze" (control)
 
     # -- undirected features ------------------------------------------------
@@ -80,8 +79,8 @@ class TopoGenConfig3D:
     trapdoor_escape_tries: tuple = (3, 6)
 
     # -- targets --------------------------------------------------------------
-    target_b1: Optional[int] = None  # solves n_rings if set
-    target_b2: Optional[int] = None  # solves n_blobs if set
+    target_b1: int | None = None  # solves n_rings if set
+    target_b2: int | None = None  # solves n_blobs if set
 
     # -- task ------------------------------------------------------------------
     goal_in_chamber: bool = False

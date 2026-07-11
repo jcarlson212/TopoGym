@@ -94,7 +94,7 @@ _RAW = {
          _c2(base="cylinder", size=17, n_holes=1, n_chambers=1, n_decoys=1)),
         ("mobius-rooms", 107, "Mobius band: crossing the seam mirrors you",
          _c2(base="mobius", size=17, n_holes=1, n_chambers=1, n_decoys=1)),
-        ("torus-holes", 108, "torus with 2 holes: b1 = 4",
+        ("torus-holes", 108, "torus with 2 holes: b1 = 3",
          _c2(base="torus", size=15, n_holes=2, n_chambers=0, n_decoys=0)),
         ("torus-rooms", 109, "torus with chambers and a decoy",
          _c2(base="torus", size=17, n_holes=1, n_chambers=2, n_decoys=1)),
