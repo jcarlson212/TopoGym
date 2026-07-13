@@ -52,9 +52,10 @@ class TopoEnvCore(gym.Env):
     #: subclasses set: 2 or 3
     DIM = None
 
-    def __init__(self, config=None, *, layout_seed=None, obs_mode="local",
-                 view_radius=None, reward_mode="goal", max_steps=None,
-                 render_mode=None, reveal_hidden=False, **overrides):
+    def __init__(self, config=None, *, layout=None, layout_seed=None,
+                 obs_mode="local", view_radius=None, reward_mode="goal",
+                 max_steps=None, render_mode=None, reveal_hidden=False,
+                 **overrides):
         cfg = config if config is not None else self._default_config()
         if isinstance(cfg, dict):
             cfg = self._config_class()(**cfg)
@@ -72,7 +73,9 @@ class TopoEnvCore(gym.Env):
         self.reveal_hidden = reveal_hidden
 
         self.layout = None
-        self._fixed_layout = None
+        # A prebuilt layout (e.g. a compiled product space) bypasses the
+        # generator entirely; it is fixed across episodes.
+        self._fixed_layout = layout
         self._build_spaces()
 
     # -- subclass hooks -----------------------------------------------------
@@ -93,9 +96,10 @@ class TopoEnvCore(gym.Env):
     # -- layout / episode state ---------------------------------------------
 
     def _obtain_layout(self):
+        if self._fixed_layout is not None:
+            return self._fixed_layout
         if self.layout_seed is not None:
-            if self._fixed_layout is None:
-                self._fixed_layout = self._generate(self.layout_seed)
+            self._fixed_layout = self._generate(self.layout_seed)
             return self._fixed_layout
         return self._generate(int(self.np_random.integers(2 ** 31 - 1)))
 
@@ -116,7 +120,12 @@ class TopoEnvCore(gym.Env):
     @property
     def topology(self):
         """Certified :class:`TopologyMetadata` of the current layout."""
-        return self.layout.metadata
+        layout = self.layout if self.layout is not None else self._fixed_layout
+        if layout is None:
+            raise RuntimeError(
+                "no layout yet: call reset() (or pass layout=/layout_seed=)"
+            )
+        return layout.metadata
 
     def visited_betti(self):
         """Z/2 Betti numbers of the region *physically visited* so far.
