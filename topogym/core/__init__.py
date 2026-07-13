@@ -1,4 +1,4 @@
-"""Core abstractions: base manifolds, cubical homology, metadata."""
+"""Core abstractions: base manifolds, GUDHI-backed homology, metadata."""
 
 from topogym.core import constants
 from topogym.core.basemap import (
@@ -19,7 +19,6 @@ from topogym.core.homology import (
     Surface2DSummary,
     analyze_2d,
     analyze_3d,
-    gf2_rank,
 )
 
 __all__ = [
@@ -39,5 +38,4 @@ __all__ = [
     "Complex3DSummary",
     "analyze_2d",
     "analyze_3d",
-    "gf2_rank",
 ]

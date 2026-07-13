@@ -20,13 +20,18 @@ is topologically exactly S^2.
 
 Base maps are responsible for three things:
 
-1. **Movement with parallel transport.** ``forward/turn_left/turn_right`` act
-   on an :class:`AgentState` (cell + local frame). Crossing a ``flip`` seam
-   mirrors the frame (that is non-orientability, experienced first-hand);
-   walking over a cube edge rotates it.
-2. **Canonical geometry for homology.** ``face_cycle`` returns each cell's
-   corner vertices as canonical ids with seam identifications applied, so a
-   single generic cubical-homology routine works for every base map.
+1. **Canonical geometry.** ``face_cycle`` returns each cell's corner
+   vertices as canonical ids with seam identifications applied. This is
+   the *gluing specification* — it fully determines the cell complex
+   (:mod:`topogym.complexes`) that everything else derives from.
+2. **Movement with parallel transport.** ``forward/turn_left/turn_right``
+   act on an :class:`AgentState` (cell + local frame). Movement across
+   cells is computed **on the cell complex**: walking out of a side asks
+   the complex which cell is glued there, through which side you enter,
+   and whether the crossing reverses handedness (the ``flip`` bit). A
+   Möbius seam mirroring the frame and a cube-sphere corner's quarter-turn
+   holonomy both fall out of the complex's gluing data — there is no
+   per-surface seam arithmetic. Turns are local chart operations.
 3. **A 2D layout for rendering** (``layout_coords``), e.g. the unfolded
    cross net for the cube-sphere.
 
@@ -39,7 +44,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import cache
+from functools import cache, cached_property
+
+from topogym.complexes.cell_complex import CellComplex2D, CellComplex3D
 
 
 class Boundary:
@@ -115,6 +122,16 @@ class BaseMap2D(ABC):
         """(n_cols, n_rows) of the drawing canvas in cells."""
 
     # -- derived helpers ---------------------------------------------------
+
+    @cached_property
+    def complex(self) -> CellComplex2D:
+        """The surface's cell complex — the source of truth for movement.
+
+        Built once from ``face_cycle`` (the gluing specification); crossing
+        a cell boundary is answered by :meth:`CellComplex2D.cross`, never
+        by per-surface seam arithmetic.
+        """
+        return CellComplex2D((c, self.face_cycle(c)) for c in self.cells())
 
     def neighbor_states(self, cell) -> list:
         """Agent states reachable in one step (4 directions), with frames."""
@@ -200,27 +217,24 @@ class RectGluing2D(BaseMap2D):
         fx, fy, rx, ry = state.frame
         return AgentState(state.cell, (rx, ry, -fx, -fy))
 
+    #: Outward direction of side ``k`` (side k = edge from ``cycle[k]`` to
+    #: ``cycle[k+1]`` of ``face_cycle``'s corner order).
+    _SIDE_DIR = ((0, -1), (1, 0), (0, 1), (-1, 0))
+
     def forward(self, state: AgentState) -> AgentState | None:
-        (x, y), (fx, fy, rx, ry) = state.cell, state.frame
-        nx, ny = x + fx, y + fy
-        w, h = self.width, self.height
-        if nx < 0 or nx >= w:
-            rule = self.rule_x
-            if rule == Boundary.WALL:
-                return None
-            nx %= w
-            if rule == Boundary.FLIP:
-                ny = h - 1 - ny
-                fy, ry = -fy, -ry  # crossing the x-seam mirrors the y-axis
-        elif ny < 0 or ny >= h:
-            rule = self.rule_y
-            if rule == Boundary.WALL:
-                return None
-            ny %= h
-            if rule == Boundary.FLIP:
-                nx = w - 1 - nx
-                fx, rx = -fx, -rx
-        return AgentState((nx, ny), (fx, fy, rx, ry))
+        fx, fy, rx, ry = state.frame
+        side = self._SIDE_DIR.index((fx, fy))
+        crossing = self.complex.cross(state.cell, side)
+        if crossing is None:  # a WALL boundary: the edge has no other side
+            return None
+        ncell, entered, flip = crossing
+        heading = (entered + 2) % 4  # in through one side, face the opposite
+        chirality = fx * ry - fy * rx
+        if flip:
+            chirality = -chirality
+        f = self._SIDE_DIR[heading]
+        r = self._SIDE_DIR[(heading + chirality) % 4]
+        return AgentState(ncell, (f[0], f[1], r[0], r[1]))
 
     # -- canonical vertices ------------------------------------------------
 
@@ -370,16 +384,24 @@ class CubeSphere2D(BaseMap2D):
         n = self._normal(state.cell)
         return AgentState(state.cell, _cross(state.frame, n))
 
+    def _side_outward(self, cell, side):
+        """Outward unit tangent of side ``side``: edge midpoint - center."""
+        cyc = self.face_cycle(cell)
+        a, b = cyc[side], cyc[(side + 1) % 4]
+        return tuple((a[k] + b[k]) // 2 - cell[k] for k in range(3))
+
     def forward(self, state: AgentState) -> AgentState | None:
-        c, f = state.cell, state.frame
-        m = 2 * self.n
-        cand = _add(c, (2 * f[0], 2 * f[1], 2 * f[2]))
-        axis = self._face_axis(c)
-        in_face = all(1 <= cand[k] <= m - 1 for k in range(3) if k != axis)
-        if in_face:
-            return AgentState(cand, f)
-        n = self._normal(c)
-        return AgentState(_sub(_add(c, f), n), _neg(n))
+        cell, f = state.cell, state.frame
+        side = next(
+            k for k in range(4) if self._side_outward(cell, k) == f
+        )
+        crossing = self.complex.cross(cell, side)
+        if crossing is None:  # cannot happen: S^2 is closed
+            return None
+        ncell, entered, _flip = crossing
+        # The new forward vector is the inward tangent of the entered side;
+        # pivoting over a cube edge (frame -> -normal) is this crossing.
+        return AgentState(ncell, self._side_outward(ncell, (entered + 2) % 4))
 
     def face_cycle(self, cell):
         axis = self._face_axis(cell)
@@ -478,15 +500,16 @@ class RectGluing3D:
             (x, y, z) for z in range(d) for y in range(h) for x in range(w)
         ]
 
+    @cached_property
+    def complex(self) -> CellComplex3D:
+        """The box's cell complex — the source of truth for movement."""
+        return CellComplex3D((c, self.cube_corners(c)) for c in self.cells())
+
     def step_dir(self, cell, direction) -> tuple | None:
-        nxt = list(cell)
-        for k in range(3):
-            nxt[k] += direction[k]
-            if nxt[k] < 0 or nxt[k] >= self.size[k]:
-                if self.rules[k] == Boundary.WALL:
-                    return None
-                nxt[k] %= self.size[k]
-        return tuple(nxt)
+        axis = next(k for k in range(3) if direction[k])
+        face_index = 2 * axis + (1 if direction[axis] > 0 else 0)
+        crossing = self.complex.cross(cell, face_index)
+        return None if crossing is None else crossing[0]
 
     def neighbors(self, cell):
         out = []
