@@ -25,7 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = ["gymnasium>=0.29", "numpy>=1.21"]
+dependencies = ["gymnasium>=0.29", "numpy>=1.21", "gudhi>=3.8"]
 
 [project.optional-dependencies]
 testing = ["pytest>=7.0"]

@@ -1,11 +1,11 @@
-"""Certified cubical homology over Z/2 for TopoGym free spaces.
+"""Certified homology of TopoGym free spaces, computed by GUDHI.
 
 Given the set of *free* (traversable) cells of a base map, we build the
-cubical complex of the free region and compute its Betti numbers over the
-field Z/2 by Gaussian elimination on boundary matrices. Z/2 coefficients
-make orientation bookkeeping unnecessary and — unlike rational coefficients
-— they *see* the torsion classes of RP^2 and the Klein bottle
-(``b1_z2(RP^2) = 1`` while ``b1_q(RP^2) = 0``).
+cell complex of the free region and compute its Betti numbers over Z/2 with
+GUDHI (:mod:`topogym.complexes`). Z/2 coefficients make orientation
+bookkeeping unnecessary and — unlike rational coefficients — they *see* the
+torsion classes of RP^2 and the Klein bottle (``b1_z2(RP^2) = 1`` while
+``b1_q(RP^2) = 0``).
 
 Open-region convention
 ----------------------
@@ -27,46 +27,17 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-# ---------------------------------------------------------------------------
-# GF(2) linear algebra
-# ---------------------------------------------------------------------------
+from topogym.complexes.cell_complex import CellComplex2D, _UnionFind
+from topogym.complexes.gudhi_backend import betti_of_poset
 
-def gf2_rank(rows) -> int:
-    """Rank over GF(2) of a matrix given as an iterable of int bitmasks."""
-    pivots = {}
-    rank = 0
-    for row in rows:
-        while row:
-            p = row.bit_length() - 1
-            if p in pivots:
-                row ^= pivots[p]
-            else:
-                pivots[p] = row
-                rank += 1
-                break
-    return rank
-
-
-class _UnionFind:
-    def __init__(self):
-        self.parent = {}
-
-    def find(self, a):
-        parent = self.parent
-        if a not in parent:
-            parent[a] = a
-            return a
-        root = a
-        while parent[root] != root:
-            root = parent[root]
-        while parent[a] != root:
-            parent[a], a = root, parent[a]
-        return root
-
-    def union(self, a, b):
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self.parent[max(ra, rb)] = min(ra, rb)
+__all__ = [
+    "Complex3DSummary",
+    "Surface2DSummary",
+    "analyze_2d",
+    "analyze_3d",
+    "free_complex_2d",
+    "free_poset_3d",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +100,20 @@ def _regularize_2d(cycles):
     ]
 
 
+def free_complex_2d(keyed_cycles) -> CellComplex2D:
+    """The regularized cell complex of a 2D free space, with face keys.
+
+    ``keyed_cycles``: iterable of ``(cell, face_cycle(cell))`` pairs. Face
+    keys are preserved — the complex's faces *are* the environment's cells,
+    so exploration analytics can index it by agent position — while
+    vertices are regularized per the open-region convention.
+    """
+    keyed_cycles = list(keyed_cycles)
+    keys = [k for k, _ in keyed_cycles]
+    reg = _regularize_2d([cyc for _, cyc in keyed_cycles])
+    return CellComplex2D(zip(keys, reg))
+
+
 def analyze_2d(cycles) -> Surface2DSummary:
     """Certified invariants for a 2D free space.
 
@@ -143,83 +128,17 @@ def analyze_2d(cycles) -> Surface2DSummary:
             n_boundary_components=0, orientable=None, genus=None,
             demigenus=None,
         )
-    reg = _regularize_2d(cycles)
+    complex_ = free_complex_2d(enumerate(cycles))
 
-    vertices = sorted({v for cyc in reg for v in cyc})
-    v_index = {v: i for i, v in enumerate(vertices)}
-    edge_faces = defaultdict(list)
-    for fi, cyc in enumerate(reg):
-        for k in range(4):
-            edge_faces[frozenset((cyc[k], cyc[(k + 1) % 4]))].append(fi)
-    edges = sorted(edge_faces, key=sorted)
-    e_index = {e: i for i, e in enumerate(edges)}
-
-    d1_rows = [
-        sum(1 << v_index[v] for v in e) for e in edges
-    ]
-    d2_rows = [
-        # XOR handles nothing here (edges of a face are distinct), sum is safe
-        sum(1 << e_index[frozenset((cyc[k], cyc[(k + 1) % 4]))] for k in range(4))
-        for cyc in reg
-    ]
-    r1 = gf2_rank(d1_rows)
-    r2 = gf2_rank(d2_rows)
-    n_v, n_e, n_f = len(vertices), len(edges), len(reg)
-    betti = (n_v - r1, n_e - r1 - r2, n_f - r2)
-    chi = n_v - n_e + n_f
-
-    # Manifold check. After regularization vertices are always fine; the
-    # only possible failure is an edge shared by 3+ faces, which cannot
-    # happen on our base maps — but verify rather than assume.
-    is_manifold = all(len(fis) <= 2 for fis in edge_faces.values())
+    betti = complex_.betti(field=2)
+    chi = complex_.euler_characteristic
+    n_v, n_e, n_f = complex_.n_vertices, complex_.n_edges, complex_.n_faces
+    is_manifold = complex_.is_manifold
 
     n_boundary = orientable = genus = demigenus = None
     if is_manifold:
-        # Boundary circles: edges with exactly one incident face.
-        buf = _UnionFind()
-        boundary_verts = set()
-        for e, fis in edge_faces.items():
-            if len(fis) == 1:
-                a, b = tuple(e)
-                boundary_verts.update((a, b))
-                buf.union(a, b)
-        n_boundary = len({buf.find(v) for v in boundary_verts})
-
-        # Orientability: try to orient all faces consistently. Faces f, g
-        # sharing edge (u, v) are consistent iff they traverse it in
-        # opposite directions.
-        directed = defaultdict(dict)  # edge -> {face: direction bit}
-        for fi, cyc in enumerate(reg):
-            for k in range(4):
-                u, w = cyc[k], cyc[(k + 1) % 4]
-                directed[frozenset((u, w))][fi] = 0 if (u, w) == tuple(
-                    sorted((u, w), key=repr)
-                ) else 1
-        face_adj = defaultdict(list)  # face -> [(other face, must_flip)]
-        for e, fis in edge_faces.items():
-            if len(fis) == 2:
-                f, g = fis
-                same_dir = directed[e][f] == directed[e][g]
-                face_adj[f].append((g, same_dir))
-                face_adj[g].append((f, same_dir))
-        orient = {}
-        orientable = True
-        for start in range(n_f):
-            if start in orient:
-                continue
-            orient[start] = 0
-            stack = [start]
-            while stack and orientable:
-                f = stack.pop()
-                for g, must_flip in face_adj[f]:
-                    want = orient[f] ^ (1 if must_flip else 0)
-                    if g not in orient:
-                        orient[g] = want
-                        stack.append(g)
-                    elif orient[g] != want:
-                        orientable = False
-                        break
-
+        n_boundary = complex_.n_boundary_components()
+        orientable = complex_.orientable()
         if betti[0] == 1:  # genus is reported for connected surfaces
             if orientable:
                 genus = (2 - n_boundary - chi) // 2
@@ -267,33 +186,34 @@ for _axis in range(3):
         _CUBE_SQUARES.append(tuple(_cyc))
 
 
-def analyze_3d(corner_maps) -> Complex3DSummary:
-    """Certified invariants for a 3D free space.
+def free_poset_3d(keyed_corner_maps):
+    """The regularized face poset of a 3D free space, with cube keys.
 
-    ``corner_maps``: one dict per free cell mapping corner bits
-    ``(dx, dy, dz)`` to canonical geometric vertex ids (from
-    ``RectGluing3D.cube_corners``).
+    ``keyed_corner_maps``: iterable of ``(cell, cube_corners(cell))``. Cube
+    keys are preserved (poset top cells are ``("c", cell)``); edges and
+    vertices are split per fan component (open-region convention).
+
+    Returns ``(tops, faces_of, counts)`` where ``counts`` is
+    ``(n_vertices, n_edges, n_squares, n_cubes)`` of the regularized
+    complex.
     """
-    corner_maps = list(corner_maps)
-    n_c = len(corner_maps)
-    if n_c == 0:
-        return Complex3DSummary((0, 0, 0, 0), 0, 0, 0, 0, 0)
+    keyed_corner_maps = list(keyed_corner_maps)
 
     # Geometric squares with incident cubes.
-    sq_cubes = defaultdict(list)  # frozenset(4 verts) -> [cube index]
+    sq_cubes = defaultdict(list)  # frozenset(4 verts) -> [cube key]
     sq_cycle = {}
-    cube_squares = []  # cube index -> [square keys]
-    for ci, corners in enumerate(corner_maps):
+    cube_squares = {}  # cube key -> [square keys]
+    for ck, corners in keyed_corner_maps:
         if len(set(corners.values())) != 8:
             raise ValueError("degenerate cube: base map too small for its gluing")
         keys = []
         for cyc_bits in _CUBE_SQUARES:
             cyc = tuple(corners[b] for b in cyc_bits)
             key = frozenset(cyc)
-            sq_cubes[key].append(ci)
+            sq_cubes[key].append(ck)
             sq_cycle.setdefault(key, cyc)
             keys.append(key)
-        cube_squares.append(keys)
+        cube_squares[ck] = keys
 
     # Fan components of cubes around each geometric edge and vertex: two
     # cubes are connected at an edge/vertex iff they share a *square*
@@ -312,69 +232,57 @@ def analyze_3d(corner_maps) -> Complex3DSummary:
             vert_uf[v].find(cubes[0])
             for other in cubes[1:]:
                 vert_uf[v].union(cubes[0], other)
-    # Make sure every incident cube is registered (singletons included).
-    for ci, corners in enumerate(corner_maps):
-        for v in corners.values():
-            vert_uf[v].find(ci)
-        for key in cube_squares[ci]:
-            cyc = sq_cycle[key]
-            for k in range(4):
-                e = frozenset((cyc[k], cyc[(k + 1) % 4]))
-                edge_uf[e].find(ci)
 
-    def edge_id(e, ci):
-        return (e, edge_uf[e].find(ci))
-
-    def vert_id(v, ci):
-        return (v, vert_uf[v].find(ci))
-
-    squares = sorted(sq_cubes, key=lambda k: sorted(k, key=repr))
-    sq_index = {k: i for i, k in enumerate(squares)}
-
-    # Rewritten edges and vertices, via any incident cube of each square
-    # (all incident cubes of a square agree on the fan components).
-    edge_index = {}
-    edge_verts = {}
+    # Regularized cells: squares keep their geometric key (all incident
+    # cubes of a square agree on its fans); edges and vertices are split
+    # per fan component.
     sq_edges = {}
-    for key in squares:
-        ci = sq_cubes[key][0]
+    edge_verts = {}
+    for key, cubes in sq_cubes.items():
+        ck = cubes[0]
         cyc = sq_cycle[key]
         eids = []
         for k in range(4):
             u, w = cyc[k], cyc[(k + 1) % 4]
             e = frozenset((u, w))
-            eid = edge_id(e, ci)
-            if eid not in edge_index:
-                edge_index[eid] = len(edge_index)
-                edge_verts[eid] = (vert_id(u, ci), vert_id(w, ci))
+            eid = (e, edge_uf[e].find(ck))
+            if eid not in edge_verts:
+                edge_verts[eid] = (
+                    (u, vert_uf[u].find(ck)), (w, vert_uf[w].find(ck))
+                )
             eids.append(eid)
         sq_edges[key] = eids
 
-    vertices = sorted({v for pair in edge_verts.values() for v in pair}, key=repr)
-    v_index = {v: i for i, v in enumerate(vertices)}
+    def faces_of(cell):
+        tag, key = cell
+        if tag == "c":
+            return [("s", sq) for sq in cube_squares[key]]
+        if tag == "s":
+            return [("e", eid) for eid in sq_edges[key]]
+        if tag == "e":
+            return [("v", v) for v in edge_verts[key]]
+        return []
 
-    d1_rows = [
-        (1 << v_index[edge_verts[eid][0]]) ^ (1 << v_index[edge_verts[eid][1]])
-        for eid in edge_index
-    ]
-    d2_rows = []
-    for key in squares:
-        row = 0
-        for eid in sq_edges[key]:
-            row ^= 1 << edge_index[eid]
-        d2_rows.append(row)
-    d3_rows = []
-    for keys in cube_squares:
-        row = 0
-        for key in keys:
-            row ^= 1 << sq_index[key]
-        d3_rows.append(row)
+    tops = [("c", ck) for ck, _ in keyed_corner_maps]
+    n_v = len({v for pair in edge_verts.values() for v in pair})
+    counts = (n_v, len(edge_verts), len(sq_cubes), len(keyed_corner_maps))
+    return tops, faces_of, counts
 
-    r1 = gf2_rank(d1_rows)
-    r2 = gf2_rank(d2_rows)
-    r3 = gf2_rank(d3_rows)
-    n_v, n_e, n_s = len(vertices), len(edge_index), len(squares)
-    betti = (n_v - r1, n_e - r1 - r2, n_s - r2 - r3, n_c - r3)
+
+def analyze_3d(corner_maps) -> Complex3DSummary:
+    """Certified invariants for a 3D free space.
+
+    ``corner_maps``: one dict per free cell mapping corner bits
+    ``(dx, dy, dz)`` to canonical geometric vertex ids (from
+    ``RectGluing3D.cube_corners``).
+    """
+    corner_maps = list(corner_maps)
+    if not corner_maps:
+        return Complex3DSummary((0, 0, 0, 0), 0, 0, 0, 0, 0)
+
+    tops, faces_of, counts = free_poset_3d(enumerate(corner_maps))
+    betti = betti_of_poset(tops, faces_of, 3, field=2)
+    n_v, n_e, n_s, n_c = counts
     chi = n_v - n_e + n_s - n_c
     return Complex3DSummary(
         betti_z2=betti, euler_characteristic=chi, n_vertices=n_v,
