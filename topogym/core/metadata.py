@@ -114,6 +114,12 @@ class TopologyMetadata:
 
     n_partitions: int = 0  # dividing walls/moats with bridge passages
 
+    # -- product provenance (set for compiled product spaces) ----------------
+    # {"factors": [{name, dim, betti_z2, betti_q}, ...],
+    #  "kunneth_cross_check": "passed"} — the computed free-space homology
+    # was verified against the Künneth formula applied to the factors.
+    product: dict | None = None
+
     certified: dict = field(default_factory=dict)
     homology: dict = field(default_factory=dict)
 

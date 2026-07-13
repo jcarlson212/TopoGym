@@ -36,9 +36,11 @@ class TopoGrid3DEnv(TopoEnvCore):
                 0, C.OBS_MAX, shape=(2 * r + 1,) * 3, dtype=np.uint8
             )
         elif self.obs_mode == "global":
-            probe = self._generate(self.layout_seed or 0)
-            if self.layout_seed is not None:
-                self._fixed_layout = probe
+            probe = self._fixed_layout
+            if probe is None:
+                probe = self._generate(self.layout_seed or 0)
+                if self.layout_seed is not None:
+                    self._fixed_layout = probe
             w, h, d = probe.base.size
             self.observation_space = spaces.Box(
                 0, C.OBS_MAX, shape=(2, w, h, d), dtype=np.uint8
