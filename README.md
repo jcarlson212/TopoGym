@@ -163,7 +163,7 @@ everyone runs byte-identical environments. Suggested protocol (≥5 agent
 seeds, coverage + Betti-recovery curves, always include the controls):
 see [docs/reference.md](docs/reference.md) and [`examples/`](examples/).
 
-## Community & contributing 🤝
+## Community & contributing
 
 - **Discord**: [join us](https://discord.gg/2Sn6cTYbbw) to discuss
   benchmarks, results, and topology questions.

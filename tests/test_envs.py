@@ -15,6 +15,8 @@ from topogym.generation import TopoGenConfig2D
     dict(base="sphere", size=6, layout_seed=5),
     dict(base="mobius", size=15, layout_seed=6),
     dict(base="square", size=19, n_trap_rooms=1, n_holes=1, layout_seed=7),
+    dict(actions="egocentric", layout_seed=3),
+    dict(obs_mode="local", layout_seed=3),
 ])
 def test_check_env_2d(kwargs):
     env = gym.make("TopoGym/Grid2D-v0", **kwargs).unwrapped
@@ -36,7 +38,7 @@ def test_episode_determinism():
         trace = [obs.tobytes()]
         rng = np.random.default_rng(0)
         for _ in range(40):
-            obs, r, term, trunc, _ = env.step(int(rng.integers(3)))
+            obs, r, term, trunc, _ = env.step(int(rng.integers(4)))
             trace.append((obs.tobytes(), r, term, trunc))
         return trace
 
@@ -109,7 +111,8 @@ def test_trapdoor_seals_after_use():
 
 def test_goal_reward_and_termination():
     env = _door_env(base="square", size=15, n_holes=1, n_chambers=0,
-                    n_decoys=0, layout_seed=4)
+                    n_decoys=0, layout_seed=4, actions="egocentric",
+                    reward_mode="goal")
     # Teleport next to the goal: neighbor_states(goal) yields states one
     # step away from it; a half-turn faces the agent back toward the goal.
     base = env.layout.base
@@ -141,7 +144,8 @@ def test_visited_betti_hook():
 
 
 def test_local_obs_is_egocentric_and_occluded():
-    env = _door_env(base="square", size=15, layout_seed=7)
+    env = _door_env(base="square", size=15, layout_seed=7,
+                    actions="egocentric")
     obs, _ = env.reset(seed=1)
     r = env.view_radius
     assert obs.shape == (2 * r + 1, 2 * r + 1)
@@ -179,6 +183,118 @@ def test_config_object_and_overrides():
 
 
 # ---------------------------------------------------------------------------
+# The universal (spec) interface: fourway actions, vector obs, p_slip,
+# reward modes
+# ---------------------------------------------------------------------------
+
+def test_fourway_default_spaces():
+    env = gym.make("TopoGym/Grid2D-v0", layout_seed=3).unwrapped
+    assert env.action_space.n == 4
+    obs, _ = env.reset(seed=0)
+    assert obs.shape == (18,) and obs.dtype == np.float32
+    assert (obs[2:] == 0).all()  # texture block zero outside Texture variants
+    x, y = env.layout.base.layout_coords(env._state.cell)
+    assert (obs[0], obs[1]) == (x, y)
+
+
+@pytest.mark.parametrize("base", ["square", "torus", "mobius", "klein"])
+def test_fourway_moves_are_inverses(base):
+    env = gym.make("TopoGym/Grid2D-v0", base=base, size=15,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    for a, b in ((0, 1), (1, 0), (2, 3), (3, 2)):
+        cell = env._state.cell
+        env.step(a)
+        if env._state.cell != cell:  # the move happened
+            env.step(b)
+            assert env._state.cell == cell
+
+
+def test_fourway_moves_one_cell():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    base = env.layout.base
+    for action in range(4):
+        x0, y0 = base.layout_coords(env._state.cell)
+        env.step(action)
+        x1, y1 = base.layout_coords(env._state.cell)
+        assert abs(x1 - x0) + abs(y1 - y0) <= 1
+
+
+def test_p_slip_validation_and_determinism():
+    with pytest.raises(ValueError):
+        gym.make("TopoGym/Grid2D-v0", p_slip=1.5, layout_seed=1)
+
+    def rollout(p):
+        env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                       p_slip=p, layout_seed=6).unwrapped
+        env.reset(seed=9)
+        return [env.step(0)[4]["position"] for _ in range(48)]
+
+    assert rollout(1.0) == rollout(1.0)  # seeded slips are reproducible
+    assert rollout(1.0) != rollout(0.0)  # and actually resample actions
+
+
+def test_reward_mode_validation():
+    with pytest.raises(ValueError):
+        gym.make("TopoGym/Grid2D-v0", reward_mode="explore", layout_seed=1)
+
+
+def test_default_is_reward_free():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   layout_seed=5, max_steps=25).unwrapped
+    env.reset(seed=0)
+    assert env.reward_mode == "none"
+    assert sum(env.step(int(a % 4))[1] for a in range(25)) == 0.0
+
+
+def test_sparse_reward_terminates_with_unit_payout():
+    env = _door_env(base="square", size=15, n_holes=1, n_chambers=0,
+                    n_decoys=0, layout_seed=4, actions="egocentric",
+                    reward_mode="sparse")
+    base = env.layout.base
+    nbr_state = base.neighbor_states(env.layout.goal)[0]
+    env._state = base.turn_left(base.turn_left(nbr_state))
+    _, reward, terminated, _, _ = env.step(env.ACTION_FORWARD)
+    assert terminated and reward == 1.0
+
+
+def test_coverage_reward_counts_first_visits():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   reward_mode="coverage", layout_seed=5).unwrapped
+    env.reset(seed=0)
+    rng = np.random.default_rng(2)
+    total = sum(env.step(int(rng.integers(4)))[1] for _ in range(60))
+    assert total == len(env._visited) - 1  # start cell gives no reward
+
+
+def test_deceptive_reward_field_and_shaping():
+    env = _door_env(base="square", size=15, n_holes=1, n_chambers=0,
+                    n_decoys=0, layout_seed=4, actions="egocentric",
+                    reward_mode="deceptive")
+    truth = env.deception
+    assert truth["field"][truth["distractor"]] == 0
+    assert set(truth["field"]) == set(env.layout.free_cells)
+    # Teleport next to the distractor and step onto it: distance drops
+    # from the start's value, so the shaping reward is positive.
+    base = env.layout.base
+    d_start = truth["field"][env.layout.start]
+    assert d_start > 1
+    nbr_state = base.neighbor_states(truth["distractor"])[0]
+    env._state = base.turn_left(base.turn_left(nbr_state))
+    _, reward, terminated, _, _ = env.step(env.ACTION_FORWARD)
+    assert reward > 0 and not terminated
+    # Goal payout still terminates.
+    nbr_state = base.neighbor_states(env.layout.goal)[0]
+    env._state = base.turn_left(base.turn_left(nbr_state))
+    _, reward, terminated, _, _ = env.step(env.ACTION_FORWARD)
+    assert terminated and reward >= 1.0 - env.DECEPTIVE_SHAPING * len(
+        env.layout.free_cells
+    )
+
+
+# ---------------------------------------------------------------------------
 # Observed-region tracking (H0 merges, loop closures)
 # ---------------------------------------------------------------------------
 
@@ -186,6 +302,7 @@ def _moat_env(**kw):
     env = gym.make(
         "TopoGym/Grid2D-v0", base="square", size=17, n_holes=0,
         n_chambers=0, n_decoys=0, n_partitions=1, partition_material="moat",
+        actions="egocentric",
         layout_seed=kw.pop("layout_seed", 21), **kw,
     ).unwrapped
     env.reset(seed=0)

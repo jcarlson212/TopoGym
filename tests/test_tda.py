@@ -24,7 +24,7 @@ def sweep(tracker, n_steps, seed=0):
 
 
 def test_tracker_records_visits_and_observations():
-    env = Square(6).compile(seed=1, reward_mode="explore", max_steps=200)
+    env = Square(6).compile(seed=1, reward_mode="none", max_steps=200)
     tracker = ExplorationTracker(env)
     tracker.reset(seed=0)
     assert list(tracker.visit_step.values()) == [0]  # the start cell
@@ -38,7 +38,7 @@ def test_tracker_records_visits_and_observations():
 
 def test_full_exploration_recovers_certified_topology():
     env = Annulus(8).compile(
-        seed=4, reward_mode="explore", obs_mode="global", max_steps=3000
+        seed=4, reward_mode="none", obs_mode="global", max_steps=3000
     )
     tracker = ExplorationTracker(env)
     tracker.reset(seed=0)
@@ -59,7 +59,7 @@ def test_full_exploration_recovers_certified_topology():
 
 
 def test_observed_region_beats_visited():
-    env = Annulus(8).compile(seed=4, reward_mode="explore", max_steps=400)
+    env = Annulus(8).compile(seed=4, reward_mode="none", max_steps=400)
     tracker = ExplorationTracker(env)
     tracker.reset(seed=0)
     sweep(tracker, 400)
@@ -71,7 +71,7 @@ def test_observed_region_beats_visited():
 
 
 def test_betti_curve_is_step_indexed_and_final():
-    env = Square(6).compile(seed=2, reward_mode="explore", max_steps=300)
+    env = Square(6).compile(seed=2, reward_mode="none", max_steps=300)
     tracker = ExplorationTracker(env)
     tracker.reset(seed=0)
     sweep(tracker, 300)
@@ -109,7 +109,7 @@ def test_discovery_diagram_h0_merges():
     # Walking two disjoint arms before connecting them must show a finite
     # H0 bar (a region discovered separately, merged later).
     env = Square(8).compile(
-        seed=1, reward_mode="explore", obs_mode="global", max_steps=2000
+        seed=1, reward_mode="none", obs_mode="global", max_steps=2000
     )
     tracker = ExplorationTracker(env)
     tracker.reset(seed=0)
