@@ -295,6 +295,17 @@ def _place_feature_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
         else:
             footprint = shape_fn(rng)
             walls, interior, door_plan = set(footprint), set(), []
+        if kind == "chamber" and cfg.chamber_placement == "center":
+            # Override the sampled anchor (the rng draw is kept so
+            # random-placement layouts are unaffected): center the
+            # footprint's bounding box on the grid.
+            w, h = base.layout_size()
+            xs = [o[0] for o in footprint]
+            ys = [o[1] for o in footprint]
+            anchor = (
+                (w - (max(xs) - min(xs) + 1)) // 2 - min(xs),
+                (h - (max(ys) - min(ys) + 1)) // 2 - min(ys),
+            )
         margin = shapes.margin_ring(footprint, radius=margin_radius)
         mapping = map_offsets(base, anchor, footprint | margin)
         if mapping is None:
@@ -377,6 +388,12 @@ def _finalize_layout(cfg: TopoGenConfig2D, base: BaseMap2D, cells: list,
     if not start_candidates:
         raise _RetryAttempt("no start candidates")
     start = start_candidates[int(rng.integers(len(start_candidates)))]
+    if cfg.start_placement == "bottom_left":
+        _, h = base.layout_size()
+        start = min(
+            start_candidates,
+            key=lambda c: (c[0] + abs(h - 1 - c[1]), repr(c)),
+        )
 
     adj = build_adjacency(free_set, base.neighbors)
     if reachable_from(adj, start) != free_set:

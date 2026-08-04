@@ -72,8 +72,9 @@ def build_top(topology: str, seed: int, size: int = 50) -> Layout:
         ok = True
         for i, (ax, ay) in enumerate(corners):
             walls, interior, cands = room_offsets(rng, "square", _ROOM_SIDE)
-            anchor = (ax + int(rng.integers(0, 3)),
-                      ay + int(rng.integers(0, 3)))
+            # Exact corner anchors: chambers in the same row/column pair
+            # share identical row/column extents (no per-chamber jitter).
+            anchor = (ax, ay)
             door_off, ext_off, _int_off = cands[
                 int(rng.integers(len(cands)))
             ]

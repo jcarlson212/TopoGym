@@ -43,6 +43,9 @@ class TopoGenConfig2D:
     chamber_side: int | None = None  # exact outer side; overrides the range
     decoy_side: int | None = None  # exact decoy side; defaults to chamber's
     chamber_shape: str = "square"  # square | circle | triangle | star | mixed
+    chamber_placement: str = "random"  # "random" | "center" (single-chamber
+    # families that read best centered: Shape, GiveUp)
+    start_placement: str = "random"  # "random" | "bottom_left"
     decoy_shape: str = "square"  # area-matched at equal side (never
     # confounds shape with size)
     min_sep: int = 2  # minimum pairwise Chebyshev separation between walls

@@ -149,7 +149,7 @@ def build_corridor(cfg: TopoGenConfig2D, base: BaseMap2D,
 
     def room_cells(node: tuple) -> list:
         i, j = node
-        x0, y0 = 1 + i * pitch, 1 + j * pitch
+        x0, y0 = 1 + i * pitch + dx, 1 + j * pitch + dy
         return [(x, y) for x in range(x0, x0 + room)
                 for y in range(y0, y0 + room)]
 
@@ -171,6 +171,14 @@ def build_corridor(cfg: TopoGenConfig2D, base: BaseMap2D,
         tree.add(edge[1])
         edges.append(edge)
 
+    # Center the grown tree's bounding box on the grid.
+    imin = min(i for i, _ in tree)
+    imax = max(i for i, _ in tree)
+    jmin = min(j for _, j in tree)
+    jmax = max(j for _, j in tree)
+    dx = (w - ((imax - imin) * pitch + room)) // 2 - (1 + imin * pitch)
+    dy = (h - ((jmax - jmin) * pitch + room)) // 2 - (1 + jmin * pitch)
+
     for node in sorted(tree):
         cells = room_cells(node)
         for c in cells:
@@ -184,7 +192,7 @@ def build_corridor(cfg: TopoGenConfig2D, base: BaseMap2D,
     for (a, b) in edges:
         (ax, _ay), (bx, _by) = a, b
         i, j = min(a, b)
-        x0, y0 = 1 + i * pitch, 1 + j * pitch
+        x0, y0 = 1 + i * pitch + dx, 1 + j * pitch + dy
         if ax != bx:  # horizontal corridor
             y = y0 + int(rng.integers(room))
             path = [(x0 + room + k, y) for k in range(cfg.corridor_len)]

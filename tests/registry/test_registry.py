@@ -192,8 +192,8 @@ def test_sealed_betti_convention():
 def test_canonical_string_shape():
     cfg = registry.get_config("TopoGym/ShapeCi-50-v0")
     s = registry.canonical_string(cfg, seed=7)
-    assert s == ("TG-GridWorld2D-S50-C1-D0-cs8-ds8-sep2-shpCi-open"
-                 "-slip0-seed7")
+    assert s == ("TG-GridWorld2D-S50-C1-D0-cs8-ds8-sep2-shpCi-ctr-bl"
+                 "-open-slip0-seed7")
 
 
 def test_manifest_rows():
