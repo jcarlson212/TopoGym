@@ -12,6 +12,7 @@ substrate, the generator, certified metadata, and trajectory TDA.
 - [The generator](#the-generator)
 - [Certified metadata](#certified-metadata)
 - [Topology of experience (TDA)](#topology-of-experience-tda)
+- [Debugging the topology live](#debugging-the-topology-live)
 - [Stats](#stats)
 
 ## The geometric substrate
