@@ -125,6 +125,7 @@ class TopoGrid2DEnv(TopoEnvCore):
             self._step_fourway(action)
         else:
             self._step_egocentric(action)
+        self._post_move_hook()
         reward, terminated, truncated = self._step_outcome(self._state.cell)
         return self._obs(), reward, terminated, truncated, self._step_info(
             self._state.cell
@@ -157,6 +158,10 @@ class TopoGrid2DEnv(TopoEnvCore):
             for _ in range(turns):
                 nxt = base.turn_left(nxt)
             self._state = nxt
+
+    def _post_move_hook(self):
+        """Cell mechanics that trigger after movement (hazards, wormholes,
+        NPCs); the Texture variants override this."""
 
     # -- observations -----------------------------------------------------------
 
