@@ -153,7 +153,9 @@ def test_winter_freezes_the_channel_and_traps():
             break
         assert not trunc
     assert outcome == "trapped"
-    assert len(env._frozen) == len(seasonal["channel"])
+    # The channel is fully frozen, and the icescape froze beyond it.
+    assert set(seasonal["channel"]) <= env._frozen
+    assert len(env._frozen) > len(seasonal["channel"])
     # Frozen cells act as ice: impassable, observed as wall.
     frozen = next(iter(env._frozen))
     assert not env._try_enter(None, frozen)
