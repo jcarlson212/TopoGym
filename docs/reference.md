@@ -109,6 +109,24 @@ agent was fooled. `rips_diagram` / `betti_at_scale` /
 `bottleneck_distance` run Rips persistence on any point cloud (policy
 hidden states, learned embeddings).
 
+## VisitedComplex: build your own topological algorithms
+
+`topogym.tda.VisitedComplex` maintains the topology of the states an
+agent has visited, incrementally: `add(cells)` as you explore (or seed
+with `VisitedComplex.from_env(env)` from the lifetime-visited set),
+then read `betti()`, `torsion(dim)`, `representatives()` (closed loops
+— for the cubical backend, loops of visited cells, i.e. sequences of
+archive targets), and `rims(observed=…)` (where each loop can still
+tighten). Three backends, independent of the env's own pipeline:
+`cubical` (the env's glued base; movement-consistent), `vr`
+(Vietoris–Rips at `epsilon` on cells or any encoder's vectors via
+`metric=`; `max_dim=2` computes H2), and `witness` (de Silva–Carlsson
+landmark witness complex; override `landmark_policy(point, landmarks,
+dist) -> (admit, evict)` to control the landmark set). Coefficients:
+any prime or `"Z"` — a fully-visited Klein bottle gives b1=2 over F2,
+b1=1 over F3, and H1 = Z + Z/2 integrally. Deterministic; logs at
+DEBUG on the `topogym` logger.
+
 ## Debugging the topology live
 
 `TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) draws the
@@ -120,6 +138,11 @@ in green — the part of the cycle adjacent to seen-but-unvisited free
 space, where the loop can still tighten. `env.h1_representatives()`
 returns exactly what is drawn ({cycle, rim, pocket} per class), so
 archive methods consume the same loops the overlay shows.
+
+`TOPOGYM_DEBUG=1` step lines include the observed region's live Euler
+characteristic and bottleneck-discovery progress; the reset line adds
+the certified surface invariants (χ, orientability, genus/demigenus,
+boundary components).
 
 `OLLIVIER_HEATMAP=1` tints free cells by Ollivier–Ricci curvature
 (strongest red = most negative: doorways, corridors, bottlenecks) with
