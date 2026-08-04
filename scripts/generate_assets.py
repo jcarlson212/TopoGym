@@ -210,7 +210,7 @@ occluded egocentric patches, `obs_mode="global"` the full symbolic grid.
 
 `reward_mode="sparse"` (default): +1 terminal on reaching the goal.
 Other modes: `none`, `coverage`, `deceptive`; `goal=False` removes the
-goal entirely. Episodes truncate after a pre-determined `4 * max(W, H)`
+goal entirely. Episodes truncate after a pre-determined `1.2 * max(W, H)`
 steps (`max_steps` overrides). Layouts, metadata, and rollouts are
 deterministic up to seeds.
 """

@@ -283,9 +283,12 @@ identical layouts, metadata, and rollouts.
 
 Every benchmark variant (GridWorld2D, -Texture, -Top) supports a
 \texttt{reward\_mode} configuration field. Episodes have a
-pre-determined length --- $4\max(W,H)$ steps for a $W \times H$
-world, knowable from the configuration alone and overridable via
-\texttt{max\_steps} --- and every environment places a goal cell by
+pre-determined length --- $\lfloor 1.2\max(W,H)\rfloor$ steps for a
+$W \times H$ world (60 on a 50-grid, 120 on a 100-grid), knowable
+from the configuration alone and overridable via
+\texttt{max\_steps}; short rollouts are deliberate, pairing with
+lifetime coverage and teleport resets for multi-episode exploration
+--- and every environment places a goal cell by
 default (removable with \texttt{goal=False} for goal-free
 exploration studies):
 \begin{itemize}[leftmargin=2em, itemsep=1pt]
@@ -461,8 +464,8 @@ Texture slice of TopoGym-v1:
         (winter), with matching palettes; the water texture's value
         encodes the season (1.0 sunny, 0.5 cold). Only the
         \emph{floating bergs} respond to the season: in winter they
-        grow --- their water fringe freezes in waves at steps 60 and
-        120, and being on a cell when it freezes ends the episode ---
+        grow --- their water fringe freezes in waves at steps 20 and
+        40, and being on a cell when it freezes ends the episode ---
         and in summer their rims melt away. Channels and the landmass
         never change. The certified metadata describes the
         episode-start geometry; a \texttt{season} make-kwarg forces
