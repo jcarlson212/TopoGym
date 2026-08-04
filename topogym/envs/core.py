@@ -37,6 +37,7 @@ persistence needs.
 from __future__ import annotations
 
 import dataclasses
+from collections import deque
 
 import gymnasium as gym
 import numpy as np
@@ -45,6 +46,15 @@ from topogym.core import constants as C
 from topogym.core.homology import _UnionFind, analyze_2d, analyze_3d
 from topogym.generation.generator import generate_2d, generate_3d
 
+#: Reward modes shared by every variant (see docs/specs/topo_gym_overview).
+#: "none" (default) — pure exploration, no extrinsic reward.
+#: "sparse" — +1 terminal on reaching the goal cell.
+#: "coverage" — +1 for each cell visited for the first time.
+#: "deceptive" — sparse goal plus a small potential-based shaping gradient
+#:   toward a distractor cell placed as far from the goal as possible.
+#: "goal" — legacy alias of sparse with a step-decayed payout.
+REWARD_MODES = ("none", "sparse", "coverage", "deceptive", "goal")
+
 
 class TopoEnvCore(gym.Env):
     metadata = {"render_modes": ["rgb_array", "ansi"], "render_fps": 8}
@@ -52,10 +62,13 @@ class TopoEnvCore(gym.Env):
     #: subclasses set: 2 or 3
     DIM = None
 
+    #: per-step magnitude of the "deceptive" shaping gradient
+    DECEPTIVE_SHAPING = 0.01
+
     def __init__(self, config=None, *, layout=None, layout_seed=None,
-                 obs_mode="local", view_radius=None, reward_mode="goal",
-                 max_steps=None, render_mode=None, reveal_hidden=False,
-                 **overrides):
+                 obs_mode=None, view_radius=None, reward_mode="none",
+                 p_slip=0.0, max_steps=None, render_mode=None,
+                 reveal_hidden=False, **overrides):
         cfg = config if config is not None else self._default_config()
         if isinstance(cfg, dict):
             cfg = self._config_class()(**cfg)
@@ -63,11 +76,21 @@ class TopoEnvCore(gym.Env):
             cfg = dataclasses.replace(cfg, **overrides)
         self.cfg = cfg
         self.layout_seed = layout_seed
-        self.obs_mode = obs_mode
+        self.obs_mode = obs_mode if obs_mode is not None else (
+            self._default_obs_mode()
+        )
         self.view_radius = view_radius if view_radius is not None else (
             3 if self.DIM == 2 else 2
         )
+        if reward_mode not in REWARD_MODES:
+            raise ValueError(
+                f"unknown reward_mode {reward_mode!r}; expected one of "
+                f"{REWARD_MODES}"
+            )
         self.reward_mode = reward_mode
+        if not 0.0 <= p_slip <= 1.0:
+            raise ValueError(f"p_slip must be in [0, 1], got {p_slip!r}")
+        self.p_slip = p_slip
         self._max_steps_cfg = max_steps
         self.render_mode = render_mode
         self.reveal_hidden = reveal_hidden
@@ -85,6 +108,9 @@ class TopoEnvCore(gym.Env):
 
     def _config_class(self):
         raise NotImplementedError
+
+    def _default_obs_mode(self):
+        return "local"
 
     def _build_spaces(self):
         raise NotImplementedError
@@ -116,6 +142,57 @@ class TopoEnvCore(gym.Env):
         self._known_uf = _UnionFind()
         self._known_components = 0
         self._h0_merges = 0
+        self._distractor = None
+        self._decept_dist = None
+        self._decept_prev = None
+        if self.reward_mode == "deceptive":
+            self._setup_deception()
+
+    # -- stochasticity ------------------------------------------------------
+
+    def _maybe_slip(self, action):
+        """With probability ``p_slip`` the executed action is resampled
+        uniformly (the spec's slip model)."""
+        if self.p_slip > 0.0 and self.np_random.random() < self.p_slip:
+            return int(self.np_random.integers(self.action_space.n))
+        return action
+
+    # -- deceptive-reward ground truth --------------------------------------
+
+    def _free_bfs(self, source):
+        """Graph distance from ``source`` over the free-cell graph
+        (doors count as free: distance describes the map, not door state)."""
+        free = set(self.layout.free_cells)
+        dist = {source: 0}
+        q = deque([source])
+        while q:
+            u = q.popleft()
+            for v in self.layout.base.neighbors(u):
+                if v in free and v not in dist:
+                    dist[v] = dist[u] + 1
+                    q.append(v)
+        return dist
+
+    def _setup_deception(self):
+        from_goal = self._free_bfs(self.layout.goal)
+        # The distractor sits as far from the goal as the map allows, so
+        # its shaping gradient leads away from the goal's neighborhood.
+        self._distractor = max(
+            from_goal, key=lambda c: (from_goal[c], repr(c))
+        )
+        self._decept_dist = self._free_bfs(self._distractor)
+        self._decept_prev = self._decept_dist.get(self.layout.start)
+
+    @property
+    def deception(self):
+        """Ground truth for ``reward_mode="deceptive"``: the distractor
+        cell and the full shaping field (graph distance per free cell)."""
+        if self._decept_dist is None:
+            raise RuntimeError('deception requires reward_mode="deceptive"')
+        return {
+            "distractor": self._distractor,
+            "field": dict(self._decept_dist),
+        }
 
     @property
     def topology(self):
@@ -249,11 +326,26 @@ class TopoEnvCore(gym.Env):
 
     def _step_outcome(self, agent_cell):
         self._steps += 1
+        newly_visited = agent_cell not in self._visited
         self._visited.add(agent_cell)
         reward, terminated = 0.0, False
-        if self.reward_mode == "goal" and agent_cell == self.layout.goal:
+        mode = self.reward_mode
+        at_goal = agent_cell == self.layout.goal
+        if mode == "sparse" and at_goal:
+            reward, terminated = 1.0, True
+        elif mode == "goal" and at_goal:  # legacy step-decayed sparse
             reward = 1.0 - 0.9 * (self._steps / self._max_steps)
             terminated = True
+        elif mode == "coverage":
+            reward = 1.0 if newly_visited else 0.0
+        elif mode == "deceptive":
+            d = self._decept_dist.get(agent_cell)
+            if d is not None and self._decept_prev is not None:
+                reward += self.DECEPTIVE_SHAPING * (self._decept_prev - d)
+                self._decept_prev = d
+            if at_goal:
+                reward += 1.0
+                terminated = True
         truncated = self._steps >= self._max_steps and not terminated
         return reward, terminated, truncated
 

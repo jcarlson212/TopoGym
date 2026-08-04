@@ -61,7 +61,8 @@ class TopoGrid3DEnv(TopoEnvCore):
     def step(self, action):
         if not 0 <= int(action) < 6:
             raise ValueError(f"invalid action {action!r}")
-        nxt = self.layout.base.step_dir(self._agent_cell, _DIRS[int(action)])
+        action = self._maybe_slip(int(action))
+        nxt = self.layout.base.step_dir(self._agent_cell, _DIRS[action])
         if nxt is not None and self._try_enter(self._agent_cell, nxt):
             self._on_leave(self._agent_cell)
             self._agent_cell = nxt

@@ -21,3 +21,11 @@ OBS_DOOR_ONEWAY = 8  # a one-way door (valve); passable side discoverable by try
 OBS_TRAPDOOR = 9  # a passage that seals permanently after one use
 
 OBS_MAX = 9
+
+# Universal observation vector (obs_mode="vector"): the agent's integer
+# cell coordinates (x, y) followed by a texture block t in [0, 1]^16.
+# Slots 0-3 are reserved library-wide for directional blocker adjacency
+# (left, right, above, below); slots 4-15 carry per-environment semantic
+# features. The block is identically zero outside the Texture variants.
+TEXTURE_DIM = 16
+TEX_BLOCK_LEFT, TEX_BLOCK_RIGHT, TEX_BLOCK_ABOVE, TEX_BLOCK_BELOW = 0, 1, 2, 3
