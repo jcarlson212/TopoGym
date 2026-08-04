@@ -23,3 +23,5 @@ One page per family; ids are stable across releases.
 - [DontFall](DontFall.md) — A fatal central drop ringed by huts, one holding the ruby; the most novel direction is the drop.
 - [SpaceWarp](SpaceWarp.md) — Four chambers and wormholes; the treasure chamber has no door and is enterable only through a wormhole inside another chamber.
 - [ClownChase](ClownChase.md) — A clown wanders near the decoys paying a depleting trickle of reward for approach; the treasure chamber is on the opposite side.
+- [SearchRescue](SearchRescue.md) — A person trapped in one large open chamber inside a dense shrapnel field: every shard is a small transient hole, the chamber the only large persistent one.
+- [EnvironmentalIceShip](EnvironmentalIceShip.md) — IceShip with seasons: sunny episodes are safe; in snowing winters the ice grows and the channel freezes shut — caught or trapped means the episode ends.

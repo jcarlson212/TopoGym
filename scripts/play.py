@@ -99,7 +99,7 @@ def main() -> int:
                 if event.key in (pygame.K_q, pygame.K_ESCAPE):
                     running = False
                 elif event.key == pygame.K_r:
-                    obs, info = env.reset(seed=0)
+                    obs, info = env.reset()  # new episode (season redraws)
                     total = 0.0
                 elif event.key == pygame.K_BACKSPACE:
                     seed += 1
@@ -125,7 +125,7 @@ def main() -> int:
                     if term or trunc:
                         print(f"episode over ({'goal' if term else 'time'}) "
                               f"steps={info['steps']} return={total:.2f}")
-                        obs, info = env.reset(seed=0)
+                        obs, info = env.reset()
                         total = 0.0
         env.render()
         if core._window is not None:

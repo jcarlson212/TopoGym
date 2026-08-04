@@ -37,7 +37,8 @@ PAGES_DIR = ROOT / "docs" / "environments"
 
 #: envs that get an animated showcase GIF (README hero set first)
 GIF_SET = [
-    "IceShip", "ClownChase", "SpaceWarp", "DontFall",
+    "IceShip", "ClownChase", "SpaceWarp", "DontFall", "SearchRescue",
+    "EnvironmentalIceShip",
     "Ladders", "BankRobber", "Nested3-50", "Decoys4-50",
     "TopTorus-50", "Maze-50", "Bottleneck6-100", "ShapeSt-50",
 ]
@@ -160,6 +161,14 @@ FAMILY_DOCS = {
     "ClownChase": "A clown wanders near the decoys paying a depleting "
                   "trickle of reward for approach; the treasure "
                   "chamber is on the opposite side.",
+    "SearchRescue": "A person trapped in one large open chamber inside "
+                    "a dense shrapnel field: every shard is a small "
+                    "transient hole, the chamber the only large "
+                    "persistent one.",
+    "EnvironmentalIceShip": "IceShip with seasons: sunny episodes are "
+                            "safe; in snowing winters the ice grows and "
+                            "the channel freezes shut — caught or "
+                            "trapped means the episode ends.",
 }
 
 _SPACES_BLURB = """\
