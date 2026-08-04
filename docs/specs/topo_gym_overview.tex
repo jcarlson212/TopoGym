@@ -678,8 +678,54 @@ m = env.metrics()      # the standardized metric set (frozen dataclass)
 m.success_rate; m.sample_efficiency; m.visitation_entropy
 m.mean_regret; m.planning_efficiency   # vs env.shortest_path()
 m.steps_to_coverage    # {0.5: step, ..., 1.0: step}
-m.steps_to_holes       # {k: step the k-th loop was discovered}
+m.steps_to_h1_holes    # {k: step the k-th loop was discovered}
 \end{lstlisting}
+
+\paragraph{The metrics interface and its toggles.} Metrics that are
+potentially expensive are \emph{off by default} and enabled per
+recorder; everything cheap is always on. The toggles:
+
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item \texttt{record\_steps} --- keep a per-step row (reward,
+        coverage, lifetime coverage) enabling
+        \texttt{coverage\_at(global\_step)}; cheap but memory-linear
+        in steps.
+  \item \texttt{track\_holes} --- recompute the observed region's
+        homology every step to timestamp discoveries:
+        \texttt{steps\_to\_h0\_holes} and
+        \texttt{steps\_to\_h1\_holes} map $k$ to the global step at
+        which the observed region first carried $h_i \ge k$ (runs
+        GUDHI per step).
+  \item \texttt{track\_curvature} --- include
+        \texttt{curvature\_coverage\_below\_zero}: the fraction of
+        negatively Ollivier--Ricci-curved cells (corridors, doorways,
+        bottlenecks) the agent has reached. Curvature is exact
+        ($\alpha = 0$, unit-expanded $W_1$ via Hungarian matching),
+        computed once per layout and cached;
+        \texttt{recorder.curvature\_coverage(x)} answers ``percent
+        of cells with curvature $< x$ reached'' for any threshold
+        regardless of the toggle, and \texttt{env.ollivier\_ricci()}
+        exposes the raw per-cell field.
+\end{itemize}
+
+\begin{lstlisting}
+env = StatsRecorder(gym.make("TopoGym/Decoys4-50-v0", seed=1),
+                    record_steps=True, track_holes=True,
+                    track_curvature=True)
+# ... run episodes ...
+m = env.metrics()          # frozen dataclass; m.to_dict() for logging
+m.steps_to_h1_holes        # {k: global step the k-th loop was found}
+m.curvature_coverage_below_zero
+env.curvature_coverage(-0.2)   # any threshold, on demand
+env.unwrapped.homology_stats("observed")  # HomologyStats(h0, h1, h2=None)
+\end{lstlisting}
+
+\texttt{env.homology\_stats(which)} returns per-dimension hole
+counts as a \texttt{HomologyStats} value object for
+\texttt{"observed"}, \texttt{"visited"}, \texttt{"certified"}, or
+\texttt{"certified\_sealed"}; gridworlds carry $h_0$ and $h_1$, with
+$h_2$/$h_3$ optional (\texttt{None} where the dimension does not
+apply).
 
 Structure accessors ground the metrics:
 \texttt{env.topology.betti\_numbers\_doors\_count\_as\_walls()} /

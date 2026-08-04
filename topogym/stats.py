@@ -71,11 +71,18 @@ class Metrics:
     planning_efficiency: float | None
     #: lifetime-coverage milestones: fraction -> global step reached
     steps_to_coverage: dict
+    #: components discovered: k -> global step the observed region
+    #: first had h0 >= k (requires track_holes=True)
+    steps_to_h0_holes: dict
     #: loops discovered: k -> global step the observed region first
-    #: carried b1 >= k (requires track_holes=True)
-    steps_to_holes: dict
+    #: had h1 >= k (requires track_holes=True)
+    steps_to_h1_holes: dict
     #: mean per-episode final coverage
     mean_episode_coverage: float
+    #: fraction of negatively curved cells (Ollivier-Ricci < 0 —
+    #: corridors, doorways, bottlenecks) the agent has reached; None
+    #: unless track_curvature=True
+    curvature_coverage_below_zero: float | None = None
 
     @property
     def sample_efficiency(self) -> int | None:
@@ -92,12 +99,16 @@ class StatsRecorder(gym.Wrapper):
     """Record per-episode (and optionally per-step) exploration stats."""
 
     def __init__(self, env: gym.Env, record_steps: bool = False,
-                 track_holes: bool = False):
+                 track_holes: bool = False,
+                 track_curvature: bool = False):
         super().__init__(env)
         self.record_steps = record_steps
-        #: compute observed b1 every step to timestamp hole discoveries
-        #: (opt-in: it runs GUDHI per step)
+        #: compute observed homology every step to timestamp hole
+        #: discoveries (opt-in: it runs GUDHI per step)
         self.track_holes = track_holes
+        #: include Ollivier-Ricci curvature coverage in metrics()
+        #: (opt-in: one exact-W1 solve per free edge, once per layout)
+        self.track_curvature = track_curvature
         self.episodes: list = []
         self.steps: list = []
         self._episode_index = -1
@@ -106,7 +117,9 @@ class StatsRecorder(gym.Wrapper):
         self._global_step = 0
         self._first_success_step: int | None = None
         self.lifetime_milestones: dict = {}
-        self.hole_steps: dict = {}
+        #: dim -> {k: global step the observed region first had
+        #: h_dim >= k}; gridworlds track dims 0 and 1
+        self.hole_steps: dict = {0: {}, 1: {}}
         self._optimal: int | None = None
         self._ep_milestones: dict = {}
         self._steps_to_success: int | None = None
@@ -146,9 +159,11 @@ class StatsRecorder(gym.Wrapper):
                     and frac not in self.lifetime_milestones:
                 self.lifetime_milestones[frac] = self._global_step
         if self.track_holes:
-            b1 = core.observed_betti()[1]
-            for k in range(len(self.hole_steps) + 1, b1 + 1):
-                self.hole_steps[k] = self._global_step
+            stats = core.homology_stats("observed")
+            for dim, count in ((0, stats.h0), (1, stats.h1)):
+                found = self.hole_steps[dim]
+                for k in range(len(found) + 1, count + 1):
+                    found[k] = self._global_step
         if terminated and core.goal_exists \
                 and info.get("position") == core.layout.goal:
             self._goal_reached = True
@@ -241,11 +256,29 @@ class StatsRecorder(gym.Wrapper):
                     for e in later) / len(later) if later else None
             ),
             steps_to_coverage=dict(self.lifetime_milestones),
-            steps_to_holes=dict(self.hole_steps),
+            steps_to_h0_holes=dict(self.hole_steps[0]),
+            steps_to_h1_holes=dict(self.hole_steps[1]),
             mean_episode_coverage=(
                 sum(e["coverage"] for e in eps) / n if n else 0.0
             ),
+            curvature_coverage_below_zero=(
+                self.curvature_coverage(0.0)
+                if self.track_curvature else None
+            ),
         )
+
+    def curvature_coverage(self, threshold: float) -> float:
+        """Fraction of cells with Ollivier-Ricci curvature below the
+        threshold that the agent has reached (lifetime). Curvature is
+        computed on demand and cached per layout, so explicit calls
+        work regardless of the ``track_curvature`` toggle."""
+        core = self._core
+        ricci = core.ollivier_ricci()
+        low = [c for c, k in ricci.items() if k < threshold]
+        if not low:
+            return 1.0
+        reached = core.lifetime_visit_counts
+        return sum(1 for c in low if c in reached) / len(low)
 
     def summary(self) -> dict:
         """Aggregates over all recorded episodes."""

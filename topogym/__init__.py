@@ -19,12 +19,17 @@ Or compose spaces directly (see :mod:`topogym.spec`)::
 from gymnasium.envs.registration import register
 
 from topogym import complexes, registry, spec, stats, tda
-from topogym.core.metadata import BettiNumbers, TopologyMetadata
+from topogym.core.metadata import (
+    BettiNumbers,
+    HomologyStats,
+    TopologyMetadata,
+)
 from topogym.generation import TopoGenConfig2D
 
 __version__ = "0.1.0"
 __all__ = [
     "BettiNumbers",
+    "HomologyStats",
     "TopologyMetadata",
     "TopoGenConfig2D",
     "complexes",

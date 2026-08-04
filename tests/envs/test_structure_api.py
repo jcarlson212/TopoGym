@@ -69,3 +69,22 @@ def test_debug_logs_bottlenecks_on_reset(monkeypatch, caplog):
     with caplog.at_level(logging.DEBUG, logger="topogym"):
         env.reset(seed=0)
     assert "bottlenecks=" in caplog.text
+
+
+def test_homology_stats_interface():
+    from topogym import HomologyStats
+
+    env = _env()
+    certified = env.homology_stats("certified")
+    assert isinstance(certified, HomologyStats)
+    assert (certified.h0, certified.h1) == (
+        env.topology.betti_z2[0], env.topology.betti_z2[1])
+    assert certified.h2 == 0 and certified.h3 is None
+    sealed = env.homology_stats("certified_sealed")
+    assert sealed.h0 == certified.h0 + 1
+    live = env.homology_stats("observed")
+    assert live.h0 >= 1 and live.h1 >= 0
+    assert env.homology_stats("visited").h0 == 1
+    assert str(certified).startswith("h0=")
+    with pytest.raises(ValueError):
+        env.homology_stats("bogus")
