@@ -2,7 +2,7 @@
 
 <img src="../envs/SearchRescue.gif" width="360"/>
 
-A person trapped in the one intact chamber of a collapsed concrete structure: 160 rubble blocks form a dense maze of small transient holes; the chamber is the only large persistent one.
+A person trapped in the one intact chamber of a collapsed concrete structure: 160 rubble blocks form a dense maze of small transient holes; the chamber is the only large persistent one; explosive barrels punish careless routes.
 
 ## Action space
 

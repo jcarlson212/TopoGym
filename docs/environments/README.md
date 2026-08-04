@@ -23,5 +23,5 @@ One page per family; ids are stable across releases.
 - [DontFall](DontFall.md) — A fatal central drop ringed by huts, one holding the ruby; the most novel direction is the drop.
 - [SpaceWarp](SpaceWarp.md) — Four chambers and wormholes; the treasure chamber has no door and is enterable only through a wormhole inside another chamber.
 - [ClownChase](ClownChase.md) — A troupe of clowns (default two, n_clowns configurable) wanders the carnival tents paying a depleting trickle of reward for approach; the treasure chamber is on the opposite side.
-- [SearchRescue](SearchRescue.md) — A person trapped in the one intact chamber of a collapsed concrete structure: 160 rubble blocks form a dense maze of small transient holes; the chamber is the only large persistent one.
+- [SearchRescue](SearchRescue.md) — A person trapped in the one intact chamber of a collapsed concrete structure: 160 rubble blocks form a dense maze of small transient holes; the chamber is the only large persistent one; explosive barrels punish careless routes.
 - [EnvironmentalIceShip](EnvironmentalIceShip.md) — IceShip with seasons: winters grow the floating bergs (their fringe freezes in waves), summers shrink them; three cavities (one treasure) and sealed water pockets structure the landmass.

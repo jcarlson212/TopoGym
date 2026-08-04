@@ -312,3 +312,26 @@ def test_treasure_texture_slot():
     env, _, _ = _make("BankRobber")
     assert env._texture_block(env.layout.goal)[C.TEX_TREASURE] == 1.0
     assert env._texture_block(env.layout.goal)[C.TEX_INTERIOR] == 1.0
+
+
+def test_search_rescue_barrels_explode_and_warn():
+    layout = build_scenario("search_rescue", 1)
+    barrels = layout.extras["hazards"]
+    assert len(barrels) == 10
+    # The rescue stays possible while avoiding every barrel.
+    safe = set(layout.free_cells) - set(barrels)
+    adj = build_adjacency(safe, layout.base.neighbors)
+    assert layout.goal in reachable_from(adj, layout.start)
+
+    env, _, _ = _make("SearchRescue")
+    target = sorted(env.layout.extras["hazards"])[0]
+    _, reward, terminated, _, _ = _step_onto(env, target)
+    assert terminated and reward == 0.0  # boom
+    # Neighbors carry the warning texture.
+    env.reset(seed=0)
+    nbr = next(
+        n for n in env.layout.base.neighbors(target)
+        if n in set(env.layout.free_cells)
+        and n not in env.layout.extras["hazards"]
+    )
+    assert env._texture_block(nbr)[C.TEX_DROP_ADJ] == 1.0

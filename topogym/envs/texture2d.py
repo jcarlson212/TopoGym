@@ -201,6 +201,20 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             self._clown_prev = d
         return reward, terminated, truncated
 
+    def _debug_extras(self) -> dict:
+        out: dict = {}
+        if self.season is not None:
+            out["season"] = self.season
+            out["frozen"] = len(self._frozen)
+            out["melted"] = len(self._melted)
+        if self._clowns:
+            out["clowns"] = list(self._clowns)
+            out["clown_budget"] = round(self._clown_budget, 4)
+        hazards = self.layout.extras.get("hazards")
+        if hazards:
+            out["hazards"] = len(hazards)
+        return out
+
     # -- observation textures --------------------------------------------------
 
     _ADJ = (((-1, 0), C.TEX_BLOCK_LEFT), ((1, 0), C.TEX_BLOCK_RIGHT),
@@ -263,6 +277,8 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         if self.scenario == "search_rescue":
             if code == C.OBS_GOAL:
                 return "person"
+            if code == C.OBS_HAZARD:
+                return "barrel"
             if code == C.OBS_WALL:
                 # Intact chamber walls read as stone; everything else
                 # collapsed into rubble.

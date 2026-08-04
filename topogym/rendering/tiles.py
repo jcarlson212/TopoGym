@@ -284,6 +284,20 @@ def _ice_cold(rng: np.random.Generator) -> np.ndarray:
     return t
 
 
+def _barrel(rng: np.random.Generator) -> np.ndarray:
+    t = _concrete(rng)
+    t[4:14, 4:12] = (188, 34, 30)  # the drum
+    t[4, 4:12] = (130, 22, 20)
+    t[13, 4:12] = (130, 22, 20)
+    t[7, 4:12] = (150, 26, 24)  # hoop
+    t[10, 4:12] = (150, 26, 24)
+    t[5:12, 5] = (232, 90, 80)  # highlight
+    t[2, 7] = (255, 200, 40)  # the little flame: flammable!
+    t[1, 7] = (255, 120, 20)
+    t[2, 8] = (255, 160, 30)
+    return t
+
+
 def _concrete(rng: np.random.Generator) -> np.ndarray:
     t = _flat((186, 184, 178))
     _chunky_noise(t, rng, 6)
@@ -381,6 +395,7 @@ BUILDERS = {
     "tent": _tent,
     "shrapnel": _shrapnel,
     "concrete": _concrete,
+    "barrel": _barrel,
     "rubble": _rubble,
     "water_sun": _water_sun,
     "ice_sun": _ice_sun,

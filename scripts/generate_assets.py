@@ -180,7 +180,8 @@ FAMILY_DOCS = {
     "SearchRescue": "A person trapped in the one intact chamber of a "
                     "collapsed concrete structure: 160 rubble blocks "
                     "form a dense maze of small transient holes; the "
-                    "chamber is the only large persistent one.",
+                    "chamber is the only large persistent one; "
+                    "explosive barrels punish careless routes.",
     "EnvironmentalIceShip": "IceShip with seasons: winters grow the "
                             "floating bergs (their fringe freezes in "
                             "waves), summers shrink them; three "
