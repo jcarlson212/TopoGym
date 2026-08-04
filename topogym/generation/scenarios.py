@@ -262,8 +262,12 @@ def build_space_warp(seed: int, warp_sep: int = 2) -> Layout:
         treasure = features[treasure_idx]
         treasure_interior = list(treasure.interior)
 
-        # Wormholes: one pair per doored chamber near its door (never in
-        # front), one of which tunnels into the treasure chamber.
+        # Wormholes. The tunnel pair sits chamber-interior to
+        # chamber-interior: its source is *inside* one of the doored
+        # chambers, its destination inside the treasure chamber — the
+        # only way in. The other doored chambers get a near-door pair
+        # (never directly in front) whose far end is a random exterior
+        # cell: a shortcut or a stranding, and only entering it tells.
         wormholes: dict = {}
         exterior = sorted(
             free_set
@@ -272,42 +276,53 @@ def build_space_warp(seed: int, warp_sep: int = 2) -> Layout:
         )
         doored = [i for i in range(4) if i != treasure_idx]
         tunnel_from = doored[int(rng.integers(len(doored)))]
+
+        def claim_pair(a, b):
+            if a is None or b is None or a == b:
+                return False
+            if a in wormholes or b in wormholes:
+                return False
+            if cell_types.get(a, 0) != 0 or cell_types.get(b, 0) != 0:
+                return False
+            wormholes[a] = b
+            wormholes[b] = a
+            cell_types[a] = C.WORMHOLE
+            cell_types[b] = C.WORMHOLE
+            return True
+
         for i in doored:
             mapping, door_plan, interior_cells = placed[i]
-            door_off, ext_off, _ = door_plan
-            # Perpendicular to the door axis, warp_sep away: near the
-            # door but never directly in front of it.
-            px, py = (door_off[1] - ext_off[1], door_off[0] - ext_off[0])
-            near = None
-            for s in (1, -1):
-                off = (ext_off[0] + s * px * warp_sep,
-                       ext_off[1] + s * py * warp_sep)
-                cand = mapping.get(off)
-                if cand is None:
-                    ext = mapping[ext_off]
-                    cand = (ext[0] + s * px * warp_sep,
-                            ext[1] + s * py * warp_sep)
-                if cand in free_set and cand not in wormholes \
-                        and cell_types.get(cand, 0) == 0:
-                    near = cand
-                    break
-            if near is None:
-                ok = False
-                break
             if i == tunnel_from:
+                source = interior_cells[
+                    int(rng.integers(len(interior_cells)))
+                ]
                 partner = treasure_interior[
                     int(rng.integers(len(treasure_interior) - 1))
                 ]
+                ok = claim_pair(source, partner)
             else:
-                partner = exterior[int(rng.integers(len(exterior)))]
-            if partner in wormholes or partner == near \
-                    or cell_types.get(partner, 0) != 0:
-                ok = False
+                door_off, ext_off, _ = door_plan
+                # Perpendicular to the door axis, warp_sep away: near
+                # the door but never directly in front of it.
+                px, py = (door_off[1] - ext_off[1],
+                          door_off[0] - ext_off[0])
+                near = None
+                for s in (1, -1):
+                    off = (ext_off[0] + s * px * warp_sep,
+                           ext_off[1] + s * py * warp_sep)
+                    cand = mapping.get(off)
+                    if cand is None:
+                        ext = mapping[ext_off]
+                        cand = (ext[0] + s * px * warp_sep,
+                                ext[1] + s * py * warp_sep)
+                    if cand in free_set and cand not in wormholes \
+                            and cell_types.get(cand, 0) == 0:
+                        near = cand
+                        break
+                far = exterior[int(rng.integers(len(exterior)))]
+                ok = claim_pair(near, far)
+            if not ok:
                 break
-            wormholes[near] = partner
-            wormholes[partner] = near
-            cell_types[near] = C.WORMHOLE
-            cell_types[partner] = C.WORMHOLE
         if not ok:
             continue
 
