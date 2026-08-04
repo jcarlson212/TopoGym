@@ -18,7 +18,7 @@ Or compose spaces directly (see :mod:`topogym.spec`)::
 
 from gymnasium.envs.registration import register
 
-from topogym import complexes, spec, tda
+from topogym import complexes, registry, spec, tda
 from topogym.core.metadata import TopologyMetadata
 from topogym.generation import TopoGenConfig2D
 
@@ -27,6 +27,7 @@ __all__ = [
     "TopologyMetadata",
     "TopoGenConfig2D",
     "complexes",
+    "registry",
     "spec",
     "tda",
 ]
@@ -35,3 +36,6 @@ register(
     id="TopoGym/Grid2D-v0",
     entry_point="topogym.envs:TopoGrid2DEnv",
 )
+
+# The TopoGym-v1 registry: named, pinned GridWorld2D environments.
+registry.register_all()

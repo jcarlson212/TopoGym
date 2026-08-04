@@ -93,12 +93,13 @@ def chamber_offsets(rng, lo, hi):
     return walls, interior, candidates
 
 
-def margin_ring(footprint):
-    """Chebyshev-1 ring around a 2D footprint (keeps obstacles separated
-    so each contributes exactly one independent homology class)."""
+def margin_ring(footprint, radius=1):
+    """Chebyshev-``radius`` ring around a 2D footprint (keeps features
+    ``radius + 1`` apart so each contributes independent homology)."""
     ring = set()
+    span = range(-radius, radius + 1)
     for x, y in footprint:
-        for dx in (-1, 0, 1):
-            for dy in (-1, 0, 1):
+        for dx in span:
+            for dy in span:
                 ring.add((x + dx, y + dy))
     return ring - set(footprint)

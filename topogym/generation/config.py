@@ -1,7 +1,7 @@
 """Generator configurations.
 
 A config plus a seed fully determines an environment layout — that pair is
-the reproducibility unit used everywhere (benchmarks pin both).
+the reproducibility unit used everywhere (the registry pins both).
 """
 
 from __future__ import annotations
@@ -14,6 +14,9 @@ from dataclasses import asdict, dataclass
 BASES_2D = ("square", "cylinder", "torus", "mobius", "klein", "rp2",
             "annulus", "x_holes")
 
+#: Generation styles (the spec's "modes"; "open" is an alias of "rooms").
+STYLES_2D = ("rooms", "nested", "corridor", "maze", "zigzag")
+
 
 @dataclass(frozen=True)
 class TopoGenConfig2D:
@@ -21,7 +24,11 @@ class TopoGenConfig2D:
 
     base: str = "square"
     size: int | tuple = 15
-    style: str = "rooms"  # "rooms" | "maze" | "zigzag" (controls)
+    #: "rooms" (the spec's "open" mode: features in a free field),
+    #: "nested" (concentric shells), "corridor" (tree of rooms joined by
+    #: width-1 corridors), "maze" (perfect maze, optionally braided),
+    #: "zigzag" (serpentine control).
+    style: str = "rooms"
 
     # -- undirected features ------------------------------------------------
     n_holes: int = 2
@@ -30,8 +37,35 @@ class TopoGenConfig2D:
     n_base_holes: int = 4  # only used by the "x_holes" preset
     hole_shapes: tuple = ("rect", "disc", "blob", "plus")
     hole_size: tuple = (2, 4)  # inclusive scale range
-    chamber_size: tuple = (4, 6)  # outer side length range
-    door_tries: tuple = (1, 4)  # bumps to open a hidden door, inclusive range
+
+    # -- rooms (chambers and decoys) -----------------------------------------
+    chamber_size: tuple = (4, 6)  # outer side range (when *_side is None)
+    chamber_side: int | None = None  # exact outer side; overrides the range
+    decoy_side: int | None = None  # exact decoy side; defaults to chamber's
+    chamber_shape: str = "square"  # square | circle | triangle | star | mixed
+    decoy_shape: str = "square"  # area-matched at equal side (never
+    # confounds shape with size)
+    min_sep: int = 2  # minimum pairwise Chebyshev separation between walls
+
+    # -- doors ---------------------------------------------------------------
+    door_kind: str = "bump"  # "bump" (hidden, opens after tries) | "open"
+    # (a width-1 gap in the wall — the spec registry's door convention)
+    doors_per_chamber: int = 1
+    door_corridor_len: int = 0  # dead-end corridor outside each door (the
+    # GiveUp mechanism; lowers the entry probability)
+    door_tries: tuple = (1, 4)  # bump doors: bumps to open, inclusive range
+
+    # -- nested style ---------------------------------------------------------
+    nested_depth: int = 1  # concentric shells around the innermost chamber
+    shell_spacing: int = 2  # free cells between consecutive shells
+
+    # -- corridor style --------------------------------------------------------
+    rooms: int = 6  # rooms in the tree
+    corridor_len: int = 3  # width-1 corridor length between rooms
+
+    # -- maze style ------------------------------------------------------------
+    braid: float = 0.0  # fraction of loop-opening candidates to open; each
+    # opening encloses wall and adds one H1 class
 
     # -- partitions (bridge-finding) ------------------------------------------
     n_partitions: int = 0  # dividing lines across the world, with passages
