@@ -263,17 +263,22 @@ identical layouts, metadata, and rollouts.
 \label{sec:reward}
 
 Every benchmark variant (GridWorld2D, -Texture, -Top) supports a
-\texttt{reward\_mode} configuration field:
+\texttt{reward\_mode} configuration field. Episodes have a
+pre-determined length --- $4WH$ steps for a $W \times H$ world,
+knowable from the configuration alone and overridable via
+\texttt{max\_steps} --- and every environment places a goal cell by
+default (removable with \texttt{goal=False} for goal-free
+exploration studies):
 \begin{itemize}[leftmargin=2em, itemsep=1pt]
-  \item \texttt{none} (default) --- no extrinsic reward; the
-        environment is a pure-exploration benchmark, and event-based
-        metrics (entry times, coverage) carry the evaluation.
-  \item \texttt{sparse} --- $+1$ terminal reward on reaching a target
-        cell placed inside a designated chamber (in Texture
-        scenarios, the treasure-chest cell). Placement inside a
-        chamber makes steps-to-first-reward coincide with
+  \item \texttt{sparse} (default) --- $+1$ terminal reward on
+        reaching the goal cell, placed inside a designated chamber
+        (in Texture scenarios, the treasure-chest cell). Placement
+        inside a chamber makes steps-to-first-reward coincide with
         steps-to-first-entry, so the reward metric stays continuous
         with the exploration metric.
+  \item \texttt{none} --- no extrinsic reward; the environment is a
+        pure-exploration benchmark, and event-based metrics (entry
+        times, coverage) carry the evaluation.
   \item \texttt{coverage} --- $+1$ for each cell visited for the
         first time: a dense pure-exploration reward for methods that
         require a reward signal.

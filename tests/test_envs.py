@@ -206,12 +206,25 @@ def test_reward_mode_validation():
         gym.make("TopoGym/Grid2D-v0", reward_mode="explore", layout_seed=1)
 
 
-def test_default_is_reward_free():
+def test_default_reward_is_sparse_goal():
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
                    layout_seed=5, max_steps=25).unwrapped
     env.reset(seed=0)
-    assert env.reward_mode == "none"
-    assert sum(env.step(int(a % 4))[1] for a in range(25)) == 0.0
+    assert env.reward_mode == "sparse" and env.goal_exists
+    # Horizon defaults to the predetermined 4*W*H unless overridden.
+    assert env._max_steps == 25
+
+
+def test_goal_can_be_removed():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   goal=False, layout_seed=5).unwrapped
+    env.reset(seed=0)
+    from topogym.core import constants as C
+    assert env._obs_code(env.layout.goal) == C.OBS_EMPTY  # reads as floor
+    # Standing on the (removed) goal neither pays nor terminates.
+    env._state = env.layout.base.initial_state(env.layout.goal)
+    reward, terminated = env._step_outcome(env.layout.goal)[:2]
+    assert reward == 0.0 and not terminated
 
 
 def test_sparse_reward_terminates_with_unit_payout():

@@ -183,6 +183,36 @@ def _room_side(rng: np.random.Generator, cfg: TopoGenConfig2D,
 _ROOM_KINDS_2D = ("chamber", "decoy")
 
 
+def _check_packing_2d(cfg: TopoGenConfig2D, base: BaseMap2D) -> None:
+    """Conservative packing feasibility: every room reserves its footprint
+    plus a ``min_sep - 1`` margin; if those squares alone exceed ~60% of
+    the world, rejection sampling cannot succeed — fail early with the
+    reason instead of burning ``max_attempts``."""
+    w, h = base.layout_size()
+    margin = max(1, cfg.min_sep - 1)
+    # Margins of neighboring features overlap, so attribute half a margin
+    # per side; use typical (mean) hole sizes. This deliberately errs
+    # permissive — marginal configs still fall through to rejection
+    # sampling, which reports its own failure.
+    side = cfg.chamber_side or max(cfg.chamber_size)
+    d_side = cfg.decoy_side or side
+    hole = sum(cfg.hole_size) / 2
+    reserved = (
+        cfg.n_chambers * (side + margin) ** 2
+        + cfg.n_decoys * (d_side + margin) ** 2
+        + cfg.n_holes * (hole + margin) ** 2
+    )
+    budget = 0.9 * w * h
+    if reserved > budget:
+        raise GenerationError(
+            f"cannot pack {cfg.n_chambers} chambers (side {side}), "
+            f"{cfg.n_decoys} decoys, and {cfg.n_holes} holes with "
+            f"min_sep={cfg.min_sep} into a {w}x{h} grid: they reserve "
+            f"~{reserved} cells but only ~{budget:.0f} are packable — "
+            "reduce min_sep, room sides, or feature counts"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Partitions (bridge-finding)
 # ---------------------------------------------------------------------------
@@ -436,6 +466,7 @@ def _attempt_2d(cfg: TopoGenConfig2D, rng: np.random.Generator) -> Layout:
             modes.build_corridor(cfg, base, rng, cell_types, features,
                                  Feature)
         elif style == "rooms":
+            _check_packing_2d(cfg, base)
             partition_plan = _plan_partitions_2d(cfg, base, rng)
             for spec in partition_plan:
                 _place_partition_2d(
@@ -664,6 +695,10 @@ def _finalize_metadata(cfg: TopoGenConfig2D, layout: Layout,
     )
 
     summary = analyze_2d(layout.base.face_cycle(c) for c in free)
+    # Second certified reading: doors count as walls (the sealed world).
+    sealed = analyze_2d(
+        layout.base.face_cycle(c) for c in free if c not in layout.doors
+    )
     # Every feature records its obstacle-component contribution at
     # placement (default 1); partitions carry theirs in gap terms.
     n_components = partition_components + sum(
@@ -705,6 +740,7 @@ def _finalize_metadata(cfg: TopoGenConfig2D, layout: Layout,
         n_cells=n_cells,
         n_free_cells=len(free),
         betti_z2=betti_z2,
+        betti_z2_sealed=sealed.betti_z2,
         euler_characteristic=summary.euler_characteristic,
         orientable=summary.orientable,
         genus=summary.genus,
@@ -717,6 +753,7 @@ def _finalize_metadata(cfg: TopoGenConfig2D, layout: Layout,
         n_partitions=len(partitions),
         certified={
             "betti_z2": True,
+            "betti_z2_sealed": True,
             "betti_q": True,
             "h1_torsion": True,
             "connectivity": True,

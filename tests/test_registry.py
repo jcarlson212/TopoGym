@@ -152,6 +152,37 @@ def test_registry_make_with_seed_and_kwargs():
     assert env.topology.betti_z2[1] > 0
 
 
+def test_min_sep_override_and_packing_check():
+    # A larger min_sep is honored: every pair of feature walls stays at
+    # least that far apart (Chebyshev).
+    env = gym.make("TopoGym/ChamberCount2-200-v0", seed=1,
+                   min_sep=25).unwrapped
+    env.reset(seed=0)
+    chambers = [f for f in env.layout.features if f.kind == "chamber"]
+    assert len(chambers) == 2
+    a, b = (set(f.cells) | set(f.meta["door_cells"]) for f in chambers)
+    dist = min(
+        max(abs(p - q) for p, q in zip(ca, cb)) for ca in a for cb in b
+    )
+    assert dist >= 25
+
+    # An impossible min_sep fails fast with a clear packing error.
+    from topogym.generation import GenerationError, generate_2d
+    cfg = registry.get_config("TopoGym/ChamberCount8-200-v0")
+    import dataclasses
+    tiny = dataclasses.replace(cfg, size=40, min_sep=20)
+    with pytest.raises(GenerationError, match="cannot pack"):
+        generate_2d(tiny, seed=0)
+
+
+def test_sealed_betti_convention():
+    # Doors-as-walls: each doored chamber interior becomes a component.
+    env = gym.make("TopoGym/Chambers2-50-v0", seed=1).unwrapped
+    _, info = env.reset(seed=0)
+    assert info["topology"]["betti_z2"] == [1, 2, 0]
+    assert info["topology"]["betti_z2_sealed"] == [3, 2, 0]
+
+
 def test_canonical_string_shape():
     cfg = registry.get_config("TopoGym/ShapeCi-50-v0")
     s = registry.canonical_string(cfg, seed=7)
