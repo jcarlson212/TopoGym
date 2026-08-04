@@ -1,7 +1,5 @@
 # TopCylinder
 
-<img src="../envs/TopCylinder.png" width="360"/>
-
 Corner chambers on a cylinder: one wrapping axis.
 
 ## Action space
@@ -32,6 +30,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/TopCylinder-50-v0` | `[1, 5, 0]` |
+| `TopoGym/TopCylinder-50-v0` | `—` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

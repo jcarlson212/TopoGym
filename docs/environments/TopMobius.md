@@ -1,7 +1,5 @@
 # TopMobius
 
-<img src="../envs/TopMobius.png" width="360"/>
-
 Corner chambers on a Möbius band: crossing the seam mirrors orientation.
 
 ## Action space
@@ -32,6 +30,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/TopMobius-50-v0` | `[1, 5, 0]` |
+| `TopoGym/TopMobius-50-v0` | `—` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

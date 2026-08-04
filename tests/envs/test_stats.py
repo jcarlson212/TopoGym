@@ -65,3 +65,60 @@ def test_stats_recorder_episodes_and_steps():
     summary = env.summary()
     assert summary["episodes"] == 2
     assert 0 <= summary["mean_coverage"] <= 1
+
+
+def _drive(env, path):
+    act = {(0, -1): 0, (0, 1): 1, (-1, 0): 2, (1, 0): 3}
+    for a, b in zip(path, path[1:]):
+        _, _, term, trunc, _ = env.step(act[(b[0]-a[0], b[1]-a[1])])
+        if term or trunc:
+            return
+
+
+def test_metrics_facade_on_optimal_runs():
+    env = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1),
+                        record_steps=True)
+    env.reset(seed=0)
+    path = env.env.unwrapped.shortest_path()
+    _drive(env, path)          # first success: discovery
+    env.reset(seed=0)
+    _drive(env, path)          # second success: replay
+    m = env.metrics()
+    assert m.episodes == 2
+    assert m.success_rate == 1.0
+    assert m.interactions_to_first_success == len(path) - 1
+    assert m.sample_efficiency == m.interactions_to_first_success
+    assert m.mean_regret == 0.0          # we walked the shortest path
+    assert m.planning_efficiency == 1.0  # and replayed it optimally
+    assert m.unique_states == len(path)
+    assert 0 < m.state_coverage < 1
+    assert m.visitation_entropy > 0
+    assert 0 < m.visitation_entropy_normalized <= 1
+    row = env.episodes[0]
+    assert row["regret"] == 0 and row["optimal_steps"] == len(path) - 1
+    assert m.to_dict()["success_rate"] == 1.0
+    # coverage_at is monotone in the global step.
+    assert env.coverage_at(5) <= env.coverage_at(10**9)
+
+
+def test_metrics_coverage_and_hole_milestones():
+    env = StatsRecorder(
+        gym.make("TopoGym/Grid2D-v0", base="square", size=9, n_holes=1,
+                 n_chambers=0, n_decoys=0, layout_seed=2,
+                 obs_mode="global", reward_mode="none", max_steps=600),
+        track_holes=True,
+    )
+    env.reset(seed=0)
+    rng = np.random.default_rng(0)
+    for _ in range(600):
+        _, _, term, trunc, _ = env.step(int(rng.integers(4)))
+        if term or trunc:
+            break
+    m = env.metrics()
+    # Global observation sees the hole immediately.
+    assert m.steps_to_holes.get(1) == 1
+    # A long random walk on a tiny grid crosses coverage milestones.
+    assert 0.5 in m.steps_to_coverage
+    fracs = sorted(m.steps_to_coverage)
+    steps = [m.steps_to_coverage[f] for f in fracs]
+    assert steps == sorted(steps)  # milestones are monotone

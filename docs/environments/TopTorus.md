@@ -1,7 +1,5 @@
 # TopTorus
 
-<img src="../envs/TopTorus.png" width="360"/>
-
 Corner chambers on a torus: all four corners are one point of the quotient.
 
 ## Action space
@@ -32,6 +30,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/TopTorus-50-v0` | `[1, 5, 0]` |
+| `TopoGym/TopTorus-50-v0` | `—` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

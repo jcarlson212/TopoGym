@@ -19,6 +19,9 @@ Rows are plain dicts, ready for pandas::
 
 from __future__ import annotations
 
+import dataclasses
+import math
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import gymnasium as gym
@@ -27,17 +30,86 @@ if TYPE_CHECKING:
     from topogym.envs.core import TopoEnvCore
 
 
+
+
+_MILESTONES = (0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0)
+
+
+def _entropy_bits(counts: dict) -> float:
+    total = sum(counts.values())
+    if not total:
+        return 0.0
+    ent = 0.0
+    for n in counts.values():
+        p = n / total
+        ent -= p * math.log2(p)
+    return ent
+
+
+@dataclass(frozen=True)
+class Metrics:
+    """Standardized exploration metrics, computed from a
+    :class:`StatsRecorder`'s records. ``to_dict()`` is logging-ready."""
+
+    episodes: int
+    #: fraction of episodes that reached the goal
+    success_rate: float
+    #: total env interactions until the first success (None if never)
+    interactions_to_first_success: int | None
+    #: lifetime unique cells visited on the layout
+    unique_states: int
+    #: lifetime fraction of the free space visited
+    state_coverage: float
+    #: Shannon entropy (bits) of the lifetime visitation distribution
+    visitation_entropy: float
+    #: entropy / log2(n_free): 1.0 = perfectly uniform visitation
+    visitation_entropy_normalized: float
+    #: mean (steps-to-goal - shortest-path) over successful episodes
+    mean_regret: float | None
+    #: mean shortest-path/steps over successes *after* the first —
+    #: 1.0 means optimal replay once the goal has been discovered
+    planning_efficiency: float | None
+    #: lifetime-coverage milestones: fraction -> global step reached
+    steps_to_coverage: dict
+    #: loops discovered: k -> global step the observed region first
+    #: carried b1 >= k (requires track_holes=True)
+    steps_to_holes: dict
+    #: mean per-episode final coverage
+    mean_episode_coverage: float
+
+    @property
+    def sample_efficiency(self) -> int | None:
+        """Alias of ``interactions_to_first_success``."""
+        return self.interactions_to_first_success
+
+    def to_dict(self) -> dict:
+        d = dataclasses.asdict(self)
+        d["sample_efficiency"] = self.sample_efficiency
+        return d
+
+
 class StatsRecorder(gym.Wrapper):
     """Record per-episode (and optionally per-step) exploration stats."""
 
-    def __init__(self, env: gym.Env, record_steps: bool = False):
+    def __init__(self, env: gym.Env, record_steps: bool = False,
+                 track_holes: bool = False):
         super().__init__(env)
         self.record_steps = record_steps
+        #: compute observed b1 every step to timestamp hole discoveries
+        #: (opt-in: it runs GUDHI per step)
+        self.track_holes = track_holes
         self.episodes: list = []
         self.steps: list = []
         self._episode_index = -1
         self._last_info: dict = {}
         self._goal_reached = False
+        self._global_step = 0
+        self._first_success_step: int | None = None
+        self.lifetime_milestones: dict = {}
+        self.hole_steps: dict = {}
+        self._optimal: int | None = None
+        self._ep_milestones: dict = {}
+        self._steps_to_success: int | None = None
 
     @property
     def _core(self) -> TopoEnvCore:
@@ -49,18 +121,44 @@ class StatsRecorder(gym.Wrapper):
         self._episode_index += 1
         self._last_info = info
         self._goal_reached = False
+        self._ep_milestones = {}
+        self._steps_to_success = None
+        core = self._core
+        if core.goal_exists:
+            try:
+                path = core.shortest_path()
+                self._optimal = len(path) - 1 if path else None
+            except ValueError:
+                self._optimal = None
+        else:
+            self._optimal = None
         return obs, info
 
     def step(self, action: int) -> tuple:
         obs, reward, terminated, truncated, info = self.env.step(action)
         self._last_info = info
         core = self._core
+        self._global_step += 1
+        for frac in _MILESTONES:
+            if info["coverage"] >= frac and frac not in self._ep_milestones:
+                self._ep_milestones[frac] = info["steps"]
+            if info["lifetime_coverage"] >= frac \
+                    and frac not in self.lifetime_milestones:
+                self.lifetime_milestones[frac] = self._global_step
+        if self.track_holes:
+            b1 = core.observed_betti()[1]
+            for k in range(len(self.hole_steps) + 1, b1 + 1):
+                self.hole_steps[k] = self._global_step
         if terminated and core.goal_exists \
                 and info.get("position") == core.layout.goal:
             self._goal_reached = True
+            self._steps_to_success = info["steps"]
+            if self._first_success_step is None:
+                self._first_success_step = self._global_step
         if self.record_steps:
             self.steps.append({
                 "episode": self._episode_index,
+                "global_step": self._global_step,
                 "step": info["steps"],
                 "reward": reward,
                 "coverage": info["coverage"],
@@ -86,8 +184,68 @@ class StatsRecorder(gym.Wrapper):
             "doors_opened": info["doors_opened"],
             "h0_merges": info["h0_merges"],
             "goal_reached": self._goal_reached,
+            "unique_states": len(self._core._visited),
+            "steps_to_success": self._steps_to_success,
+            "optimal_steps": self._optimal,
+            "regret": (self._steps_to_success - self._optimal
+                       if self._steps_to_success is not None
+                       and self._optimal is not None else None),
+            "coverage_milestones": dict(self._ep_milestones),
+            "visitation_entropy":
+                _entropy_bits(self._core.visit_counts),
         })
         self._last_info = {}
+
+    def coverage_at(self, global_step: int) -> float:
+        """Lifetime coverage reached by the given global step (requires
+        ``record_steps=True``)."""
+        if not self.record_steps:
+            raise RuntimeError(
+                "coverage_at needs StatsRecorder(record_steps=True)"
+            )
+        best = 0.0
+        for row in self.steps:
+            if row["global_step"] > global_step:
+                break
+            best = row["lifetime_coverage"]
+        return best
+
+    def metrics(self) -> Metrics:
+        """The standardized metric set, as a frozen value object."""
+        self._flush()
+        eps = self.episodes
+        n = len(eps)
+        core = self._core
+        n_free = len(core.layout.free_cells) if core.layout else 1
+        lifetime_counts = core.lifetime_visit_counts
+        entropy = _entropy_bits(lifetime_counts)
+        successes = [e for e in eps if e["goal_reached"]
+                     and e["regret"] is not None]
+        later = [e for e in successes[1:]
+                 if e["steps_to_success"]]
+        return Metrics(
+            episodes=n,
+            success_rate=(sum(e["goal_reached"] for e in eps) / n
+                          if n else 0.0),
+            interactions_to_first_success=self._first_success_step,
+            unique_states=len(lifetime_counts),
+            state_coverage=len(lifetime_counts) / n_free,
+            visitation_entropy=entropy,
+            visitation_entropy_normalized=(
+                entropy / math.log2(n_free) if n_free > 1 else 0.0
+            ),
+            mean_regret=(sum(e["regret"] for e in successes)
+                         / len(successes) if successes else None),
+            planning_efficiency=(
+                sum(e["optimal_steps"] / e["steps_to_success"]
+                    for e in later) / len(later) if later else None
+            ),
+            steps_to_coverage=dict(self.lifetime_milestones),
+            steps_to_holes=dict(self.hole_steps),
+            mean_episode_coverage=(
+                sum(e["coverage"] for e in eps) / n if n else 0.0
+            ),
+        )
 
     def summary(self) -> dict:
         """Aggregates over all recorded episodes."""

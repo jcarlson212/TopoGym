@@ -1,7 +1,5 @@
 # TopPlane
 
-<img src="../envs/TopPlane.png" width="360"/>
-
 The canonical corner-chamber layout on the walled plane — the control for the Top slice.
 
 ## Action space
@@ -32,6 +30,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/TopPlane-50-v0` | `[1, 4, 0]` |
+| `TopoGym/TopPlane-50-v0` | `—` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

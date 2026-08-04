@@ -340,7 +340,7 @@ def test_search_rescue_barrels_explode_and_warn():
 
 def test_search_rescue_gets_a_longer_horizon():
     env, _, _ = _make("SearchRescue")
-    assert env._max_steps == int(1.3 * ((6 * 61) // 5))  # 95, +30%
+    assert env._max_steps == int(1.56 * ((6 * 61) // 5))  # 113
     override = gym.make("TopoGym/SearchRescue-v0", seed=1,
                         max_steps=40).unwrapped
     override.reset(seed=0)

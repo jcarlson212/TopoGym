@@ -24,6 +24,33 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 
 
+@dataclass(frozen=True)
+class BettiNumbers:
+    """Betti numbers of a 2D free space, as a value object.
+
+    ``b0``: connected components; ``b1``: independent loops; ``b2``:
+    enclosed voids (always 0 for gridworld free spaces with boundary).
+    """
+
+    b0: int
+    b1: int
+    b2: int = 0
+
+    @classmethod
+    def from_tuple(cls, betti: tuple) -> BettiNumbers:
+        padded = tuple(betti) + (0, 0, 0)
+        return cls(int(padded[0]), int(padded[1]), int(padded[2]))
+
+    def as_tuple(self) -> tuple:
+        return (self.b0, self.b1, self.b2)
+
+    def __iter__(self):
+        return iter(self.as_tuple())
+
+    def __str__(self) -> str:
+        return f"b0={self.b0} b1={self.b1} b2={self.b2}"
+
+
 def homology_strings(betti_q: tuple | None, h1_torsion: tuple,
                      betti_z2: tuple) -> dict:
     """Human-readable homology groups, e.g. ``{"H1": "Z^2 + Z/2"}``."""
@@ -97,6 +124,16 @@ class TopologyMetadata:
 
     certified: dict = field(default_factory=dict)
     homology: dict = field(default_factory=dict)
+
+    def betti_numbers_doors_dont_count_as_walls(self) -> BettiNumbers:
+        """Betti numbers of the traversable free space: door cells count
+        as free, so b0 = 1 and homology is door-state invariant."""
+        return BettiNumbers.from_tuple(self.betti_z2)
+
+    def betti_numbers_doors_count_as_walls(self) -> BettiNumbers:
+        """The sealed-world convention: doors count as walls, so each
+        doored chamber interior is its own component."""
+        return BettiNumbers.from_tuple(self.betti_z2_sealed)
 
     def to_dict(self) -> dict:
         """JSON-serializable dict (for logging / sweeping / pandas)."""
