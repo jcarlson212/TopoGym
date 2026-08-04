@@ -29,6 +29,7 @@ dependencies = ["gymnasium>=0.29", "numpy>=1.21", "gudhi>=3.8"]
 
 [project.optional-dependencies]
 testing = ["pytest>=7.0"]
+play = ["pygame>=2.1"]
 
 [project.urls]
 Homepage = "https://github.com/jcarlson212/TopoGym"

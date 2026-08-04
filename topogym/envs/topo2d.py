@@ -215,9 +215,27 @@ class TopoGrid2DEnv(TopoEnvCore):
     def render(self):
         if self.render_mode == "rgb_array":
             return render_rgb_2d(self)
+        if self.render_mode == "human":
+            if getattr(self, "_window", None) is None:
+                from topogym.rendering.window import Window
+
+                self._window = Window(
+                    title=f"TopoGym ({self.cfg.base})",
+                    fps=self.metadata["render_fps"],
+                )
+            w, h = self.layout.base.layout_size()
+            tile = max(3, 720 // max(w, h))
+            self._window.show(render_rgb_2d(self, tile=tile))
+            return None
         if self.render_mode == "ansi":
             return self._render_ansi()
         return None
+
+    def close(self):
+        window = getattr(self, "_window", None)
+        if window is not None:
+            window.close()
+            self._window = None
 
     _ANSI = {
         C.OBS_EMPTY: "·", C.OBS_WALL: "#", C.OBS_HOLE: "O",
