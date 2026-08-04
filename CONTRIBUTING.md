@@ -11,9 +11,15 @@ git clone https://github.com/<you>/TopoGym.git
 cd TopoGym
 pip install -e ".[testing]"
 pip install ruff            # linting
-pytest -q                   # ~220 tests, a few seconds
+pytest -q                   # a few hundred tests, ~30 seconds
 ruff check .
+git config core.hooksPath .githooks   # pre-commit lint gate (once)
 ```
+
+The last line installs the repo's pre-commit hook: every `git commit`
+runs `ruff check` and the version-sync check (the fast CI gates) and
+refuses the commit if they fail — so lint failures surface locally,
+not on CI. Bypass deliberately with `git commit --no-verify`.
 
 ## What to contribute
 
