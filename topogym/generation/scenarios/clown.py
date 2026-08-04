@@ -19,11 +19,12 @@ from topogym.generation.scenarios._shared import (
 )
 
 
-def build_clown_chase(seed: int) -> Layout:
-    """A clown wanders near sealed decoys on one side of the map, paying
-    a tiny reward for every step that closes the distance to it — from a
-    budget that runs out after a few thousand rewarding steps. The
-    treasure chamber sits on the opposite side."""
+def build_clown_chase(seed: int, n_clowns: int = 2) -> Layout:
+    """A troupe of clowns (``n_clowns``, default two) wanders near the
+    sealed decoy tents on one side of the map, paying a tiny reward for
+    every step that closes the distance to the *nearest* clown — from
+    one shared budget that runs out after a few thousand rewarding
+    steps. The treasure chamber sits on the opposite side."""
     size = SCENARIO_SIZES["clown_chase"]
     cfg = TopoGenConfig2D(
         base="square", size=size, style="rooms",
@@ -47,9 +48,16 @@ def build_clown_chase(seed: int) -> Layout:
             continue
 
         free = set(layout.free_cells)
-        anchor = min(
-            (c for c in free), key=lambda c: (abs(c[0] - dx), repr(c))
-        )
+        # One anchor per clown, each hugging a different decoy tent.
+        anchors: list = []
+        for i in range(n_clowns):
+            tent = decoys[i % len(decoys)]
+            tx, ty = centroid(tent.cells)
+            anchor = min(
+                (c for c in free if c not in anchors),
+                key=lambda c: (abs(c[0] - tx) + abs(c[1] - ty), repr(c)),
+            )
+            anchors.append(anchor)
         # Start away from the clown's side, not inside any room.
         interiors = set(_interiors(layout))
         start_side = [
@@ -68,9 +76,9 @@ def build_clown_chase(seed: int) -> Layout:
         layout.extras = {
             "textures": textures,
             "clown": {
-                "anchor": anchor,
+                "anchors": tuple(anchors),
                 "radius": 8,
-                "budget": 2.0,        # total distractor payout
+                "budget": 2.0,        # total payout, shared by the troupe
                 "step_reward": 0.001,  # ~2000 rewarding steps
             },
         }

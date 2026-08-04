@@ -2,7 +2,7 @@
 
 <img src="../envs/ClownChase.gif" width="360"/>
 
-A clown wanders near the decoys paying a depleting trickle of reward for approach; the treasure chamber is on the opposite side.
+A troupe of clowns (default two, n_clowns configurable) wanders the carnival tents paying a depleting trickle of reward for approach; the treasure chamber is on the opposite side.
 
 ## Action space
 
