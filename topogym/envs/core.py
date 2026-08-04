@@ -58,7 +58,8 @@ COMPLEX_BACKENDS = ("cubical", "rips")
 
 
 class TopoEnvCore(gym.Env):
-    metadata = {"render_modes": ["rgb_array", "ansi"], "render_fps": 8}
+    metadata = {"render_modes": ["rgb_array", "ansi", "human"],
+                "render_fps": 8}
 
     #: subclasses set: 2 or 3
     DIM = None
