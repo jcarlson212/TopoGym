@@ -198,6 +198,15 @@ class TopoEnvCore(gym.Env):
         self._decept_prev = None
         if self.reward_mode == "deceptive":
             self._setup_deception()
+        # Chamber-entry instrumentation: interior cell -> chamber index.
+        self._chamber_of = {
+            c: i
+            for i, f in enumerate(self.layout.features)
+            if f.kind == "chamber"
+            for c in f.interior
+        }
+        self.chamber_entry_steps: dict = {}
+        self._episode_return = 0.0
 
     # -- stochasticity ------------------------------------------------------
 
@@ -377,6 +386,9 @@ class TopoEnvCore(gym.Env):
         self._steps += 1
         newly_visited = agent_cell not in self._visited
         self._visited.add(agent_cell)
+        chamber = self._chamber_of.get(agent_cell)
+        if chamber is not None and chamber not in self.chamber_entry_steps:
+            self.chamber_entry_steps[chamber] = self._steps
         reward, terminated = 0.0, False
         mode = self.reward_mode
         at_goal = self.goal_exists and agent_cell == self.layout.goal
@@ -396,6 +408,7 @@ class TopoEnvCore(gym.Env):
                 reward += 1.0
                 terminated = True
         truncated = self._steps >= self._max_steps and not terminated
+        self._episode_return += reward
         return reward, terminated, truncated
 
     def _step_info(self, agent_cell):
@@ -404,10 +417,16 @@ class TopoEnvCore(gym.Env):
             "position": agent_cell,
             "steps": self._steps,
             "coverage": len(self._visited) / n_free,
+            # Coverage across the env's lifetime on this layout (all
+            # episodes, teleport resets included).
+            "lifetime_coverage":
+                len(self._ever_visited | self._visited) / n_free,
             "observed_frac": len(self._observed_free) / n_free,
             "known_components": self._known_components,
             "h0_merges": self._h0_merges,
             "doors_opened": len(self._open),
+            "chambers_entered": len(self.chamber_entry_steps),
+            "episode_return": self._episode_return,
         }
 
     def _reset_info(self, agent_cell):

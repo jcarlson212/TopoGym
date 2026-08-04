@@ -18,7 +18,7 @@ Or compose spaces directly (see :mod:`topogym.spec`)::
 
 from gymnasium.envs.registration import register
 
-from topogym import complexes, registry, spec, tda
+from topogym import complexes, registry, spec, stats, tda
 from topogym.core.metadata import TopologyMetadata
 from topogym.generation import TopoGenConfig2D
 
@@ -29,6 +29,7 @@ __all__ = [
     "complexes",
     "registry",
     "spec",
+    "stats",
     "tda",
 ]
 
