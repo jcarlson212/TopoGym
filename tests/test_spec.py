@@ -22,9 +22,10 @@ def test_fluent_modifiers_are_immutable():
     assert base.cfg.n_holes == 0
     assert with_holes.cfg.n_holes == 3
     md = with_holes.chambers(1).metadata(seed=2)
-    # Torus loops (2) + 4 obstacles - 1 (the first puncture of a closed
-    # surface kills b2 instead of adding a loop) = 5.
-    assert md.betti_z2 == (1, 5, 0)
+    # Torus loops (2) + 3 sealed obstacles - 1 (the first puncture of
+    # a closed surface kills b2 instead of adding a loop) = 4; the
+    # doored chamber is a room, not a hole.
+    assert md.betti_z2 == (1, 4, 0)
     assert md.certified["betti_z2"]
 
 

@@ -92,7 +92,7 @@ import topogym  # registers the TopoGym/* ids
 
 env = gym.make("TopoGym/Decoys4-50-v0", seed=3)
 obs, info = env.reset(seed=0)
-info["topology"]["betti_z2"]         # [1, 5, 0] — certified
+info["topology"]["betti_z2"]         # [1, 4, 0] — doors walkable
 info["topology"]["betti_z2_sealed"]  # [2, 5, 0] — doors count as walls
 ```
 

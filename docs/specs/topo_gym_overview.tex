@@ -237,6 +237,34 @@ analytic expectation for the placed features at generation time.
 Registration-time unit tests assert the standing conventions on every
 generated instance.
 
+\paragraph{The two door conventions.} Every instance certifies its
+Betti numbers under both readings of a door:
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item \texttt{betti\_z2} (\emph{doors walkable}, the headline):
+        an enclosure with a door is an enterable room, not a hole ---
+        its wall is filled before computing, so $b_1$ counts only
+        \emph{sealed} structure: decoys, doorless chambers, and solid
+        obstacles. A \texttt{ChamberCount} world certifies
+        $[1, 0, 0]$; \texttt{Decoys4} certifies $[1, 4, 0]$ (the
+        four sealed decoys and nothing else); the \texttt{Top}
+        surfaces, whose chambers all have doors, recover the full
+        closed surface (the torus certifies $[1, 2, 1]$, with
+        $H_1 = \Z^2$ and Klein's torsion $\Z \oplus \Z/2$ intact).
+  \item \texttt{betti\_z2\_sealed} (\emph{doors count as walls}):
+        every door is sealed, so each doored interior becomes its own
+        component and every wall component --- open arcs included ---
+        contributes a class. The raw free-space $b_1$ (the strict
+        homotopy type of the traversable region, where even a
+        C-shaped wall arc carries a class) coincides with
+        $\texttt{sealed}[1]$, so no information is lost between the
+        two readings.
+\end{itemize}
+Both are certified against independent analytic expectations at
+generation time, and the accessors
+\texttt{betti\_numbers\_doors\_dont\_count\_as\_walls()} /
+\texttt{betti\_numbers\_doors\_count\_as\_walls()} name them
+unambiguously.
+
 \subsection{Complex backends (all variants)}
 \label{sec:complex}
 
@@ -259,8 +287,9 @@ selecting the geometric substrate used for free-space homology:
         separated by a width-one wall (ambient distance 2) do not, so
         obstacles produce classes exactly as in the cubical complex; the
         backend reports dimensions 0 and 1, and the library's tests
-        assert agreement with the certified cubical numbers on every
-        base.
+        assert agreement with the cubical computation of the raw free
+        space on every base (the strict traversable-space reading;
+        its $b_1$ equals $\texttt{sealed}[1]$).
 \end{itemize}
 The backend governs the environment-side homology computations
 (\texttt{free\_betti}, \texttt{visited\_betti},
@@ -615,7 +644,7 @@ import topogym  # registers the TopoGym/* ids
 
 env = gym.make("TopoGym/Decoys4-50-v0", seed=3, p_slip=0.05)
 obs, info = env.reset(seed=0)
-info["topology"]["betti_z2"]         # [1, 5, 0]  (certified)
+info["topology"]["betti_z2"]         # [1, 4, 0]  (doors walkable)
 info["topology"]["betti_z2_sealed"]  # [2, 5, 0]  (doors count as walls)
 
 from topogym import registry
@@ -626,7 +655,8 @@ registry.canonical_string(
 registry.manifest(seed=0)            # validity + assumptions per entry
 \end{lstlisting}
 
-Episodes truncate after the pre-determined $4\max(W,H)$ steps; the
+Episodes truncate after the pre-determined $1.2\max(W,H)$ steps
+(60 on 50-grids, 120 on 100-grids; Section~\ref{sec:modes}); the
 sparse goal pays $+1$ by default (Section~\ref{sec:reward}).
 Archive-style teleport resets are opt-in:
 
@@ -781,32 +811,31 @@ debugger; both are off by default and cost nothing when unset.
 
 \paragraph{The H1 overlay.} \texttt{TOPOGYM\_OVERLAY=1} (alias
 \texttt{OVERLAY\_ENABLED=1}) recomputes, on every rendered frame, the
-$\Hm{1}$ classes of the \emph{observed region} --- the region the
-agent has seen and believes free --- and draws each class on the
-grid:
+$\Hm{1}$ classes of the \emph{strictly-visited region} --- the cells
+the agent has actually stood on, which are exactly the states an
+archive can restore to --- and draws each class on the grid:
 
 \begin{itemize}[leftmargin=2em, itemsep=1pt]
-  \item the \textbf{representative cycle} (yellow): the observed
-        cells that currently witness the class, i.e.\ the inner
-        boundary of the known region around the enclosed pocket. It
-        is loose when the agent has only encircled from afar and
-        tightens as the wall is hugged;
-  \item the \textbf{rim} (green): the free cells directly adjacent to
-        the wall component enclosed by the class. A class \emph{with}
-        a rim encloses real structure and will persist; a yellow
-        cycle with \emph{no} green rim encloses only unexplored free
-        space --- a transient belief that dies the moment the pocket
-        is explored. Watching transient cycles appear and collapse
-        while real ones tighten onto their rims is the fastest way to
-        build intuition for the discovery filtration of
-        Section~\ref{sec:gw}.
+  \item the \textbf{representative cycle} (yellow): the innermost
+        closed loop through strictly-visited cells enclosing the
+        pocket. Every cell on it is a valid archive/teleport target;
+        cells merely \emph{seen} never appear. The loop is loose when
+        the agent has only encircled from afar and tightens as its
+        trail hugs the structure;
+  \item the \textbf{rim} (green): the part of the cycle adjacent to
+        seen-but-unvisited free space --- where the loop can still
+        tighten. A class whose rim has gone dark is as tight as the
+        walls allow; a class that dies when its pocket is walked was
+        a transient belief, not a hole. Watching cycles tighten and
+        transient ones collapse is the fastest way to build intuition
+        for the discovery filtration of Section~\ref{sec:gw}.
 \end{itemize}
 
 A legend with the live $\Hm{1}$ count sits in the top-right corner.
-The overlay uses the library's own machinery (observed-region
-filtration, movement connectivity, the pinch convention), so what it
-draws is exactly what \texttt{observed\_betti()} and the
-\texttt{ExplorationTracker} count.
+\texttt{env.h1\_representatives()} returns exactly what is drawn
+(one \texttt{\{cycle, rim, pocket\}} record per class, every cycle
+cell strictly visited), so archive methods consume the same loops the
+overlay shows --- what you see is the interface.
 
 \begin{lstlisting}[language=bash]
 # watch loops be conjectured, confirmed, and refuted as you drive:

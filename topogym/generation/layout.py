@@ -100,6 +100,22 @@ def map_offsets(base: BaseMap2D, anchor: tuple, offsets: set) -> dict | None:
     return mapping
 
 
+def walkable_cells(free: list, features: list) -> set:
+    """The doors-walkable region: the free space plus the walls of
+    every enclosure that has a door. A doored chamber is an enterable
+    room, not a hole -- its wall arc is filled before computing the
+    headline homology, so ``betti_z2`` counts only *sealed* structure
+    (decoys, doorless chambers, solid obstacles). The raw free-space
+    b1 (which counts every wall component, arcs included) survives as
+    ``betti_z2_sealed[1]``."""
+    filled = {
+        c for f in features
+        if f.kind in ("chamber", "shell") and f.doors
+        for c in f.cells
+    }
+    return set(free) | filled
+
+
 def expected_betti_2d(base_info: BaseMapInfo, n_components: int) -> tuple:
     b2 = 1 if (base_info.closed and n_components == 0) else 0
     b1 = 1 + b2 - base_info.euler_characteristic + n_components

@@ -141,7 +141,7 @@ def test_standardized_run_log(tmp_path, caplog):
     out = env.save(tmp_path / "run.json")
     payload = json.loads(out.read_text())
     assert payload["run"]["key"].startswith("TG-GridWorld2D-S50-")
-    assert payload["run"]["topology"]["betti_z2"] == [1, 1, 0]
+    assert payload["run"]["topology"]["betti_z2"] == [1, 0, 0]
     assert payload["metrics"]["success_rate"] == 0.0
     assert len(payload["episodes"]) >= 1
     assert payload["steps"][0]["global_step"] == 1

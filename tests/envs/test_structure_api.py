@@ -24,7 +24,9 @@ def test_betti_numbers_dataclass_conventions():
     assert tuple(sealed) == tuple(env.topology.betti_z2_sealed)
     assert walkable.b0 == 1  # doors walkable: one component
     assert sealed.b0 == walkable.b0 + 1  # the chamber interior seals off
-    assert sealed.b1 == walkable.b1
+    # Sealing keeps the chamber's wall arc as a raw class on top of
+    # the walkable count (which sees only the sealed decoys).
+    assert sealed.b1 == walkable.b1 + 1
     assert str(walkable).startswith("b0=")
 
 

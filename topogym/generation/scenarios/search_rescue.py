@@ -28,6 +28,7 @@ from topogym.generation.layout import (
     Feature,
     GenerationError,
     Layout,
+    walkable_cells,
 )
 from topogym.generation.rooms import room_offsets
 from topogym.generation.scenarios._shared import SCENARIO_SIZES, _mark
@@ -132,8 +133,8 @@ def build_search_rescue(seed: int) -> Layout:
         for c in barrels:
             cell_types[c] = C.HAZARD
 
-        summary = analyze_2d(base.face_cycle(c) for c in free)
-        if summary.betti_z2 != (1, _N_BLOCKS + 1, 0):
+        raw = analyze_2d(base.face_cycle(c) for c in free)
+        if raw.betti_z2 != (1, _N_BLOCKS + 1, 0):
             continue
         sealed = analyze_2d(
             base.face_cycle(c) for c in free if c not in doors
@@ -149,6 +150,13 @@ def build_search_rescue(seed: int) -> Layout:
                     doors=(), meta={"components": 1})
             for b in picked
         ]
+
+        summary = analyze_2d(
+            base.face_cycle(c)
+            for c in walkable_cells(free, features)
+        )
+        if summary.betti_z2 != (1, _N_BLOCKS, 0):
+            continue
 
         layout = Layout(
             dim=2, base=base, cell_types=cell_types, doors=doors,

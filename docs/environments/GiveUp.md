@@ -32,8 +32,8 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/GiveUp1-50-v0` | `[1, 1, 0]` |
-| `TopoGym/GiveUp2-50-v0` | `[1, 1, 0]` |
-| `TopoGym/GiveUp4-50-v0` | `[1, 1, 0]` |
+| `TopoGym/GiveUp1-50-v0` | `[1, 0, 0]` |
+| `TopoGym/GiveUp2-50-v0` | `[1, 0, 0]` |
+| `TopoGym/GiveUp4-50-v0` | `[1, 0, 0]` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

@@ -124,22 +124,26 @@ def build_top(topology: str, seed: int, size: int = 50) -> Layout:
         if reachable_from(adj, start) != free_set:
             continue
 
-        summary = analyze_2d(base.face_cycle(c) for c in free)
-        expected = expected_betti_2d(base.info, 4)
-        if summary.betti_z2 != expected:
+        raw = analyze_2d(base.face_cycle(c) for c in free)
+        if raw.betti_z2 != expected_betti_2d(base.info, 4):
             continue
         sealed = analyze_2d(
             base.face_cycle(c) for c in free if c not in doors
         )
+        # Doors-walkable reading: every chamber has a door, so filling
+        # their walls restores the full closed surface.
+        summary = analyze_2d(base.face_cycle(c) for c in cells)
+        if summary.betti_z2 != expected_betti_2d(base.info, 0):
+            continue
 
         layout = Layout(
             dim=2, base=base, cell_types=cell_types, doors=doors,
             start=start, goal=goal, features=features, free_cells=free,
         )
         info = base.info
-        # Puncturing removes torsion; the free space is a surface with
-        # boundary, so betti_q matches betti_z2.
-        betti_q = (1, summary.betti_z2[1], 0)
+        # The walkable reading is the full surface: rational betti and
+        # torsion are the base's own.
+        betti_q, torsion = info.betti_q, info.h1_torsion
         layout.metadata = TopologyMetadata(
             dim=2, base_map=TOPOLOGIES[topology],
             base={k: getattr(info, k) for k in info.__dataclass_fields__},
@@ -152,12 +156,14 @@ def build_top(topology: str, seed: int, size: int = 50) -> Layout:
             orientable=summary.orientable, genus=summary.genus,
             demigenus=summary.demigenus,
             n_boundary_components=summary.n_boundary_components,
-            betti_q=betti_q, betti_q_expected=betti_q, h1_torsion=(),
+            betti_q=betti_q, betti_q_expected=betti_q,
+            h1_torsion=torsion,
             connectivity=connectivity_block(free_set, base.neighbors),
             certified={"betti_z2": True, "betti_z2_sealed": True,
                        "betti_q": True, "h1_torsion": True,
                        "connectivity": True, "genus": True},
-            homology=homology_strings(betti_q, (), summary.betti_z2),
+            homology=homology_strings(betti_q, torsion or (),
+                                      summary.betti_z2),
         )
         return layout
     raise GenerationError(

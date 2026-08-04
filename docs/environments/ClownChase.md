@@ -32,6 +32,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/ClownChase-v0` | `[1, 4, 0]` |
+| `TopoGym/ClownChase-v0` | `[1, 3, 0]` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

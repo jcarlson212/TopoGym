@@ -288,6 +288,23 @@ class TopoEnvCore(gym.Env):
 
     # -- environment structure accessors -------------------------------------
 
+    def h1_representatives(self) -> list:
+        """Archive-facing H1 representatives of the strictly-visited
+        region — exactly what the debug overlay draws. One dict per
+        enclosed pocket: ``cycle`` is the innermost closed loop
+        through cells the agent has actually stood on (every cell is
+        a valid teleport/archive target — cells merely seen never
+        appear); ``rim`` is the subset of the cycle adjacent to
+        seen-but-unvisited free space, where the loop can still
+        tighten; ``pocket`` is the enclosed unvisited region."""
+        from topogym.rendering.overlay import h1_classes
+
+        return [
+            {"cycle": frozenset(cycle), "rim": frozenset(rim),
+             "pocket": frozenset(pocket)}
+            for cycle, rim, pocket in h1_classes(self)
+        ]
+
     def ollivier_ricci(self) -> dict:
         """Per-cell Ollivier-Ricci curvature of the free-cell graph
         (mean over incident edges; alpha = 0, exact W1). Expensive on

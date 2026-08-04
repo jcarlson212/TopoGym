@@ -32,6 +32,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/SpaceWarp-v0` | `[2, 4, 0]` |
+| `TopoGym/SpaceWarp-v0` | `[2, 1, 0]` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

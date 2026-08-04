@@ -18,6 +18,7 @@ from topogym.generation.layout import (
     GenerationError,
     Layout,
     map_offsets,
+    walkable_cells,
 )
 from topogym.generation.rooms import room_offsets
 from topogym.generation.scenarios._shared import (
@@ -187,8 +188,16 @@ def build_space_warp(seed: int, warp_sep: int = 3) -> Layout:
 
         # Certification: spatially the treasure interior is its own
         # component (b0 = 2) and each chamber contributes one class.
-        summary = analyze_2d(base.face_cycle(c) for c in free)
-        if summary.betti_z2 != (2, 4, 0):
+        raw = analyze_2d(base.face_cycle(c) for c in free)
+        if raw.betti_z2 != (2, 4, 0):
+            continue
+        # Walkable: the doorless treasure chamber is the only true
+        # hole (and its interior the second component).
+        summary = analyze_2d(
+            base.face_cycle(c)
+            for c in walkable_cells(free, features)
+        )
+        if summary.betti_z2 != (2, 1, 0):
             continue
         sealed = analyze_2d(
             base.face_cycle(c) for c in free if c not in doors
@@ -211,7 +220,7 @@ def build_space_warp(seed: int, warp_sep: int = 3) -> Layout:
             euler_characteristic=summary.euler_characteristic,
             orientable=summary.orientable, genus=None, demigenus=None,
             n_boundary_components=summary.n_boundary_components,
-            betti_q=(2, 4, 0), betti_q_expected=(2, 4, 0), h1_torsion=(),
+            betti_q=(2, 1, 0), betti_q_expected=(2, 1, 0), h1_torsion=(),
             connectivity=connectivity_block(free_set, base.neighbors),
             certified={"betti_z2": True, "betti_z2_sealed": True,
                        "betti_q": True, "h1_torsion": True,

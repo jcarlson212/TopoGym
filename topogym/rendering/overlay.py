@@ -1,26 +1,29 @@
-"""The H1 debug overlay: live homology of the agent's known region.
+"""The H1 debug overlay: live homology of the agent's *visited* region.
 
 Enabled with ``TOPOGYM_OVERLAY=1`` (alias ``OVERLAY_ENABLED=1``). Each
-rendered frame recomputes the H1 classes of the *observed* region and
-draws, per class:
+rendered frame recomputes the H1 classes of the strictly-visited
+region — the cells the agent has actually stood on, the ones an
+archive can restore to — and draws, per class:
 
-- the **representative cycle** (yellow): the observed cells that
-  currently witness the class — the inner boundary of the known region
-  around the enclosed pocket. Loose when the agent has only encircled
-  from afar, tightening as it hugs the wall.
-- the **rim** (green): the free cells directly adjacent to the enclosed
-  wall component. A class with a rim encloses real structure; a class
-  with *no* rim encloses only unexplored free space — a transient
-  belief that will die when the pocket is explored.
+- the **representative cycle** (yellow): the innermost closed loop
+  through strictly-visited cells enclosing the pocket. Every cycle
+  cell is a valid archive/teleport target; cells merely *seen* never
+  appear. Loose when the agent has only encircled from afar,
+  tightening as its trail hugs the structure.
+- the **rim** (green): the cycle cells adjacent to seen-but-unvisited
+  free space — where the loop can still tighten. A class whose rim
+  has gone dark is as tight as the walls allow; a class that dies
+  when its pocket is walked was a transient belief, not a hole.
 
-Square (walled) bases only; a legend sits in the top-right corner.
+``env.h1_representatives()`` returns exactly what is drawn, so archive
+methods can consume the same cycles. Square (walled) bases only; a
+legend sits in the top-right corner.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from topogym.core import constants as C
 from topogym.core.basemap import Boundary, RectGluing2D
 
 CYCLE_COLOR = (244, 208, 34)  # yellow: the representative cycle
@@ -42,14 +45,18 @@ _FONT = {
 
 
 def h1_classes(env) -> list:
-    """``[(cycle_cells, rim_cells)]`` for each H1 class of the observed
-    region (enclosed pockets of not-yet-known space)."""
+    """``[(cycle, rim, pocket)]`` per H1 class of the strictly-visited
+    region. ``cycle`` is the innermost visited loop enclosing the
+    pocket (all cells archive-restorable); ``rim`` is the part of the
+    cycle adjacent to seen-but-unvisited free space (the loop can
+    still tighten there); ``pocket`` the enclosed unvisited cells."""
     layout = env.layout
     base = layout.base
     if not isinstance(base, RectGluing2D) or (
         base.rule_x != Boundary.WALL or base.rule_y != Boundary.WALL
     ):
         return []  # v1: walled square bases only
+    visited = set(env.lifetime_visit_counts)
     observed = env._observed_free
     w, h = base.layout_size()
     seen: set = set()
@@ -57,9 +64,10 @@ def h1_classes(env) -> list:
     for y in range(h):
         for x in range(w):
             cell = (x, y)
-            if cell in observed or cell in seen:
+            if cell in visited or cell in seen:
                 continue
-            # Flood the unknown pocket (walls + unobserved free alike).
+            # Flood the unvisited pocket (walls and unvisited free
+            # alike — seen-but-unvisited cells are still pocket).
             pocket = {cell}
             stack = [cell]
             touches_edge = False
@@ -71,26 +79,25 @@ def h1_classes(env) -> list:
                                (cx, cy + 1), (cx, cy - 1)):
                     n = (nx, ny)
                     if 0 <= nx < w and 0 <= ny < h \
-                            and n not in observed and n not in pocket:
+                            and n not in visited and n not in pocket:
                         pocket.add(n)
                         stack.append(n)
             seen |= pocket
             if touches_edge:
                 continue  # the outer unknown, not a hole
+            # 8-adjacency closes the loop at its corners, so the
+            # cycle is traversable (and archive-walkable) end to end.
             cycle = {
-                n for c in pocket for n in base.neighbors(c)
-                if n in observed
-            }
-            walls = {
-                c for c in pocket
-                if layout.cell_types.get(c, C.EMPTY) in (C.WALL, C.HOLE)
+                (cx + dx, cy + dy)
+                for (cx, cy) in pocket
+                for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                if (dx or dy) and (cx + dx, cy + dy) in visited
             }
             rim = {
-                n for c in walls for n in base.neighbors(c)
-                if layout.cell_types.get(n, C.EMPTY)
-                not in (C.WALL, C.HOLE)
+                c for c in cycle for n in base.neighbors(c)
+                if n in pocket and n in observed
             }
-            out.append((cycle, rim))
+            out.append((cycle, rim, frozenset(pocket)))
     return out
 
 
@@ -111,7 +118,7 @@ def draw_h1_overlay(env, img: np.ndarray, tile: int) -> None:
     from topogym.rendering import tiles as _tiles
 
     classes = h1_classes(env)
-    for cycle, rim in classes:
+    for cycle, rim, _pocket in classes:
         for (x, y) in rim:
             _tiles.tint(img[y * tile:(y + 1) * tile,
                             x * tile:(x + 1) * tile], RIM_COLOR, 0.55)

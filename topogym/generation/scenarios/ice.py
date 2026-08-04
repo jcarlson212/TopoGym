@@ -34,6 +34,7 @@ from topogym.generation.layout import (
     Feature,
     GenerationError,
     Layout,
+    walkable_cells,
 )
 from topogym.generation.rooms import filled_circle
 from topogym.generation.scenarios._shared import (
@@ -174,8 +175,8 @@ def _build_ice_world(seed: int, scenario: str, n_cavities: int = 1,
         ):
             continue
 
-        summary = analyze_2d(base.face_cycle(c) for c in free)
-        if summary.betti_z2 != (1 + n_pockets, 4, 0):
+        raw = analyze_2d(base.face_cycle(c) for c in free)
+        if raw.betti_z2 != (1 + n_pockets, 4, 0):
             continue
         sealed = analyze_2d(
             base.face_cycle(c) for c in free if c not in doors
@@ -203,6 +204,16 @@ def _build_ice_world(seed: int, scenario: str, n_cavities: int = 1,
             features.append(Feature(
                 kind="pocket", cells=(), interior=tuple(sorted(p)),
                 doors=(), meta={"components": 0}))
+
+        # Walkable reading: cavities carve the boundary-attached
+        # landmass (no class of their own) and the bergs are sealed,
+        # so filling doored rings changes nothing -- certify that.
+        summary = analyze_2d(
+            base.face_cycle(c)
+            for c in walkable_cells(free, features)
+        )
+        if summary.betti_z2 != (1 + n_pockets, 4, 0):
+            continue
 
         layout = Layout(
             dim=2, base=base, cell_types=cell_types, doors=doors,

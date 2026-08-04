@@ -19,6 +19,7 @@ from topogym.generation.layout import (
     GenerationError,
     Layout,
     map_offsets,
+    walkable_cells,
 )
 from topogym.generation.rooms import room_offsets
 from topogym.generation.scenarios._shared import (
@@ -122,8 +123,14 @@ def build_dont_fall(seed: int) -> Layout:
         adj = build_adjacency(free_set, base.neighbors)
         if reachable_from(adj, start) != free_set:
             continue
-        summary = analyze_2d(base.face_cycle(c) for c in free)
-        if summary.betti_z2 != (1, n_huts, 0):
+        raw = analyze_2d(base.face_cycle(c) for c in free)
+        if raw.betti_z2 != (1, n_huts, 0):
+            continue
+        summary = analyze_2d(
+            base.face_cycle(c)
+            for c in walkable_cells(free, features)
+        )
+        if summary.betti_z2 != (1, 0, 0):
             continue
         sealed = analyze_2d(
             base.face_cycle(c) for c in free if c not in doors
