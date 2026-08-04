@@ -136,9 +136,12 @@ class TopoGrid2DEnv(TopoEnvCore):
         reward, terminated, truncated = self._step_outcome(self._state.cell)
         self._episode_return += reward  # the final reward, bonuses included
         info = self._step_info(self._state.cell)
+        obs = self._obs()
         if self._debug:
             self._debug_step(action, reward, terminated, truncated, info)
-        return self._obs(), reward, terminated, truncated, info
+            from topogym.envs.core import logger
+            logger.debug("obs    %s", self._describe_obs(obs))
+        return obs, reward, terminated, truncated, info
 
     def _step_egocentric(self, action: int) -> None:
         base = self.layout.base
@@ -168,6 +171,37 @@ class TopoGrid2DEnv(TopoEnvCore):
         if nxt is not None and self._try_enter(t.cell, nxt.cell):
             self._on_leave(self._state.cell)
             self._state = base.turn_left(base.initial_state(nxt.cell))
+
+    def _describe_obs(self, obs: np.ndarray) -> str:
+        """A human-readable rendering of the current observation for
+        the TOPOGYM_DEBUG stream."""
+        if self.obs_mode == "vector":
+            x, y = int(obs[0]), int(obs[1])
+            parts = [f"x={x} y={y}"]
+            active = []
+            for slot in range(C.TEXTURE_DIM):
+                value = float(obs[2 + slot])
+                if value:
+                    name = C.TEX_SLOT_NAMES.get(slot, f"slot{slot}")
+                    active.append(
+                        name if value == 1.0 else f"{name}={value:g}"
+                    )
+            parts.append("tex[" + ", ".join(active) + "]"
+                         if active else "tex[]")
+            return "  ".join(parts)
+        if self.obs_mode == "local":
+            r = self.view_radius
+            rows = []
+            for i, row in enumerate(obs):
+                glyphs = [self._ANSI.get(int(v), "?") for v in row]
+                if i == r:
+                    glyphs[r] = "@"
+                rows.append("".join(glyphs))
+            return "egocentric view (@=agent, ?=unseen)\n" + \
+                "\n".join("        " + row for row in rows)
+        h, w = obs.shape[1], obs.shape[2]
+        return (f"global grid {w}x{h}; agent at "
+                f"{self.layout.base.layout_coords(self._state.cell)}")
 
     def _post_move_hook(self) -> None:
         """Cell mechanics that trigger after movement (hazards, wormholes,
