@@ -3,12 +3,13 @@
 Two agent interfaces (``actions=``):
 
 - ``"fourway"`` (default, the spec's universal action space) —
-  ``Discrete(4)``: 0 = up, 1 = down, 2 = left, 3 = right. Directions are
-  taken in the agent's parallel-transported grid frame, so on plain bases
-  they are absolute grid directions, and crossing an identified edge
-  applies the identification map (coordinate and orientation reversal
-  where the gluing flips) without changing the action set. Moving into an
-  obstacle leaves the agent in place.
+  ``Discrete(4)``: 0 = up, 1 = down, 2 = left, 3 = right, in *screen*
+  directions (up decreases y). Directions are taken in the agent's
+  parallel-transported grid frame, so on plain bases they are absolute
+  grid directions, and crossing an identified edge applies the
+  identification map (coordinate and orientation reversal where the
+  gluing flips) without changing the action set. Moving into an obstacle
+  leaves the agent in place.
 - ``"egocentric"`` — ``Discrete(3)``: 0 = turn left, 1 = turn right,
   2 = forward. The agent's local frame is parallel-transported as it
   moves: a Mobius/Klein/RP^2 seam mirrors its view.
@@ -100,13 +101,18 @@ class TopoGrid2DEnv(TopoEnvCore):
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
+        self._note_episode_end()
         self.layout = self._obtain_layout()
         self._reset_runtime()
         base = self.layout.base
-        self._state = base.initial_state(self.layout.start)
+        self._state = base.initial_state(self._resolve_start(options))
         if self.actions == "egocentric":
             for _ in range(int(self.np_random.integers(4))):
                 self._state = base.turn_left(self._state)
+        else:
+            # The canonical frame faces +x; a left turn makes "forward"
+            # screen-up so fourway actions are screen directions.
+            self._state = base.turn_left(self._state)
         self._visited.add(self._state.cell)
         return self._obs(), self._reset_info(self._state.cell)
 
@@ -240,7 +246,7 @@ class TopoGrid2DEnv(TopoEnvCore):
     _ANSI = {
         C.OBS_EMPTY: "·", C.OBS_WALL: "#", C.OBS_HOLE: "O",
         C.OBS_DOOR_OPEN: "/", C.OBS_GOAL: "G", C.OBS_OUT_OF_WORLD: " ",
-        C.OBS_UNSEEN: "?",
+        C.OBS_UNSEEN: "?", C.OBS_HAZARD: "!", C.OBS_WORMHOLE: "*",
     }
 
     def _render_ansi(self):

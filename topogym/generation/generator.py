@@ -80,6 +80,9 @@ class Layout:
     features: list = field(default_factory=list)
     free_cells: list = field(default_factory=list)
     metadata: TopologyMetadata | None = None
+    #: Texture-variant payload: {"textures": {cell: {slot: value}},
+    #: "hazards": frozenset, "wormholes": {cell: partner}, "clown": {...}}
+    extras: dict = field(default_factory=dict)
 
     def neighbors(self, cell: tuple) -> list:
         return self.base.neighbors(cell)
@@ -546,14 +549,15 @@ def _place_feature_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
             door_off = cand[0]
             cell = mapping[door_off]
             if cfg.door_kind == "open":
-                feature_doors.append(DoorSpec(cell, "open", tries=0))
+                # Visible, always-walkable doorway (rendered as wood).
+                spec = DoorSpec(cell, "open", tries=0)
             else:
                 spec = DoorSpec(
                     cell, "bump", tries=_sample_tries(rng, cfg.door_tries)
                 )
-                cell_types[cell] = DOOR
-                doors[cell] = spec
-                feature_doors.append(spec)
+            cell_types[cell] = DOOR
+            doors[cell] = spec
+            feature_doors.append(spec)
 
         interior_cells = tuple(
             mapping[off] for off in sorted(interior)
