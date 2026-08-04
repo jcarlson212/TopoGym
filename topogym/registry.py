@@ -119,6 +119,8 @@ TEXTURE_SCENARIOS = {
     "DontFall": "dont_fall",
     "SpaceWarp": "space_warp",
     "ClownChase": "clown_chase",
+    "SearchRescue": "search_rescue",
+    "EnvironmentalIceShip": "environmental_ice_ship",
 }
 
 

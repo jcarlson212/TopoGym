@@ -48,6 +48,8 @@ SCENARIO_SIZES = {
     "dont_fall": 61,
     "space_warp": 50,
     "clown_chase": 60,
+    "search_rescue": 61,
+    "environmental_ice_ship": 50,
 }
 
 
@@ -714,6 +716,121 @@ def build_clown_chase(seed: int) -> Layout:
     raise GenerationError(f"could not build ClownChase for seed {seed}")
 
 
+def build_environmental_ice_ship(seed: int) -> Layout:
+    """IceShip with seasons. Each episode is drawn sunny (summer) or
+    snowing (winter). In winter the ice *grows*: the narrow channel
+    freezes shut cell by cell from its mouth toward the door — being on
+    a cell when it freezes, or being inside when the channel closes,
+    ends the episode. In summer the ice shrinks: the channel's flanking
+    walls melt, widening the passage. Certified metadata describes the
+    episode-start geometry; the seasonal ice is episode-local state."""
+    layout = build_ice_ship(seed)
+    (chamber,) = [f for f in layout.features if f.kind == "chamber"]
+    # Segment joints appear twice in the carved path; the freeze
+    # schedule needs each cell exactly once.
+    channel = list(dict.fromkeys(chamber.meta["channel"]))
+    (door,) = chamber.meta["door_cells"]
+
+    # Order the channel from its mouth toward the door (BFS distance
+    # from the first carved cell, which sits at the sheet's edge).
+    allowed = set(channel) | {door}
+    order = {channel[0]: 0}
+    frontier = [channel[0]]
+    while frontier:
+        nxt = []
+        for u in frontier:
+            for v in layout.base.neighbors(u):
+                if v in allowed and v not in order:
+                    order[v] = order[u] + 1
+                    nxt.append(v)
+        frontier = nxt
+    ordered = sorted(channel, key=lambda c: (order.get(c, 0), c))
+
+    walls = {c for c, t in layout.cell_types.items() if t == C.WALL}
+    flanks = []
+    for c in ordered:
+        pair = tuple(
+            n for n in layout.base.neighbors(c)
+            if n in walls and n not in set(chamber.cells)
+        )
+        if pair:
+            flanks.append(pair)
+
+    # The whole icescape breathes with the season, not just the
+    # channel: in winter the water fringe of every ice mass freezes in
+    # waves; in summer the outermost ice layer melts away. The channel
+    # neighborhood is exempt from the waves (its own cell-by-cell
+    # schedule governs the passage), as are the cavity and the goal.
+    free_set = set(layout.free_cells)
+    inside = set(chamber.interior) | {door}
+    exempt = set()
+    for c in list(ordered) + [door]:
+        for dx in (-2, -1, 0, 1, 2):
+            for dy in (-2, -1, 0, 1, 2):
+                exempt.add((c[0] + dx, c[1] + dy))
+    exempt |= inside | {layout.goal, layout.start}
+
+    def fringe(ice_set, water_set):
+        return {
+            w for w in water_set
+            if any(n in ice_set for n in layout.base.neighbors(w))
+        }
+
+    ice0 = set(walls)
+    water0 = free_set - inside
+    grow1 = fringe(ice0, water0) - exempt
+    grow2 = fringe(ice0 | grow1, water0 - grow1) - exempt
+
+    def rim(ice_set):
+        return {
+            c for c in ice_set
+            if any(n in free_set or n not in ice_set
+                   for n in layout.base.neighbors(c))
+        }
+
+    melt1 = rim(ice0)
+    melt2 = rim(ice0 - melt1)
+
+    layout.extras["seasonal"] = {
+        "channel": tuple(ordered),
+        "door": door,
+        "inside": tuple(sorted(inside)),
+        "flanks": tuple(flanks),
+        "start_step": 40,
+        "interval": 6,
+        "grow_layers": (tuple(sorted(grow1)), tuple(sorted(grow2))),
+        "melt_layers": (tuple(sorted(melt1)), tuple(sorted(melt2))),
+        "wave_steps": (60, 120),
+    }
+    return layout
+
+
+def build_search_rescue(seed: int) -> Layout:
+    """Search and rescue. A person is trapped in one large open chamber
+    buried in a dense field of shrapnel. Every shard adds a small H1
+    class; the victim's chamber is the only *large, persistent* hole —
+    in the agent's own discovery filtration (the archive), the shards
+    resolve as small transient bars while the chamber's enclosing class
+    grows large and refuses to die. Persistence, not luck, finds the
+    person."""
+    cfg = TopoGenConfig2D(
+        base="square", size=SCENARIO_SIZES["search_rescue"],
+        style="rooms",
+        n_holes=26, hole_shapes=("rect", "plus", "blob"),
+        hole_size=(1, 2),
+        n_chambers=1, n_decoys=0, chamber_side=15,
+        door_kind="open", min_sep=2, goal_in_chamber=True,
+    )
+    layout = generate_2d(cfg, seed)
+    textures: dict = {}
+    free = set(layout.free_cells)
+    _mark(textures, free, C.TEX_DIRT)
+    _mark(textures, set(_interiors(layout)) & free, C.TEX_INTERIOR)
+    _mark(textures, _door_cells(layout), C.TEX_DOOR)
+    layout.extras = {"textures": textures, "person": layout.goal}
+    return layout
+
+
 #: scenario name -> builder
 SCENARIOS = {
     "ice_ship": build_ice_ship,
@@ -722,6 +839,8 @@ SCENARIOS = {
     "dont_fall": build_dont_fall,
     "space_warp": build_space_warp,
     "clown_chase": build_clown_chase,
+    "search_rescue": build_search_rescue,
+    "environmental_ice_ship": build_environmental_ice_ship,
 }
 
 

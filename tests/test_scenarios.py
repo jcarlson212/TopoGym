@@ -40,6 +40,8 @@ def _step_onto(env, target):
     ("DontFall", [1, 12, 0], [13, 12, 0]),
     ("SpaceWarp", [2, 4, 0], [5, 4, 0]),
     ("ClownChase", [1, 4, 0], [2, 4, 0]),
+    ("SearchRescue", [1, 27, 0], [2, 27, 0]),
+    ("EnvironmentalIceShip", [1, 4, 0], [2, 4, 0]),
 ])
 def test_scenarios_certify(name, betti, sealed):
     env, obs, info = _make(name)
@@ -107,6 +109,102 @@ def test_ice_ship_has_attached_land_and_boat():
     assert any(y == 0 for _, y in walls)
     assert any(y == size - 1 for _, y in walls)
     assert layout.extras["boat"] is True
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_search_rescue_chamber_dominates_the_shrapnel(seed):
+    """The victim's chamber is the only large hole: its enclosed area
+    dwarfs every shrapnel shard, so it is findable purely from the
+    archive's persistence signal."""
+    layout = build_scenario("search_rescue", seed)
+    (chamber,) = [f for f in layout.features if f.kind == "chamber"]
+    shards = [f for f in layout.features if f.kind == "hole"]
+    assert len(shards) == 26
+    largest = max(len(f.cells) for f in shards)
+    assert len(chamber.interior) >= 15 * largest
+    assert layout.goal in chamber.interior  # the trapped person
+    # And the person is reachable (the generator guarantees it; pin it).
+    free = set(layout.free_cells)
+    adj = build_adjacency(free, layout.base.neighbors)
+    assert layout.goal in reachable_from(adj, layout.start)
+
+
+def _seasonal_env(season):
+    env = gym.make("TopoGym/EnvironmentalIceShip-v0", seed=1,
+                   season=season).unwrapped
+    env.reset(seed=0)
+    return env
+
+
+def test_winter_freezes_the_channel_and_traps():
+    env = _seasonal_env("winter")
+    seasonal = env.layout.extras["seasonal"]
+    base = env.layout.base
+    # Idling inside the cavity: the ice closes the channel and the
+    # episode ends before the horizon.
+    env._state = base.turn_left(
+        base.initial_state(seasonal["inside"][0])
+    )
+    outcome = None
+    for _ in range(env._max_steps):
+        _, _, term, trunc, _ = env.step(0)
+        if term:
+            outcome = "trapped"
+            break
+        assert not trunc
+    assert outcome == "trapped"
+    assert len(env._frozen) == len(seasonal["channel"])
+    # Frozen cells act as ice: impassable, observed as wall.
+    frozen = next(iter(env._frozen))
+    assert not env._try_enter(None, frozen)
+    assert env._texture_block(seasonal["inside"][0]) is not None
+
+
+def test_winter_crushes_an_agent_in_the_channel():
+    env = _seasonal_env("winter")
+    seasonal = env.layout.extras["seasonal"]
+    base = env.layout.base
+    env._state = base.turn_left(
+        base.initial_state(seasonal["channel"][3])
+    )
+    crushed = False
+    for _ in range(env._max_steps):
+        _, _, term, _, _ = env.step(0)
+        if term:
+            crushed = True
+            break
+    assert crushed
+
+
+def test_summer_melts_the_flanks_and_is_safe():
+    env = _seasonal_env("summer")
+    seasonal = env.layout.extras["seasonal"]
+    base = env.layout.base
+    env._state = base.turn_left(
+        base.initial_state(seasonal["inside"][0])
+    )
+    for _ in range(env._max_steps - 1):
+        _, _, term, _, _ = env.step(0)
+        assert not term
+    assert env._melted  # the passage widened
+    melted = sorted(env._melted)[0]
+    assert env._try_enter(None, melted)
+
+
+def test_season_is_drawn_per_episode_and_sensed():
+    env = gym.make("TopoGym/EnvironmentalIceShip-v0", seed=1).unwrapped
+    env.reset(seed=0)
+    seasons = {env.season}
+    for _ in range(10):
+        env.reset()
+        seasons.add(env.season)
+    assert seasons == {"summer", "winter"}
+    # The water texture value encodes the season (1.0 sunny, 0.5 cold).
+    env = _seasonal_env("winter")
+    water_cell = env.layout.start
+    assert env._texture_block(water_cell)[C.TEX_WATER] == 0.5
+    env = _seasonal_env("summer")
+    assert env._texture_block(water_cell)[C.TEX_WATER] == 1.0
 
 
 def test_dont_fall_drop_is_fatal():

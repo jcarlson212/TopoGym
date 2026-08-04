@@ -245,6 +245,71 @@ def _hatch(rng: np.random.Generator) -> np.ndarray:
     return t
 
 
+def _water_sun(rng: np.random.Generator) -> np.ndarray:
+    t = _flat((58, 150, 200))
+    _chunky_noise(t, rng, 7)
+    for row in range(1, BASE, 4):
+        start = int(rng.integers(BASE))
+        cols = [(start + k) % BASE for k in range(int(rng.integers(4, 9)))]
+        t[row, cols] += (40, 40, 28)
+    _speckle(t, rng, (250, 245, 200), 2)  # sun glints
+    return t
+
+
+def _ice_sun(rng: np.random.Generator) -> np.ndarray:
+    t = _flat((208, 234, 248))
+    _chunky_noise(t, rng, 6)
+    xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
+    t[(xs + ys) % 7 == 0] += 24
+    return t
+
+
+def _water_cold(rng: np.random.Generator) -> np.ndarray:
+    t = _flat((22, 48, 96))
+    _chunky_noise(t, rng, 6)
+    for row in range(2, BASE, 5):
+        start = int(rng.integers(BASE))
+        cols = [(start + k) % BASE for k in range(int(rng.integers(3, 7)))]
+        t[row, cols] += (14, 18, 22)
+    _speckle(t, rng, (235, 240, 248), 3)  # falling snow
+    return t
+
+
+def _ice_cold(rng: np.random.Generator) -> np.ndarray:
+    t = _flat((150, 172, 196))
+    _chunky_noise(t, rng, 8)
+    xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
+    t[(xs + ys) % 6 == 0] += 26
+    _speckle(t, rng, (240, 244, 250), 4)  # snow cover
+    return t
+
+
+def _shrapnel(rng: np.random.Generator) -> np.ndarray:
+    t = _dirt(rng)
+    for _ in range(5):  # jagged metal shards
+        x, y = int(rng.integers(1, BASE - 3)), int(rng.integers(1, BASE - 3))
+        length = int(rng.integers(2, 5))
+        dx, dy = (1, 1) if rng.random() < 0.5 else (1, -1)
+        for k in range(length):
+            px, py = x + k * dx, y + k * dy
+            if 0 <= px < BASE and 0 <= py < BASE:
+                t[py, px] = (168, 172, 182)
+                if px + 1 < BASE:
+                    t[py, px + 1] = (108, 112, 122)
+    return t
+
+
+def _person(rng: np.random.Generator) -> np.ndarray:
+    t = _dirt(rng)
+    t[3:6, 6:10] = (235, 195, 160)  # head
+    t[6:11, 5:11] = (200, 60, 50)  # jacket
+    t[7:9, 3:5] = (200, 60, 50)  # waving arm
+    t[6, 3] = (235, 195, 160)
+    t[11:14, 6:8] = (60, 62, 90)  # legs
+    t[11:14, 8:10] = (60, 62, 90)
+    return t
+
+
 def _tent(rng: np.random.Generator) -> np.ndarray:
     t = _flat((240, 236, 226))
     for col in range(BASE):  # candy stripes
@@ -288,6 +353,12 @@ BUILDERS = {
     "chest": _chest,
     "clown": _clown,
     "tent": _tent,
+    "shrapnel": _shrapnel,
+    "water_sun": _water_sun,
+    "ice_sun": _ice_sun,
+    "water_cold": _water_cold,
+    "ice_cold": _ice_cold,
+    "person": _person,
     "space": _space,
     "hull": _hull,
     "deck": _deck,
