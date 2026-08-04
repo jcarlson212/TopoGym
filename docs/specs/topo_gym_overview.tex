@@ -349,36 +349,44 @@ variable out of their results.
 \subsection{Universal action and observation spaces}
 \label{sec:spaces}
 
-Both spaces are identical across all variants (GridWorld2D, -Texture,
--Top); an agent written against them runs on every environment in the
-library unchanged.
+Both action modes are identical across all variants (GridWorld2D,
+-Texture, -Top); an agent written against either runs on every
+environment in the library unchanged.
 
-\paragraph{Action space.} \texttt{Discrete(4)}: up, down, left,
-right, always denoting \emph{screen} directions (up decreases $y$).
-Moving into an obstacle leaves the agent in place. With
-\texttt{p\_slip} $> 0$ the executed action is resampled uniformly
-with that probability. In GridWorld2D-Top, crossing an identified
-edge applies the identification map to the agent's \emph{position}
-(coordinate reversal where the identification is flipped) --- the
-action space and the meaning of each action are unchanged: left is
-still screen-left after any crossing. (The optional egocentric
-\texttt{Discrete(3)} interface instead carries a parallel-transported
-frame, where a flipped seam genuinely mirrors the agent's view.) Family-specific cell mechanics (hazard
-cells that reset the episode, wormhole cells that teleport;
-Section~\ref{sec:tex}) are documented
-with the family and never alter the action set.
+\paragraph{Action space.} The default is \emph{egocentric}
+\texttt{Discrete(3)}: turn left, turn right, step forward. The agent
+carries a parallel-transported frame, so a flipped seam (M\"obius,
+Klein, $\mathbb{RP}^2$) genuinely mirrors its view --- and its heading is
+always visible in the rendering (a MiniGrid-style arrow, or the
+scenario sprite, rotated to face forward). Moving into an obstacle
+leaves the agent in place; with \texttt{p\_slip} $> 0$ the executed
+action is resampled uniformly with that probability.
 
-\paragraph{Observation space.} The canonical observation is a fixed
-vector: the agent's integer cell coordinates $(x, y)$ followed by a
-texture block $t \in [0, 1]^{16}$. Slots 0--3 are reserved
-library-wide for directional blocker adjacency (obstacle to the left,
-right, above, below of the current cell); slots 4--15 carry
-per-environment semantic features documented with each family. The
-texture block is identically zero in GridWorld2D and GridWorld2D-Top;
-only GridWorld2D-Texture populates it. Optional observation modes for
-learned baselines --- flattened symbolic grid, or an egocentric
-window of configurable radius with per-cell texture --- are available
-on every variant. Snapshot save/restore is exact (deep copy), and the
+The override \texttt{actions="fourway"} selects the spec's universal
+\texttt{Discrete(4)} space: up, down, left, right, always denoting
+\emph{screen} directions (up decreases $y$) --- the frame is
+re-canonicalized every step, so after any seam crossing left is still
+screen-left, and only the \emph{position} feels the identification
+map. Family-specific cell mechanics (hazard cells that reset the
+episode, wormhole cells that teleport; Section~\ref{sec:tex}) are
+documented with the family and never alter either action set.
+
+\paragraph{Observation space.} The default observation follows the
+action mode: egocentric agents receive an occluded egocentric window
+--- a $(2r{+}1) \times (2r{+}1)$ symbolic patch (default $r = 3$),
+agent centered and facing up, walls occluding line of sight. The
+spec's \emph{universal vector} observation (default under
+\texttt{fourway}, available everywhere via
+\texttt{obs\_mode="vector"}) is the agent's integer cell
+coordinates $(x, y)$ followed by a texture block
+$t \in [0, 1]^{16}$: slots 0--3 are reserved library-wide for
+directional blocker adjacency (obstacle to the left, right, above,
+below of the current cell); slots 4--15 carry per-environment
+semantic features documented with each family. The texture block is
+identically zero in GridWorld2D and GridWorld2D-Top; only
+GridWorld2D-Texture populates it. \texttt{obs\_mode="global"} (the
+flattened symbolic grid with an agent mask) completes the set; all
+three are available on every variant. Snapshot save/restore is exact (deep copy), and the
 environment is deterministic given (configuration, seed, action
 sequence) when \texttt{p\_slip} $= 0$.
 

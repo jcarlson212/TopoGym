@@ -107,7 +107,8 @@ def test_witness_custom_policy_admit_and_evict():
 
 
 def test_from_env_seeds_lifetime_visits():
-    env = gym.make("TopoGym/Dilution-50-v0", seed=1).unwrapped
+    env = gym.make("TopoGym/Dilution-50-v0", seed=1,
+                   actions="fourway").unwrapped
     env.reset(seed=0)
     for a in (0, 3, 1, 2):
         env.step(a)

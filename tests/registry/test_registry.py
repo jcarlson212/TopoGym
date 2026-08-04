@@ -139,7 +139,7 @@ def test_registry_make_with_seed_and_kwargs():
     _, info = env.reset(seed=0)
     # 2 sealed decoys; the doored chamber is a room, not a hole.
     assert info["topology"]["betti_z2"] == [1, 2, 0]
-    assert env.action_space.n == 4
+    assert env.action_space.n == 3  # egocentric Discrete(3) default
 
     # Same seed, same env; different seed, different layout.
     again = gym.make("TopoGym/Decoys2-50-v0", seed=1).unwrapped

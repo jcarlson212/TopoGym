@@ -25,7 +25,7 @@ def test_check_env_2d(kwargs):
 def test_episode_determinism():
     def rollout():
         env = gym.make("TopoGym/Grid2D-v0", base="torus", size=15,
-                       layout_seed=11)
+                       actions="fourway", layout_seed=11)
         obs, _ = env.reset(seed=5)
         trace = [obs.tobytes()]
         rng = np.random.default_rng(0)
@@ -148,12 +148,22 @@ def test_config_object_and_overrides():
 
 
 # ---------------------------------------------------------------------------
-# The universal (spec) interface: fourway actions, vector obs, p_slip,
-# reward modes
+# Action modes: egocentric Discrete(3) default; fourway is the
+# override carrying the spec's universal vector observation
 # ---------------------------------------------------------------------------
 
-def test_fourway_default_spaces():
+def test_egocentric_is_the_default():
     env = gym.make("TopoGym/Grid2D-v0", layout_seed=3).unwrapped
+    assert env.actions == "egocentric"
+    assert env.action_space.n == 3
+    obs, _ = env.reset(seed=0)
+    r = env.view_radius
+    assert obs.shape == (2 * r + 1, 2 * r + 1)  # local egocentric patch
+
+
+def test_fourway_override_spaces():
+    env = gym.make("TopoGym/Grid2D-v0", layout_seed=3,
+                   actions="fourway").unwrapped
     assert env.action_space.n == 4
     obs, _ = env.reset(seed=0)
     assert obs.shape == (18,) and obs.dtype == np.float32
@@ -165,6 +175,7 @@ def test_fourway_default_spaces():
 @pytest.mark.parametrize("base", ["square", "torus", "mobius", "klein"])
 def test_fourway_moves_are_inverses(base):
     env = gym.make("TopoGym/Grid2D-v0", base=base, size=15,
+                   actions="fourway",
                    layout_seed=3).unwrapped
     env.reset(seed=0)
     for a, b in ((0, 1), (1, 0), (2, 3), (3, 2)):
@@ -177,7 +188,7 @@ def test_fourway_moves_are_inverses(base):
 
 def test_fourway_moves_one_cell():
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
-                   layout_seed=3).unwrapped
+                   actions="fourway", layout_seed=3).unwrapped
     env.reset(seed=0)
     base = env.layout.base
     for action in range(4):
@@ -240,6 +251,7 @@ def test_sparse_reward_terminates_with_unit_payout():
 
 def test_coverage_reward_counts_first_visits():
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   actions="fourway",
                    reward_mode="coverage", layout_seed=5).unwrapped
     env.reset(seed=0)
     rng = np.random.default_rng(2)
@@ -279,7 +291,7 @@ def test_deceptive_reward_field_and_shaping():
 def test_fourway_actions_are_screen_directions():
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
                    n_holes=0, n_chambers=0, n_decoys=0,
-                   layout_seed=3).unwrapped
+                   actions="fourway", layout_seed=3).unwrapped
     env.reset(seed=0)
     deltas = {0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
     base = env.layout.base
@@ -338,7 +350,7 @@ def test_episode_length_is_predetermined():
 def test_teleport_reset():
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
                    n_holes=0, n_chambers=0, n_decoys=0, teleport=True,
-                   layout_seed=3).unwrapped
+                   actions="fourway", layout_seed=3).unwrapped
     env.reset(seed=0)
     for a in (0, 3, 3, 1, 2):
         env.step(a)

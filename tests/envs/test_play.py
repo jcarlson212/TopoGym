@@ -12,7 +12,8 @@ pytest.importorskip("pygame")
 
 def test_human_render_mode_headless(monkeypatch):
     monkeypatch.setitem(os.environ, "SDL_VIDEODRIVER", "dummy")
-    env = gym.make("TopoGym/Dilution-50-v0", seed=1, render_mode="human")
+    env = gym.make("TopoGym/Dilution-50-v0", seed=1, render_mode="human",
+                   actions="fourway")
     env.reset(seed=0)
     for action in (0, 3, 1, 2):
         env.step(action)

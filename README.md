@@ -50,8 +50,11 @@ trivial.
 ## Environments
 
 One benchmark, **TopoGym-v1**, in three slices under a universal
-interface (`Discrete(4)` screen-direction actions; observation =
-`(x, y)` + a 16-slot texture block):
+interface (egocentric `Discrete(3)` turn-left / turn-right / forward
+actions with an occluded egocentric view by default — the rendered
+agent is a MiniGrid-style arrow, so its heading is always visible;
+`actions="fourway"` opts into `Discrete(4)` screen-direction actions
+with the universal `(x, y)` + 16-slot texture vector):
 
 | slice | families | axis |
 |---|---|---|

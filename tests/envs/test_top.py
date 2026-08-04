@@ -62,7 +62,8 @@ def test_top_rips_backend_agrees(topology):
 
 
 def test_top_wraparound_movement():
-    env = gym.make("TopoGym/TopTorus-50-v0", seed=1).unwrapped
+    env = gym.make("TopoGym/TopTorus-50-v0", seed=1,
+                   actions="fourway").unwrapped
     env.reset(seed=0)
     # Walking left across the seam wraps to the far column when free.
     base = env.layout.base

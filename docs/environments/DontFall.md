@@ -6,19 +6,22 @@ A fatal central drop ringed by huts, one holding the ruby; the most novel direct
 
 ## Action space
 
-`Discrete(4)`: 0 = up, 1 = down, 2 = left, 3 = right (screen
-directions). Moving into an obstacle leaves the agent in place. With
-`p_slip > 0` the executed action is resampled uniformly with that
-probability. The egocentric `Discrete(3)` interface (turn left / turn
-right / forward) is available with `actions="egocentric"`.
+Egocentric `Discrete(3)` (default): 0 = turn left, 1 = turn right,
+2 = step forward; the rendered agent (arrow or scenario sprite) always
+points where it faces. `actions="fourway"` opts into `Discrete(4)`:
+0 = up, 1 = down, 2 = left, 3 = right (screen directions). Moving into
+an obstacle leaves the agent in place. With `p_slip > 0` the executed
+action is resampled uniformly with that probability.
 
 ## Observation space
 
-The universal vector observation: the agent's integer cell coordinates
-`(x, y)` followed by a 16-slot texture block in `[0, 1]` (slots 0-3:
-blocker adjacency left/right/above/below; 4-15: per-scenario semantic
-features, zero outside the Texture variants). `obs_mode="local"` gives
-occluded egocentric patches, `obs_mode="global"` the full symbolic grid.
+Default (egocentric): an occluded egocentric symbolic patch, agent
+centered and facing up. `obs_mode="vector"` (default under fourway)
+gives the universal vector observation: the agent's integer cell
+coordinates `(x, y)` followed by a 16-slot texture block in `[0, 1]`
+(slots 0-3: blocker adjacency left/right/above/below; 4-15:
+per-scenario semantic features, zero outside the Texture variants);
+`obs_mode="global"` the full symbolic grid.
 
 ## Rewards and episodes
 

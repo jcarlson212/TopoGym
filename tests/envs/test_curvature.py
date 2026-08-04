@@ -26,7 +26,7 @@ def test_hungarian_matches_brute_force():
 
 
 def test_corridors_are_negatively_curved():
-    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15, actions="fourway",
                    n_holes=0, n_chambers=1, n_decoys=0,
                    layout_seed=1).unwrapped
     env.reset(seed=0)
@@ -47,7 +47,7 @@ def test_corridors_are_negatively_curved():
 
 def test_curvature_coverage_toggle_and_accessor():
     env = StatsRecorder(
-        gym.make("TopoGym/Grid2D-v0", base="square", size=13,
+        gym.make("TopoGym/Grid2D-v0", base="square", size=13, actions="fourway",
                  n_holes=0, n_chambers=1, n_decoys=0, layout_seed=1),
         track_curvature=True,
     )
@@ -59,7 +59,7 @@ def test_curvature_coverage_toggle_and_accessor():
     assert 0 <= m.curvature_coverage_below_zero <= 1
     # Parametrized accessor works regardless of the toggle.
     off = StatsRecorder(
-        gym.make("TopoGym/Grid2D-v0", base="square", size=13,
+        gym.make("TopoGym/Grid2D-v0", base="square", size=13, actions="fourway",
                  n_holes=0, n_chambers=1, n_decoys=0, layout_seed=1),
     )
     off.reset(seed=0)

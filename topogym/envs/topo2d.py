@@ -1,27 +1,24 @@
-"""TopoGrid2D: an agent on a 2D base manifold.
+"""2D topological gridworlds.
 
-Two agent interfaces (``actions=``):
+Actions (``actions=``):
 
-- ``"fourway"`` (default, the spec's universal action space) —
+- ``"egocentric"`` (default) — ``Discrete(3)``: 0 = turn left,
+  1 = turn right, 2 = step forward. The agent carries a frame; frame
+  transport across identified edges is what makes flips felt. This is
+  the mode most exploration research drives (and the one the docs
+  animations show — the explorer sprite is asymmetric on both axes, so
+  its heading is always visible).
+- ``"fourway"`` (override, the spec's universal action space) —
   ``Discrete(4)``: 0 = up, 1 = down, 2 = left, 3 = right, in *screen*
-  directions (up decreases y). Directions are taken in the agent's
-  parallel-transported grid frame, so on plain bases they are absolute
-  grid directions, and crossing an identified edge applies the
-  identification map (coordinate and orientation reversal where the
-  gluing flips) without changing the action set. Moving into an obstacle
-  leaves the agent in place.
-- ``"egocentric"`` — ``Discrete(3)``: 0 = turn left, 1 = turn right,
-  2 = forward. The agent's local frame is parallel-transported as it
-  moves: a Mobius/Klein/RP^2 seam mirrors its view.
+  directions. The frame is re-canonicalized every step, so actions
+  always mean screen directions, even after crossing a flip seam.
 
-Observations (``obs_mode=``): ``"vector"`` (default for fourway, the
-spec's universal observation) — the agent's integer cell coordinates
-``(x, y)`` followed by a 16-slot texture block in ``[0, 1]``, identically
-zero outside the Texture variants; ``"local"`` (default for egocentric) —
-occluded egocentric ``(2r+1, 2r+1)`` patches (agent at the center, facing
-"up"), so chamber interiors — and whether a suspicious room is a decoy —
-must be discovered by interaction; ``"global"`` — the full symbolic grid
-plus an agent mask.
+Observations (``obs_mode=``): ``"local"`` (default for egocentric) —
+occluded egocentric ``(2r+1, 2r+1)`` patches (agent at the center,
+facing up); ``"vector"`` (default for fourway, the spec's universal
+observation) — the agent's ``(x, y)`` plus the 16-slot texture block,
+identically zero outside the Texture variants; ``"global"`` — the full
+symbolic grid plus an agent mask.
 """
 
 from __future__ import annotations
@@ -48,7 +45,7 @@ class TopoGrid2DEnv(TopoEnvCore):
     _FOURWAY_TURNS = {MOVE_UP: 0, MOVE_DOWN: 2, MOVE_LEFT: 3, MOVE_RIGHT: 1}
 
     def __init__(self, config: TopoGenConfig2D | dict | None = None, *,
-                 actions: str = "fourway", **kwargs):
+                 actions: str = "egocentric", **kwargs):
         if actions not in ("fourway", "egocentric"):
             raise ValueError(
                 f'actions must be "fourway" or "egocentric", got {actions!r}'
