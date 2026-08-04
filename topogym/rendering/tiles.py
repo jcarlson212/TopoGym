@@ -284,6 +284,32 @@ def _ice_cold(rng: np.random.Generator) -> np.ndarray:
     return t
 
 
+def _concrete(rng: np.random.Generator) -> np.ndarray:
+    t = _flat((186, 184, 178))
+    _chunky_noise(t, rng, 6)
+    # hairline cracks
+    x, y = int(rng.integers(2, BASE - 2)), int(rng.integers(BASE))
+    for k in range(int(rng.integers(4, 9))):
+        if 0 <= y < BASE:
+            t[y, min(BASE - 1, x + k)] -= 30
+            y += int(rng.integers(-1, 2))
+    _speckle(t, rng, (150, 148, 142), 4)
+    return t
+
+
+def _rubble(rng: np.random.Generator) -> np.ndarray:
+    t = _flat((120, 118, 114))
+    _chunky_noise(t, rng, 16)
+    for _ in range(4):  # broken slabs at angles
+        x, y = int(rng.integers(BASE - 5)), int(rng.integers(BASE - 5))
+        w, h = int(rng.integers(3, 6)), int(rng.integers(2, 4))
+        t[y:y + h, x:x + w] = (156 + int(rng.integers(-18, 18)),) * 3
+        t[y, x:x + w] -= 36  # slab edge shadow
+    _speckle(t, rng, (92, 60, 48), 2)  # exposed rebar rust
+    _speckle(t, rng, (70, 70, 72), 4)
+    return t
+
+
 def _shrapnel(rng: np.random.Generator) -> np.ndarray:
     t = _dirt(rng)
     for _ in range(5):  # jagged metal shards
@@ -300,7 +326,7 @@ def _shrapnel(rng: np.random.Generator) -> np.ndarray:
 
 
 def _person(rng: np.random.Generator) -> np.ndarray:
-    t = _dirt(rng)
+    t = _concrete(rng)
     t[3:6, 6:10] = (235, 195, 160)  # head
     t[6:11, 5:11] = (200, 60, 50)  # jacket
     t[7:9, 3:5] = (200, 60, 50)  # waving arm
@@ -354,6 +380,8 @@ BUILDERS = {
     "clown": _clown,
     "tent": _tent,
     "shrapnel": _shrapnel,
+    "concrete": _concrete,
+    "rubble": _rubble,
     "water_sun": _water_sun,
     "ice_sun": _ice_sun,
     "water_cold": _water_cold,

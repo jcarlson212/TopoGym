@@ -2,7 +2,7 @@
 
 <img src="../envs/SearchRescue.gif" width="360"/>
 
-A person trapped in one large open chamber inside a dense shrapnel field: every shard is a small transient hole, the chamber the only large persistent one.
+A person trapped in the one intact chamber of a collapsed concrete structure: 160 rubble blocks form a dense maze of small transient holes; the chamber is the only large persistent one.
 
 ## Action space
 
@@ -32,6 +32,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/SearchRescue-v0` | `[1, 27, 0]` |
+| `TopoGym/SearchRescue-v0` | `[1, 161, 0]` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

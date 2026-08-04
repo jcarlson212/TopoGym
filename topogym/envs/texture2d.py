@@ -63,6 +63,10 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             c for f in self.layout.features if f.kind == "decoy"
             for c in f.cells
         )
+        self._chamber_walls = frozenset(
+            c for f in self.layout.features if f.kind == "chamber"
+            for c in f.cells
+        )
         # Seasonal state (EnvironmentalIceShip): the season is drawn per
         # episode; winter freezes the channel shut cell by cell, summer
         # melts its flanks open. Frozen/melted sets are episode-local
@@ -244,10 +248,16 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
                     and cell in self._decoy_cells:
                 return "tent"  # the carnival grounds
             return "hull" if space else "stone"
-        if code == C.OBS_HOLE and self.scenario == "search_rescue":
-            return "shrapnel"
-        if code == C.OBS_GOAL and self.scenario == "search_rescue":
-            return "person"
+        if self.scenario == "search_rescue":
+            if code == C.OBS_GOAL:
+                return "person"
+            if code == C.OBS_WALL:
+                # Intact chamber walls read as stone; everything else
+                # collapsed into rubble.
+                return ("stone" if cell in self._chamber_walls
+                        else "rubble")
+            if code in (C.OBS_EMPTY, C.OBS_DOOR_OPEN):
+                return "door" if code == C.OBS_DOOR_OPEN else "concrete"
         if code == C.OBS_HAZARD:
             return "drop"
         if code == C.OBS_WORMHOLE:
