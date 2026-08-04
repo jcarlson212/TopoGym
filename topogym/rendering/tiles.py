@@ -201,6 +201,62 @@ def _boat(rng):
     return t
 
 
+def _space(rng):
+    t = _flat((10, 10, 22))
+    _chunky_noise(t, rng, 3)
+    for _ in range(4):  # stars
+        x, y = int(rng.integers(BASE)), int(rng.integers(BASE))
+        t[y, x] = (235, 235, 250)
+    if rng.random() < 0.3:
+        x, y = int(rng.integers(BASE)), int(rng.integers(BASE))
+        t[y, x] = (150, 180, 255)  # a blue giant
+    return t
+
+
+def _hull(rng):
+    t = _flat((142, 150, 164))
+    _chunky_noise(t, rng, 6)
+    for line in (0, 8):  # panel seams
+        t[line, :] -= 34
+        t[:, line] -= 34
+    t[4, 4] = t[4, 12] = t[12, 4] = t[12, 12] = (90, 96, 108)  # rivets
+    if rng.random() < 0.4:
+        t[6:8, 9:11] = (120, 220, 160)  # a status light
+    return t
+
+
+def _deck(rng):
+    t = _flat((92, 100, 118))
+    _chunky_noise(t, rng, 5)
+    xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
+    t[((xs // 4) + (ys // 4)) % 2 == 0] -= 14
+    return t
+
+
+def _hatch(rng):
+    t = _flat((70, 76, 90))
+    xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
+    d = np.maximum(np.abs(xs - 7.5), np.abs(ys - 7.5))
+    t[d < 5] = (110, 118, 134)  # the door plate
+    t[d < 2] = (240, 200, 70)  # the wheel
+    stripe = ((xs + ys) % 6 < 3) & (d >= 5)
+    t[stripe] = (216, 176, 40)  # hazard chevrons
+    _chunky_noise(t, rng, 4)
+    return t
+
+
+def _tent(rng):
+    t = _flat((240, 236, 226))
+    for col in range(BASE):  # candy stripes
+        if (col // 2) % 2 == 0:
+            t[:, col] = (208, 44, 52)
+    _chunky_noise(t, rng, 5)
+    t[0, :] = (150, 26, 34)  # canopy edge
+    t[-1, :] -= 40  # ground shadow
+    t[0:2, 7:9] = (250, 208, 70)  # the little flag
+    return t
+
+
 def _clown(rng):
     t = _flat((248, 148, 24))  # the suit
     t[2:5, 3:13] = (220, 40, 40)  # wig
@@ -231,6 +287,11 @@ BUILDERS = {
     "hole": _hole,
     "chest": _chest,
     "clown": _clown,
+    "tent": _tent,
+    "space": _space,
+    "hull": _hull,
+    "deck": _deck,
+    "hatch": _hatch,
     "boat": _boat,
     "unseen": lambda rng: _flat((130, 130, 140)),
     "out": lambda rng: _flat((28, 28, 36)),

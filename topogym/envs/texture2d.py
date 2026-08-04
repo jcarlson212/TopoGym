@@ -53,6 +53,10 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
     def _reset_runtime(self):
         super()._reset_runtime()
         self._fell = False
+        self._decoy_cells = frozenset(
+            c for f in self.layout.features if f.kind == "decoy"
+            for c in f.cells
+        )
         clown = self.layout.extras.get("clown")
         if clown is not None:
             self._clown_pos = clown["anchor"]
@@ -160,17 +164,25 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
     def _tile_name(self, cell, code) -> str:
         if code in (C.OBS_UNSEEN, C.OBS_OUT_OF_WORLD):
             return "unseen" if code == C.OBS_UNSEEN else "out"
+        space = self.scenario == "space_warp"
         if code == C.OBS_WALL:
-            return "ice" if self.scenario == "ice_ship" else "stone"
+            if self.scenario == "ice_ship":
+                return "ice"
+            if self.scenario == "clown_chase" \
+                    and cell in self._decoy_cells:
+                return "tent"  # the carnival grounds
+            return "hull" if space else "stone"
         if code == C.OBS_HAZARD:
             return "drop"
         if code == C.OBS_WORMHOLE:
             return "wormhole"
         if code == C.OBS_DOOR_OPEN:
-            return "door"
+            return "hatch" if space else "door"
         if code == C.OBS_GOAL:
             return "chest"
         slots = self.layout.extras.get("textures", {}).get(cell, ())
+        if space:  # outer space; station interiors are deck plating
+            return "deck" if C.TEX_INTERIOR in slots else "space"
         for slot, name in self._SLOT_TILES:
             if slot in slots:
                 return name
