@@ -32,10 +32,9 @@ the versioned, pinned registry across all variants under the
 universal action and observation spaces of
 Section~\ref{sec:spaces} --- Plain, Texture, and Top are reporting
 slices of a single suite, and the version pins the environment list
-(future families extend to v2 without altering v1 entries). The
-experiment program that consumes TopoGym-v1 is specified in
-\texttt{papers/method/experiment\_design.tex} (campaign X1);
-this document is the authority on the environments themselves. GridWorld2D is specified fully here; the Texture and Top
+(future families extend to v2 without altering v1 entries). This
+document is the authority on the environments themselves.
+GridWorld2D is specified fully here; the Texture and Top
 variants are outlined, with their detailed scenario and construction
 specifications to follow.
 
@@ -57,8 +56,8 @@ the benchmark is directly usable by others.
 A \texttt{size} $\times$ \texttt{size} grid of cells, partitioned
 into free and obstacle cells. The agent occupies one free cell;
 actions are \{up, down, left, right\}; moving into an obstacle leaves
-the agent in place. Standing conventions, inherited from the theory
-document and enforced at generation time:
+the agent in place. Standing conventions, enforced at generation
+time:
 \begin{itemize}[leftmargin=2em, itemsep=1pt]
   \item the exterior free space (the component containing the start
         cell) is 4-connected;
@@ -70,8 +69,7 @@ document and enforced at generation time:
   \item a chamber is an obstacle wall enclosing free interior once
         its doors are sealed; a decoy is a sealed ring enclosing no
         reachable free cell --- its interior is unvisitable by
-        construction, which is what makes it a decoy from the
-        archive's perspective.
+        construction, so persistence against it is never rewarded.
 \end{itemize}
 
 \subsection{Registry: named environments (the primary interface)}
@@ -173,8 +171,7 @@ registry entries belong to the published benchmark.
         innermost chamber, one door per shell, doors angularly offset
         so entry forces traversing shells in order. The sequential
         regime where the parallel-chamber separation deliberately
-        fails, and where learned-persistence baselines are predicted
-        to win. Bars are born sequentially: entering shell $j$ first
+        fails. Bars are born sequentially: entering shell $j$ first
         exposes shell $j{+}1$'s cycle. Validity: shell spacing
         $\geq 2$; depth $\times$ spacing bounded by half the side.
   \item \texttt{corridor}: rooms joined by width-1 corridors of
@@ -206,23 +203,18 @@ door width; separation claims. The manifest tool emits a CSV of
 (registry id, canonical configuration, validity, satisfied
 assumptions) covering the registry --- and, for power users, any
 custom configuration set. The published benchmark is the registry
-manifest plus fixed seed lists ---
-tuning seeds and evaluation seeds, identical environments, disjoint
-seeds --- as specified in the experiment design.
+manifest plus fixed seed lists --- tuning seeds and evaluation seeds,
+identical environments, disjoint seeds.
 
 \subsection{Ground truth, certification, and instrumentation}
 
 Read-only accessors per instance: the wall mask; the chamber list
-with interiors $I(W_i)$, perimeters $P_i$, door cells $D(W_i)$; the
-decoy list with representative rims; per-cell annotations (chamber
-and door membership; full-graph Ollivier--Ricci curvature, computed
-once by the generator); and exact snapshot save/restore. A
-certification checker validates a reported class list against the
-decoy ground truth and each certificate (every rim action tried
-$u_{\max}$ times without discovery, or explicit interior filling)
-directly from the run log. The shared recorder writes the full metric
-catalogue of the experiment design to Parquet at four granularities
-(per step, per epoch, per training run, per evaluation run).
+with interiors, perimeters, and door cells; the decoy list; per-cell
+annotations (chamber and door membership); and exact snapshot
+save/restore. The certified metadata attached to every instance
+records the free space's homology, computed from the selected complex
+backend (Section~\ref{sec:complex}) and cross-checked against the
+analytic expectation for the placed features at generation time.
 Registration-time unit tests assert the standing conventions on every
 generated instance.
 
@@ -293,10 +285,9 @@ Every benchmark variant (GridWorld2D, -Texture, -Top) supports a
 \end{itemize}
 Ground truth exposes the reward cells and (for \texttt{deceptive})
 the shaping field. Reward modes exist for community use, for training
-reward-consuming components (the hole-value and frontier heads, the
-planner's exploitation term), and for deception studies; the
-method experiment program runs \texttt{none} throughout to keep
-an extra variable out of its main results.
+reward-consuming baselines, and for deception studies; pure
+exploration evaluations should run \texttt{none} to keep an extra
+variable out of their results.
 
 \subsection{Universal action and observation spaces}
 \label{sec:spaces}
@@ -411,23 +402,20 @@ Texture slice of TopoGym-v1:
         stranding, and only entering it tells.
 \end{itemize}
 
-\paragraph{SpaceWarp and the certificate (semantics, not
-soundness).} SpaceWarp does not break the certificate --- it sharpens
-what the certificate says. Both certified statements remain true
-here: the treasure chamber's enclosing class is genuinely permanent
-in the spatial complex (its wall has no door, so the class never dies
-even after wormhole entry archives the interior --- the wall stays
-uncovered and the hugging cycle never bounds), and its gate log is
-genuinely exhausted (no local entry exists). What the environment
-changes is the gloss: a decoy certificate certifies no local entry
-and a permanent spatial $\Hm{1}$ class, not unenterability --- with
-non-local transitions, certified decoys can still be enterable
-through a wormhole. SpaceWarp is included to make that semantic
-boundary measurable; the extension that upgrades the certificate from
-``no local entry'' to ``no entry'' --- evaluating gate evidence and
-the complex on the archive transition graph, where wormhole edges
-appear once traversed --- is future work the environment is built to
-test.
+\paragraph{SpaceWarp and local evidence (semantics, not
+soundness).} SpaceWarp is built to separate two statements that
+coincide everywhere else in the library: ``this enclosure admits no
+local entry'' and ``this enclosure cannot be entered.'' The treasure
+chamber's enclosing class is genuinely permanent in the spatial
+complex (its wall has no door, so the hugging cycle never bounds even
+after the interior has been visited), and exhaustive local probing of
+its wall truthfully reports no entry --- yet the chamber is
+enterable, through a non-local transition. Methods that classify
+enclosures from local evidence alone will mark it unenterable;
+methods that account for non-local transitions --- e.g.\ by analyzing
+the transition graph of experience, where a wormhole edge appears
+once traversed --- can do better. SpaceWarp makes that semantic
+boundary measurable.
 
 \paragraph{Status.} The scenario constructions above fix the suite;
 exact sizes, layouts, semantic slot assignments, and generation rules
@@ -488,10 +476,10 @@ edges; an agent that carries only local structure treats the corners
 as far apart, while the quotient makes them neighbors.
 
 \paragraph{Status.} Identification-aware metric and
-complex construction (the Rips complex on the quotient metric), the
-interaction of wrap-around with the archive and with return-by-replay,
-detection of the ambient classes versus feature classes, and the
-per-topology registry entries are to be specified in a forthcoming
-revision of this document.
+complex construction (the Rips complex on the quotient metric,
+already available as the \texttt{rips} backend of
+Section~\ref{sec:complex}), detection of the ambient classes versus
+feature classes, and the per-topology registry entries are to be
+specified in a forthcoming revision of this document.
 
 \end{document}
