@@ -5,14 +5,9 @@ Door mechanics
 - **bump** (hidden door): observed as a wall until opened. Walking into it
   counts one "try"; after ``tries`` bumps it opens permanently (for the
   episode) and becomes passable.
-- **one_way**: visible as a valve; can only be *entered* from its
-  ``allowed_from`` neighbor. From any other side it acts as a wall, forever.
-- **trapdoor**: visible; passable once. It seals permanently the moment the
-  agent steps off it.
 
 Episode dynamics never change the free space's homology (a door cell is a
-free cell either way) — doors gate *coverage* and *reversibility*, which is
-exactly what the metadata's ``asymmetry`` block describes.
+free cell either way) — doors gate *coverage*, not homology.
 
 Observed-region tracking
 ------------------------
@@ -29,8 +24,7 @@ monotone filtration. Discovering a passage is exactly one of:
   evaluation cadence).
 
 Hidden doors participate naturally: a closed bump-door is believed to be a
-wall, so opening it *is* the discovery event. Tracking is cumulative and
-optimistic (a sealed trapdoor stays in the observed region) — what
+wall, so opening it *is* the discovery event. Tracking is cumulative — what
 persistence needs.
 """
 
@@ -43,8 +37,8 @@ import gymnasium as gym
 import numpy as np
 
 from topogym.core import constants as C
-from topogym.core.homology import _UnionFind, analyze_2d, analyze_3d
-from topogym.generation.generator import generate_2d, generate_3d
+from topogym.core.homology import _UnionFind, analyze_2d
+from topogym.generation.generator import generate_2d
 
 #: Reward modes shared by every variant (see docs/specs/topo_gym_overview).
 #: "none" (default) — pure exploration, no extrinsic reward.
@@ -116,8 +110,7 @@ class TopoEnvCore(gym.Env):
         raise NotImplementedError
 
     def _generate(self, seed):
-        gen = generate_2d if self.DIM == 2 else generate_3d
-        return gen(self.cfg, seed)
+        return generate_2d(self.cfg, seed)
 
     # -- layout / episode state ---------------------------------------------
 
@@ -132,7 +125,6 @@ class TopoEnvCore(gym.Env):
     def _reset_runtime(self):
         self._bumps = {}
         self._open = set()
-        self._sealed = set()
         self._visited = set()
         self._steps = 0
         n_free = len(self.layout.free_cells)
@@ -220,14 +212,10 @@ class TopoEnvCore(gym.Env):
         return self._betti_of(self._observed_free)
 
     def _betti_of(self, cells):
-        if self.DIM == 2:
-            s = analyze_2d(self.layout.base.face_cycle(c) for c in cells)
-        else:
-            s = analyze_3d(self.layout.base.cube_corners(c) for c in cells)
+        s = analyze_2d(self.layout.base.face_cycle(c) for c in cells)
         return s.betti_z2
 
-    _KNOWN_FREE_CODES = (C.OBS_EMPTY, C.OBS_GOAL, C.OBS_DOOR_OPEN,
-                         C.OBS_DOOR_ONEWAY, C.OBS_TRAPDOOR)
+    _KNOWN_FREE_CODES = (C.OBS_EMPTY, C.OBS_GOAL, C.OBS_DOOR_OPEN)
 
     def _note_observed(self, cell, code):
         """Add a sighted cell to the observed-region filtration."""
@@ -256,34 +244,22 @@ class TopoEnvCore(gym.Env):
         if t in (C.WALL, C.HOLE):
             return False
         if t == C.DOOR:
+            if target in self._open:
+                return True
             spec = self.layout.doors[target]
-            if spec.kind == "bump":
-                if target in self._open:
-                    return True
-                self._bumps[target] = self._bumps.get(target, 0) + 1
-                if self._bumps[target] >= spec.tries:
-                    self._open.add(target)
-                return False
-            if spec.kind == "one_way":
-                return frm == spec.allowed_from
-            if spec.kind == "trapdoor":
-                return target not in self._sealed
+            self._bumps[target] = self._bumps.get(target, 0) + 1
+            if self._bumps[target] >= spec.tries:
+                self._open.add(target)
+            return False
         return True
 
     def _on_leave(self, cell):
-        spec = self.layout.doors.get(cell)
-        if spec is not None and spec.kind == "trapdoor":
-            self._sealed.add(cell)
+        pass  # hook for mechanics that trigger on leaving a cell
 
     def _obs_code(self, cell) -> int:
         t = self.layout.cell_types.get(cell, C.EMPTY)
         if t == C.DOOR:
-            spec = self.layout.doors[cell]
-            if spec.kind == "bump":
-                return C.OBS_DOOR_OPEN if cell in self._open else C.OBS_WALL
-            if spec.kind == "one_way":
-                return C.OBS_DOOR_ONEWAY
-            return C.OBS_WALL if cell in self._sealed else C.OBS_TRAPDOOR
+            return C.OBS_DOOR_OPEN if cell in self._open else C.OBS_WALL
         return {
             C.EMPTY: C.OBS_EMPTY, C.WALL: C.OBS_WALL, C.HOLE: C.OBS_HOLE,
             C.GOAL: C.OBS_GOAL,
@@ -319,8 +295,7 @@ class TopoEnvCore(gym.Env):
 
     # Sight blockers. HOLE cells are pits/moats: impassable but transparent,
     # so the far side of a moat is visible before it is reachable.
-    _BLOCKING = (C.OBS_WALL, C.OBS_OUT_OF_WORLD,
-                 C.OBS_DOOR_ONEWAY, C.OBS_TRAPDOOR)
+    _BLOCKING = (C.OBS_WALL, C.OBS_OUT_OF_WORLD)
 
     # -- reward / bookkeeping -------------------------------------------------
 
@@ -359,7 +334,6 @@ class TopoEnvCore(gym.Env):
             "known_components": self._known_components,
             "h0_merges": self._h0_merges,
             "doors_opened": len(self._open),
-            "trapdoors_used": len(self._sealed),
         }
 
     def _reset_info(self, agent_cell):

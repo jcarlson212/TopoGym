@@ -17,7 +17,7 @@ print("base:      ", topo["base_map"])
 print("betti_z2:  ", topo["betti_z2"], "(certified)")
 print("homology:  ", topo["homology"])
 print("genus:     ", topo["genus"])
-print("asymmetry: ", topo["asymmetry"]["is_symmetric"])
+print("bridges:   ", topo["connectivity"]["n_bridges"])
 
 for _ in range(50):
     action = env.action_space.sample()

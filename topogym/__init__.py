@@ -1,4 +1,4 @@
-"""TopoGym: build RL environments from topology, with certified metadata.
+"""TopoGym: gridworld environments with certified topology.
 
 Quick start::
 
@@ -11,22 +11,21 @@ Quick start::
 
 Or compose spaces directly (see :mod:`topogym.spec`)::
 
-    from topogym.spec import Annulus, Circle
+    from topogym.spec import Torus
 
-    env = (Annulus(15) * Circle(8)).compile(seed=3)
+    env = Torus(15).holes(3).compile(seed=7)
 """
 
 from gymnasium.envs.registration import register
 
 from topogym import complexes, spec, tda
 from topogym.core.metadata import TopologyMetadata
-from topogym.generation import TopoGenConfig2D, TopoGenConfig3D
+from topogym.generation import TopoGenConfig2D
 
 __version__ = "0.1.0"
 __all__ = [
     "TopologyMetadata",
     "TopoGenConfig2D",
-    "TopoGenConfig3D",
     "complexes",
     "spec",
     "tda",
@@ -36,10 +35,3 @@ register(
     id="TopoGym/Grid2D-v0",
     entry_point="topogym.envs:TopoGrid2DEnv",
 )
-register(
-    id="TopoGym/Grid3D-v0",
-    entry_point="topogym.envs:TopoGrid3DEnv",
-)
-
-# Benchmark entries register their pinned env ids on import.
-from topogym import benchmarks as _benchmarks  # noqa: E402,F401

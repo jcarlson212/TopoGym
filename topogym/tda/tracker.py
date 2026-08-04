@@ -27,7 +27,7 @@ import math
 import gymnasium as gym
 
 from topogym.complexes.gudhi_backend import persistence_of_poset
-from topogym.core.homology import analyze_2d, analyze_3d, free_complex_2d, free_poset_3d
+from topogym.core.homology import analyze_2d, free_complex_2d
 
 
 class ExplorationTracker(gym.Wrapper):
@@ -85,11 +85,8 @@ class ExplorationTracker(gym.Wrapper):
         raise ValueError(f"which must be 'visited' or 'observed', got {which!r}")
 
     def _betti_of_cells(self, cells) -> tuple:
-        core = self._core
-        base = core.layout.base
-        if core.DIM == 2:
-            return analyze_2d(base.face_cycle(c) for c in cells).betti_z2
-        return analyze_3d(base.cube_corners(c) for c in cells).betti_z2
+        base = self._core.layout.base
+        return analyze_2d(base.face_cycle(c) for c in cells).betti_z2
 
     def betti_curve(self, which: str = "observed", every: int = 1) -> list:
         """``[(step, betti_z2), ...]`` of the known region over time.
@@ -117,20 +114,14 @@ class ExplorationTracker(gym.Wrapper):
         (and their lifetimes measure how long the agent was fooled).
         """
         steps = self._steps_of(which)
-        core = self._core
-        base = core.layout.base
+        base = self._core.layout.base
         cells = list(steps)
         if not cells:
             return {}
-        if core.DIM == 2:
-            complex_ = free_complex_2d(
-                (c, base.face_cycle(c)) for c in cells
-            )
-            tops, faces_of = complex_.top_cells(), complex_.faces_of
-        else:
-            tops, faces_of, _ = free_poset_3d(
-                (c, base.cube_corners(c)) for c in cells
-            )
+        complex_ = free_complex_2d(
+            (c, base.face_cycle(c)) for c in cells
+        )
+        tops, faces_of = complex_.top_cells(), complex_.faces_of
         return persistence_of_poset(
             tops, faces_of, lambda top: steps[top[1]]
         )

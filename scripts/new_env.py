@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Design a TopoGym environment from the command line.
 
-Any field of TopoGenConfig2D / TopoGenConfig3D can be set with
-``--set key=value`` (values are parsed as Python literals when possible):
+Any field of TopoGenConfig2D can be set with ``--set key=value`` (values
+are parsed as Python literals when possible):
 
-    python scripts/new_env.py --dim 2 --name klein-b7 --seed 42 \\
+    python scripts/new_env.py --name klein-b7 --seed 42 \\
         --set base=klein size=21 target_b1=7 n_chambers=2 n_decoys=1
 
 Writes ``docs/envs/community/<name>.svg`` and ``<name>.json`` (config +
@@ -23,12 +23,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from topogym.generation import (  # noqa: E402
-    TopoGenConfig2D,
-    TopoGenConfig3D,
-    generate_2d,
-    generate_3d,
-)
+from topogym.generation import TopoGenConfig2D, generate_2d  # noqa: E402
 from topogym.rendering.svg import layout_to_svg  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -45,7 +40,6 @@ def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("--dim", type=int, choices=(2, 3), default=2)
     ap.add_argument("--name", required=True, help="output file stem")
     ap.add_argument("--seed", type=int, required=True,
                     help="layout seed (part of the environment's identity)")
@@ -54,7 +48,7 @@ def main():
     ap.add_argument("--out", default=str(ROOT / "docs" / "envs" / "community"))
     args = ap.parse_args()
 
-    config_cls = TopoGenConfig2D if args.dim == 2 else TopoGenConfig3D
+    config_cls = TopoGenConfig2D
     fields = {f.name for f in dataclasses.fields(config_cls)}
     overrides = {}
     for item in args.set:
@@ -64,8 +58,7 @@ def main():
         overrides[key] = parse_value(raw)
     cfg = config_cls(**overrides)
 
-    gen = generate_2d if args.dim == 2 else generate_3d
-    layout = gen(cfg, args.seed)
+    layout = generate_2d(cfg, args.seed)
     md = layout.metadata
 
     out_dir = pathlib.Path(args.out)

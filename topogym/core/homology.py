@@ -11,12 +11,12 @@ Open-region convention
 ----------------------
 The complex is *regularized* so that its homotopy type matches the open free
 region the agent actually moves in: where two free cells touch only at a
-corner (2D) or only along an edge/corner (3D) with obstacles pinching in
-between, the shared vertex/edge is split into one copy per "fan" of cells.
+corner with obstacles pinching in between, the shared vertex is split
+into one copy per "fan" of cells.
 This keeps homology consistent with movement connectivity (the agent cannot
 squeeze through a pinch point).
 
-For 2D free spaces the regularized complex is always a surface with
+The regularized complex is always a surface with
 boundary, so we also report Euler characteristic, orientability, number of
 boundary circles, and genus (orientable) or demigenus / crosscap number
 (non-orientable) — computed, not assumed.
@@ -28,21 +28,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from topogym.complexes.cell_complex import CellComplex2D, _UnionFind
-from topogym.complexes.gudhi_backend import betti_of_poset
 
 __all__ = [
-    "Complex3DSummary",
     "Surface2DSummary",
     "analyze_2d",
-    "analyze_3d",
     "free_complex_2d",
-    "free_poset_3d",
 ]
 
-
-# ---------------------------------------------------------------------------
-# 2D
-# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class Surface2DSummary:
@@ -150,141 +142,4 @@ def analyze_2d(cycles) -> Surface2DSummary:
         n_edges=n_e, n_faces=n_f, is_manifold=is_manifold,
         n_boundary_components=n_boundary, orientable=orientable,
         genus=genus, demigenus=demigenus,
-    )
-
-
-# ---------------------------------------------------------------------------
-# 3D
-# ---------------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class Complex3DSummary:
-    """Certified invariants of a 3D free space."""
-
-    betti_z2: tuple  # (b0, b1, b2, b3)
-    euler_characteristic: int
-    n_vertices: int
-    n_edges: int
-    n_squares: int
-    n_cubes: int
-
-
-# Square faces of a unit cube: (axis held fixed, side), corner bits in
-# cyclic order around the square.
-_CUBE_SQUARES = []
-for _axis in range(3):
-    for _side in (0, 1):
-        _order = [(0, 0), (1, 0), (1, 1), (0, 1)]
-        _cyc = []
-        for _a, _b in _order:
-            bits = [0, 0, 0]
-            bits[_axis] = _side
-            others = [k for k in range(3) if k != _axis]
-            bits[others[0]] = _a
-            bits[others[1]] = _b
-            _cyc.append(tuple(bits))
-        _CUBE_SQUARES.append(tuple(_cyc))
-
-
-def free_poset_3d(keyed_corner_maps):
-    """The regularized face poset of a 3D free space, with cube keys.
-
-    ``keyed_corner_maps``: iterable of ``(cell, cube_corners(cell))``. Cube
-    keys are preserved (poset top cells are ``("c", cell)``); edges and
-    vertices are split per fan component (open-region convention).
-
-    Returns ``(tops, faces_of, counts)`` where ``counts`` is
-    ``(n_vertices, n_edges, n_squares, n_cubes)`` of the regularized
-    complex.
-    """
-    keyed_corner_maps = list(keyed_corner_maps)
-
-    # Geometric squares with incident cubes.
-    sq_cubes = defaultdict(list)  # frozenset(4 verts) -> [cube key]
-    sq_cycle = {}
-    cube_squares = {}  # cube key -> [square keys]
-    for ck, corners in keyed_corner_maps:
-        if len(set(corners.values())) != 8:
-            raise ValueError("degenerate cube: base map too small for its gluing")
-        keys = []
-        for cyc_bits in _CUBE_SQUARES:
-            cyc = tuple(corners[b] for b in cyc_bits)
-            key = frozenset(cyc)
-            sq_cubes[key].append(ck)
-            sq_cycle.setdefault(key, cyc)
-            keys.append(key)
-        cube_squares[ck] = keys
-
-    # Fan components of cubes around each geometric edge and vertex: two
-    # cubes are connected at an edge/vertex iff they share a *square*
-    # containing it. Cubes touching only along an edge or corner (a 3D
-    # pinch) fall in different components and the edge/vertex is split.
-    edge_uf = defaultdict(_UnionFind)  # geometric edge -> UF over cubes
-    vert_uf = defaultdict(_UnionFind)  # geometric vertex -> UF over cubes
-    for key, cubes in sq_cubes.items():
-        cyc = sq_cycle[key]
-        for k in range(4):
-            e = frozenset((cyc[k], cyc[(k + 1) % 4]))
-            edge_uf[e].find(cubes[0])
-            for other in cubes[1:]:
-                edge_uf[e].union(cubes[0], other)
-        for v in cyc:
-            vert_uf[v].find(cubes[0])
-            for other in cubes[1:]:
-                vert_uf[v].union(cubes[0], other)
-
-    # Regularized cells: squares keep their geometric key (all incident
-    # cubes of a square agree on its fans); edges and vertices are split
-    # per fan component.
-    sq_edges = {}
-    edge_verts = {}
-    for key, cubes in sq_cubes.items():
-        ck = cubes[0]
-        cyc = sq_cycle[key]
-        eids = []
-        for k in range(4):
-            u, w = cyc[k], cyc[(k + 1) % 4]
-            e = frozenset((u, w))
-            eid = (e, edge_uf[e].find(ck))
-            if eid not in edge_verts:
-                edge_verts[eid] = (
-                    (u, vert_uf[u].find(ck)), (w, vert_uf[w].find(ck))
-                )
-            eids.append(eid)
-        sq_edges[key] = eids
-
-    def faces_of(cell):
-        tag, key = cell
-        if tag == "c":
-            return [("s", sq) for sq in cube_squares[key]]
-        if tag == "s":
-            return [("e", eid) for eid in sq_edges[key]]
-        if tag == "e":
-            return [("v", v) for v in edge_verts[key]]
-        return []
-
-    tops = [("c", ck) for ck, _ in keyed_corner_maps]
-    n_v = len({v for pair in edge_verts.values() for v in pair})
-    counts = (n_v, len(edge_verts), len(sq_cubes), len(keyed_corner_maps))
-    return tops, faces_of, counts
-
-
-def analyze_3d(corner_maps) -> Complex3DSummary:
-    """Certified invariants for a 3D free space.
-
-    ``corner_maps``: one dict per free cell mapping corner bits
-    ``(dx, dy, dz)`` to canonical geometric vertex ids (from
-    ``RectGluing3D.cube_corners``).
-    """
-    corner_maps = list(corner_maps)
-    if not corner_maps:
-        return Complex3DSummary((0, 0, 0, 0), 0, 0, 0, 0, 0)
-
-    tops, faces_of, counts = free_poset_3d(enumerate(corner_maps))
-    betti = betti_of_poset(tops, faces_of, 3, field=2)
-    n_v, n_e, n_s, n_c = counts
-    chi = n_v - n_e + n_s - n_c
-    return Complex3DSummary(
-        betti_z2=betti, euler_characteristic=chi, n_vertices=n_v,
-        n_edges=n_e, n_squares=n_s, n_cubes=n_c,
     )
