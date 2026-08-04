@@ -1,61 +1,59 @@
-"""numpy RGB rendering (no extra dependencies)."""
+"""numpy RGB rendering with procedural pixel-art tiles (no extra deps)."""
 
 from __future__ import annotations
 
 import numpy as np
 
 from topogym.core import constants as C
+from topogym.rendering import tiles
 
-CODE_COLORS = {
-    C.OBS_EMPTY: (240, 240, 244),
-    C.OBS_WALL: (68, 68, 80),
-    C.OBS_HOLE: (15, 15, 18),
-    C.OBS_DOOR_OPEN: (161, 116, 56),  # wood: a visible walk-through door
-    C.OBS_GOAL: (39, 174, 96),
-    C.OBS_OUT_OF_WORLD: (28, 28, 36),
-    C.OBS_UNSEEN: (130, 130, 140),
-    C.OBS_HAZARD: (120, 26, 26),  # the drop: dark red pit
-    C.OBS_WORMHOLE: (155, 89, 182),  # all wormholes are purple
+#: observation code -> default tile name
+CODE_TILES = {
+    C.OBS_EMPTY: "floor",
+    C.OBS_WALL: "stone",
+    C.OBS_HOLE: "hole",
+    C.OBS_DOOR_OPEN: "door",
+    C.OBS_GOAL: "chest",
+    C.OBS_OUT_OF_WORLD: "out",
+    C.OBS_UNSEEN: "unseen",
+    C.OBS_HAZARD: "drop",
+    C.OBS_WORMHOLE: "wormhole",
 }
+
 REVEAL_BUMP_DOOR = (155, 89, 182)  # hidden bump-doors, revealed for docs
 REVEAL_DECOY = (146, 63, 63)  # decoy walls, revealed for docs
 AGENT_COLOR = (231, 76, 60)
-START_COLOR = (52, 152, 219)
 
 
-def _cell_color(env, cell):
-    code = env._obs_code(cell)
-    color = CODE_COLORS[code]
-    if env.reveal_hidden:
-        spec = env.layout.doors.get(cell)
-        if spec is not None and spec.kind == "bump" and cell not in env._open:
-            color = REVEAL_BUMP_DOOR
-        else:
-            for f in env.layout.features:
-                if f.kind == "decoy" and cell in f.cells:
-                    color = REVEAL_DECOY
-                    break
-    return color
+def _reveal_tint(env, cell):
+    """The reveal-mode overlay color for a cell, or None."""
+    if not env.reveal_hidden:
+        return None
+    spec = env.layout.doors.get(cell)
+    if spec is not None and spec.kind == "bump" and cell not in env._open:
+        return REVEAL_BUMP_DOOR
+    for f in env.layout.features:
+        if f.kind == "decoy" and cell in f.cells:
+            return REVEAL_DECOY
+    return None
 
 
 def render_rgb_2d(env, tile=14):
     base = env.layout.base
     w, h = base.layout_size()
-    img = np.zeros((h * tile, w * tile, 3), np.uint8)
-    img[:] = CODE_COLORS[C.OBS_OUT_OF_WORLD]
+    img = np.tile(tiles.tile("out", tile), (h, w, 1))
+    namer = getattr(env, "_tile_name", None)
     for cell in base.cells():
         x, y = base.layout_coords(cell)
-        img[y * tile:(y + 1) * tile, x * tile:(x + 1) * tile] = _cell_color(
-            env, cell
-        )
-        img[y * tile, x * tile:(x + 1) * tile] = np.maximum(
-            img[y * tile, x * tile:(x + 1) * tile].astype(int) - 18, 0
-        )
-        img[y * tile:(y + 1) * tile, x * tile] = np.maximum(
-            img[y * tile:(y + 1) * tile, x * tile].astype(int) - 18, 0
-        )
+        code = env._obs_code(cell)
+        name = namer(cell, code) if namer is not None else CODE_TILES[code]
+        region = img[y * tile:(y + 1) * tile, x * tile:(x + 1) * tile]
+        region[:] = tiles.tile(name, tile, (x, y))
+        color = _reveal_tint(env, cell)
+        if color is not None:
+            tiles.tint(region, color)
 
-    # Agent: filled cell + a heading notch toward the forward cell.
+    # Agent: filled square + a heading notch toward the forward cell.
     ax, ay = base.layout_coords(env._state.cell)
     y0, x0 = ay * tile, ax * tile
     pad = max(1, tile // 6)
