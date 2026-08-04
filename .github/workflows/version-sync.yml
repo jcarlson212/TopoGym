@@ -1,0 +1,42 @@
+name: Version sync
+
+# Keep CITATION.cff, topogym/__init__.py, and the README citation in
+# lockstep with the version in pyproject.toml (the single source of
+# truth). On main, stale files are fixed and committed back; on pull
+# requests, the job fails with instructions instead.
+
+on:
+  push:
+    branches: [main]
+    paths: [pyproject.toml]
+  pull_request:
+    paths: [pyproject.toml]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sync version metadata
+        if: github.event_name == 'push'
+        run: |
+          python scripts/sync_version.py
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -am "Sync version metadata with pyproject.toml"
+            git push
+          fi
+      - name: Check version metadata (PRs)
+        if: github.event_name == 'pull_request'
+        run: |
+          python scripts/sync_version.py --check || {
+            echo "::error::CITATION.cff / __init__.py / README are out of sync with pyproject.toml — run: python scripts/sync_version.py"
+            exit 1
+          }
