@@ -90,3 +90,32 @@ def test_line_of_sight_dimming(reveal, expect_dim):
     bright = region.mean()
     # An undimmed floor tile averages ~230; dimmed ~0.55x that.
     assert (bright < 160) == expect_dim
+
+
+def test_ricci_heatmap_env_var(monkeypatch):
+    monkeypatch.setenv("OLLIVIER_HEATMAP", "1")
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_holes=0, n_chambers=1, n_decoys=0, layout_seed=1,
+                   render_mode="rgb_array").unwrapped
+    env.reset(seed=0)
+    img = env.render()
+    # Legend box top-left with the gradient scale.
+    assert (img[4:10, 4:40] == (24, 24, 30)).all(axis=-1).any()
+    # The doorway is the most negatively curved spot: strongest red.
+    (door,) = env.layout.doors
+    ricci = env.ollivier_ricci()
+    assert ricci[door] == min(ricci.values())
+    tile = img.shape[0] // 15
+    dx, dy = door
+    region = img[dy * tile:(dy + 1) * tile, dx * tile:(dx + 1) * tile]
+    red_excess = region[..., 0].astype(int) - region[..., 1].astype(int)
+    assert red_excess.mean() > 40  # visibly red
+
+
+def test_ricci_heatmap_off_by_default(monkeypatch):
+    monkeypatch.delenv("OLLIVIER_HEATMAP", raising=False)
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_holes=0, n_chambers=1, n_decoys=0, layout_seed=1,
+                   render_mode="rgb_array").unwrapped
+    env.reset(seed=0)
+    assert not env._ricci_overlay

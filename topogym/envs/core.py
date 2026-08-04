@@ -141,6 +141,7 @@ class TopoEnvCore(gym.Env):
         self._debug = bool(os.environ.get("TOPOGYM_DEBUG"))
         self._overlay = bool(os.environ.get("TOPOGYM_OVERLAY")
                              or os.environ.get("OVERLAY_ENABLED"))
+        self._ricci_overlay = bool(os.environ.get("OLLIVIER_HEATMAP"))
         self.layout = None
         # A prebuilt layout (e.g. a compiled product space) bypasses the
         # generator entirely; it is fixed across episodes.
