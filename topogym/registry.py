@@ -172,9 +172,10 @@ def manifest(seed: int = 0, ids: list | None = None) -> list:
             "seed": seed,
         }
         try:
-            layout = generate_2d(cfg, seed)
+            metadata = generate_2d(cfg, seed).metadata
+            assert metadata is not None  # always set by generate_2d
             row["valid"] = True
-            row["betti_z2"] = list(layout.metadata.betti_z2)
+            row["betti_z2"] = list(metadata.betti_z2)
             row["assumptions"] = {
                 "well_composed": True,  # enforced at generation
                 "door_width": 1,
