@@ -129,9 +129,11 @@ class TopoGrid2DEnv(TopoEnvCore):
             self._step_egocentric(action)
         self._post_move_hook()
         reward, terminated, truncated = self._step_outcome(self._state.cell)
-        return self._obs(), reward, terminated, truncated, self._step_info(
-            self._state.cell
-        )
+        self._episode_return += reward  # the final reward, bonuses included
+        info = self._step_info(self._state.cell)
+        if self._debug:
+            self._debug_step(action, reward, terminated, truncated, info)
+        return self._obs(), reward, terminated, truncated, info
 
     def _step_egocentric(self, action: int) -> None:
         base = self.layout.base

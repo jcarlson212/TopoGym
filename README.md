@@ -140,7 +140,9 @@ python scripts/play.py TopoGym/SpaceWarp-v0
 ```
 
 Arrow keys move; `Tab` reveals hidden structure; `r` resets;
-`Backspace` regenerates the layout.
+`Backspace` regenerates the layout. Set `TOPOGYM_DEBUG=1` to stream
+everything the env computes each step (position, rewards, coverage,
+scenario state) to the console.
 
 ## Determinism, certification, and stats
 

@@ -31,6 +31,8 @@ persistence needs.
 from __future__ import annotations
 
 import dataclasses
+import logging
+import os
 from collections import deque
 from collections.abc import Iterable
 
@@ -58,6 +60,15 @@ REWARD_MODES = ("none", "sparse", "coverage", "deceptive", "goal")
 #: "rips" — a Vietoris-Rips complex on free-cell centers in the quotient
 #:   metric (topogym.complexes.rips); reports dimensions 0 and 1.
 COMPLEX_BACKENDS = ("cubical", "rips")
+
+#: Set TOPOGYM_DEBUG=1 to stream everything the env computes each step
+#: to the console (the "topogym" logger at DEBUG level).
+logger = logging.getLogger("topogym")
+if os.environ.get("TOPOGYM_DEBUG") and not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("[topogym] %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.DEBUG)
 
 
 class TopoEnvCore(gym.Env):
@@ -124,6 +135,7 @@ class TopoEnvCore(gym.Env):
         self.render_mode = render_mode
         self.reveal_hidden = reveal_hidden
 
+        self._debug = bool(os.environ.get("TOPOGYM_DEBUG"))
         self.layout = None
         # A prebuilt layout (e.g. a compiled product space) bypasses the
         # generator entirely; it is fixed across episodes.
@@ -417,7 +429,6 @@ class TopoEnvCore(gym.Env):
                 reward += 1.0
                 terminated = True
         truncated = self._steps >= self._max_steps and not terminated
-        self._episode_return += reward
         return reward, terminated, truncated
 
     def _step_info(self, agent_cell: tuple) -> dict:
@@ -442,4 +453,33 @@ class TopoEnvCore(gym.Env):
         info = self._step_info(agent_cell)
         info["topology"] = self.layout.metadata.to_dict()
         info["topology"]["complex"] = self.complex_backend
+        if self._debug:
+            t = info["topology"]
+            logger.debug(
+                "reset  %s seed=%s start=%s goal=%s betti=%s sealed=%s "
+                "horizon=%s reward_mode=%s extras=%s",
+                t["base_map"], t["layout_seed"], agent_cell,
+                self.layout.goal if self.goal_exists else None,
+                t["betti_z2"], t["betti_z2_sealed"], self._max_steps,
+                self.reward_mode, self._debug_extras(),
+            )
         return info
+
+    def _debug_extras(self) -> dict:
+        """Per-step scenario state for TOPOGYM_DEBUG logging; variants
+        override to expose their mechanics."""
+        return {}
+
+    def _debug_step(self, action: int, reward: float, terminated: bool,
+                    truncated: bool, info: dict) -> None:
+        logger.debug(
+            "step=%-5d action=%s pos=%s reward=%+.4f return=%+.4f "
+            "term=%s trunc=%s coverage=%.3f lifetime=%.3f observed=%.3f "
+            "components=%s h0_merges=%s chambers=%s doors=%s extras=%s",
+            info["steps"], action, info["position"], reward,
+            info["episode_return"], terminated, truncated,
+            info["coverage"], info["lifetime_coverage"],
+            info["observed_frac"], info["known_components"],
+            info["h0_merges"], info["chambers_entered"],
+            info["doors_opened"], self._debug_extras(),
+        )

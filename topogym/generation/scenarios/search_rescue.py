@@ -35,6 +35,7 @@ from topogym.generation.scenarios._shared import SCENARIO_SIZES, _mark
 _PITCH = 4  # rubble lattice pitch: blocks of 2-3 leave passages of 1-2
 _N_BLOCKS = 160  # fixed count: certified b1 = _N_BLOCKS + 1
 _CHAMBER_SIDE = 15
+_N_BARRELS = 10  # explosive barrels among the rubble: step on = boom
 
 
 def build_search_rescue(seed: int) -> Layout:
@@ -106,6 +107,31 @@ def build_search_rescue(seed: int) -> Layout:
         adj = build_adjacency(free_set, base.neighbors)
         if reachable_from(adj, start) != free_set:
             continue
+
+        # Explosive barrels in the passages: fatal to step on. The
+        # rescue must stay possible while avoiding every barrel.
+        passage = sorted(
+            free_set - interior - set(doors) - {start, goal}
+        )
+        barrels: set = set()
+        for idx in rng.permutation(len(passage)):
+            c = passage[int(idx)]
+            if all(max(abs(c[0] - b[0]), abs(c[1] - b[1])) >= 5
+                   for b in barrels) and (
+                abs(c[0] - start[0]) + abs(c[1] - start[1]) > 4
+            ):
+                barrels.add(c)
+            if len(barrels) == _N_BARRELS:
+                break
+        if len(barrels) < _N_BARRELS:
+            continue
+        safe = free_set - barrels
+        adj_safe = build_adjacency(safe, base.neighbors)
+        if goal not in reachable_from(adj_safe, start):
+            continue
+        for c in barrels:
+            cell_types[c] = C.HAZARD
+
         summary = analyze_2d(base.face_cycle(c) for c in free)
         if summary.betti_z2 != (1, _N_BLOCKS + 1, 0):
             continue
@@ -154,10 +180,16 @@ def build_search_rescue(seed: int) -> Layout:
         _mark(textures, free_set, C.TEX_DIRT)
         _mark(textures, interior, C.TEX_INTERIOR)
         _mark(textures, [door], C.TEX_DOOR)
+        barrel_adjacent = {
+            n for c in barrels for n in base.neighbors(c)
+            if n in free_set and n not in barrels
+        }
+        _mark(textures, barrel_adjacent, C.TEX_DROP_ADJ)
         layout.extras = {
             "textures": textures,
             "person": goal,
             "rubble": tuple(sorted(c for b in picked for c in b)),
+            "hazards": frozenset(barrels),
         }
         return layout
     raise GenerationError(f"could not build SearchRescue for seed {seed}")
