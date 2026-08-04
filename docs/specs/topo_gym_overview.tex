@@ -272,7 +272,8 @@ Every environment exposes a \texttt{complex} configuration field
 selecting the geometric substrate used for free-space homology:
 \begin{itemize}[leftmargin=2em, itemsep=1pt]
   \item \texttt{cubical} (default) --- the glued cubical cell complex of
-        the free cells; homology is computed by GUDHI on the order
+        the free cells; homology is computed by
+        GUDHI~\cite{maria14} on the order
         complex of its face poset (the barycentric subdivision), which is
         robust to every edge identification of
         Section~\ref{sec:top}. This backend is the certification source
@@ -785,6 +786,81 @@ Per-step \texttt{info} carries \texttt{coverage},
 \texttt{env.unwrapped.chamber\_entry\_steps} gives each chamber's
 first-entry step.
 
+\subsection{Learning from topology: the \texttt{VisitedComplex}}
+\label{sec:visited}
+
+The \texttt{VisitedComplex} is the library's interface for building
+custom topological RL algorithms: an incrementally maintained cell
+complex over the states an agent has \emph{visited} --- the
+archive-restorable set --- from which agents read Betti numbers,
+torsion, representative cycles, and rims, using their own encoders
+and their own choice of complex. It is deliberately independent of
+the environment's certification pipeline: the backend, scale, and
+coefficient ring can all differ from what the env itself uses.
+
+\begin{lstlisting}
+from topogym.tda import VisitedComplex
+
+vc = VisitedComplex.from_env(env)      # seeded with lifetime visits
+vc.add(new_cells)                      # feed states as you explore
+vc.betti()                             # (b0, b1) over the chosen ring
+vc.representatives()                   # one closed loop of cells per
+                                       #   H1 generator: teleportable
+vc.rims(observed=seen)                 # where each loop can tighten
+vc.torsion(1)                          # integral torsion of H1
+\end{lstlisting}
+
+\paragraph{Backends.} Three complexes, each with its parameters:
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item \texttt{cubical} (cell environments; takes the env's glued
+        base map): vertices are the visited cells, edges their
+        4-adjacencies (seam gluings included), and a square fills
+        wherever the full star of a base corner is visited.
+        Representative cycles are therefore loops \emph{of cells} ---
+        ordered sequences of archive targets --- and diagonally
+        touching trails stay disconnected, matching the movement
+        convention. A fully-visited \texttt{TopKlein} recovers the
+        Klein bottle exactly (below).
+  \item \texttt{vr} (\texttt{epsilon}, default 1.5): Vietoris--Rips
+        on arbitrary points --- visited cells under the base's
+        quotient metric, or any encoder's vectors via
+        \texttt{metric=}. Cliques are built to \texttt{max\_dim+1},
+        so \texttt{max\_dim=2} computes $\Hm{2}$ (a sampled sphere
+        reports $(1, 0, 1)$).
+  \item \texttt{witness} (\texttt{landmark\_radius},
+        \texttt{relaxation}): the landmark witness complex of de
+        Silva and Carlsson~\cite{deSilvaCarlsson04}. Every visited
+        point witnesses; a sparse landmark subset spans the complex,
+        so it stays small on long trajectories. Landmark selection is
+        a \emph{policy you override}:
+        \texttt{landmark\_policy(point, landmarks, dist)
+        $\to$ (admit, evict)} decides whether a new state becomes a
+        landmark and which existing one (if any) is kicked out ---
+        the default admits maxmin-style at
+        \texttt{landmark\_radius}, and a six-slot ring buffer is
+        three lines.
+\end{itemize}
+
+\paragraph{Coefficients.} \texttt{coefficients} takes any prime
+($\F_2$ default, $\F_3$, \dots; Gaussian elimination mod $p$) or
+\texttt{"Z"} (Smith normal form), where \texttt{torsion()} becomes
+meaningful. The standard example is visible in-library: a
+fully-visited Klein bottle reports $b_1 = 2$ over $\F_2$, $b_1 = 1$
+over $\F_3$, and $H_1 = \Z \oplus \Z/2$ integrally
+\cite{carlsson09}.
+
+\paragraph{Design.} All three backends reduce to one
+\texttt{ChainComplex} (cells per dimension, integer boundary maps),
+so higher-dimensional features arrive by adding cells, not new
+machinery; \texttt{add()} is cheap and rebuilds lazily; every query
+is deterministic (sorted iteration); progress logs flow through the
+\texttt{topogym} logger at DEBUG. Representative loops are
+fundamental cycles of a spanning forest kept when independent modulo
+the 2-cell boundary space~\cite{zomorodian05}, so each returned
+generator is an actual closed walk through visited states --- the
+same objects the H1 overlay draws and \texttt{h1\_representatives()}
+returns, generalized to user-selected complexes.
+
 \subsection{Playing and rendering}
 
 Every environment renders as \texttt{rgb\_array} (procedural
@@ -853,22 +929,131 @@ gradient bar with the scale's minimum and maximum values, so the
 colors read as numbers. Driving through a world with the heatmap on
 makes the geometric signature of its bottlenecks visible at a glance
 --- the red ridges are exactly the cells the curvature-coverage
-metric of Section~\ref{sec:code} tracks. It composes with the other
-two variables.
+metric of Section~\ref{sec:code} tracks \cite{ollivier09}. It
+composes with the other two variables.
 
 \paragraph{The step stream.} \texttt{TOPOGYM\_DEBUG=1} streams
 everything the environment computes to the console: a reset line
-(layout, seed, certified Betti numbers in both door conventions,
-horizon, reward mode) and one line per step with position, action,
+(layout, seed, certified Betti numbers in both door conventions, the
+surface invariants --- Euler characteristic, orientability, genus or
+demigenus, boundary components --- horizon, reward mode, and the
+bottleneck cells) and one line per step with position, action,
 reward, running return, termination flags, coverage, lifetime
-coverage, observed fraction, known components, H0 merges, chamber
-entries, doors opened, and live scenario state (season and
+coverage, observed fraction, known components, H0 merges, the
+observed region's live Euler characteristic, bottlenecks seen so far,
+chamber entries, doors opened, live scenario state (season and
 frozen/melted counts, clown positions and remaining budget, hazard
-counts). The two variables compose:
+counts), and the observation itself rendered human-readably (named
+texture slots in vector mode; the occluded egocentric patch as ASCII
+in local mode). The variables compose:
 
 \begin{lstlisting}[language=bash]
 TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 \
     python scripts/play.py TopoGym/SearchRescue-v0
 \end{lstlisting}
+
+\section{Benchmarks}
+\label{sec:benchmarks}
+
+\emph{(Outline --- the benchmark suite and its numbers land in a
+future revision; the split manifests will be generated and pinned
+exactly like the registry manifest of Section~\ref{sec:registry}.)}
+
+\subsection{The comparative benchmark}
+
+One overall benchmark for comparing agents: disjoint \textbf{train},
+\textbf{eval}, \textbf{hold-out}, and \textbf{hyperparameter-tuning}
+splits (the last reserved for pre-training hyperparameter selection,
+so tuning never touches eval or hold-out). Each split ships as a
+pinned manifest --- one row per (environment id, seed) with its
+canonical configuration and certified topology, in the same
+machine-readable format as \texttt{docs/manifest.csv} --- so a
+reported score names its exact environments.
+
+\subsection{Skill ladders}
+
+Per skill (e.g.\ hole counting, chamber discrimination, decoy
+rejection, seasonal replanning, hazard routing), a \emph{ladder}
+dataset of incrementally harder environments with train / eval / test
+splits. Ladder \emph{train} splits are ordered --- the sequence is
+part of the dataset, since curricula depend on it --- while eval and
+test are unordered sets at held-out difficulty rungs.
+
+\subsection{Baselines}
+
+Reference runs on every split and ladder, so each dataset's
+difficulty is legible: PPO~\cite{schulman17} as the plain policy
+baseline; the exploration family --- ICM~\cite{pathak17},
+RND~\cite{burda19}, and an archive method in the Go-Explore
+line~\cite{ecoffet21} consuming \texttt{VisitedComplex} cycles
+(Section~\ref{sec:visited}); and GRPO~\cite{shao24} for
+group-relative training. Benchmark tooling is not part of the core
+install: \texttt{pip install topogym[benchmarks]} pulls the extras
+(including Ray~\cite{moritz18} for distributed runs); the core
+library never depends on them.
+
+\begin{thebibliography}{99}
+\itemsep0pt
+
+\bibitem{towers24} M.~Towers et al.
+\newblock Gymnasium: A Standard Interface for Reinforcement Learning
+Environments.
+\newblock arXiv:2407.17032, 2024.
+
+\bibitem{maria14} C.~Maria, J.-D.~Boissonnat, M.~Glisse, and
+M.~Yvinec.
+\newblock The GUDHI Library: Simplicial Complexes and Persistent
+Homology.
+\newblock \emph{ICMS 2014}, LNCS 8592, pp.~167--174, 2014.
+
+\bibitem{deSilvaCarlsson04} V.~de~Silva and G.~Carlsson.
+\newblock Topological estimation using witness complexes.
+\newblock \emph{Eurographics Symposium on Point-Based Graphics},
+pp.~157--166, 2004.
+
+\bibitem{carlsson09} G.~Carlsson.
+\newblock Topology and data.
+\newblock \emph{Bulletin of the AMS}, 46(2):255--308, 2009.
+
+\bibitem{zomorodian05} A.~Zomorodian and G.~Carlsson.
+\newblock Computing persistent homology.
+\newblock \emph{Discrete \& Computational Geometry},
+33(2):249--274, 2005.
+
+\bibitem{ollivier09} Y.~Ollivier.
+\newblock Ricci curvature of Markov chains on metric spaces.
+\newblock \emph{Journal of Functional Analysis}, 256(3):810--864,
+2009.
+
+\bibitem{schulman17} J.~Schulman, F.~Wolski, P.~Dhariwal,
+A.~Radford, and O.~Klimov.
+\newblock Proximal Policy Optimization Algorithms.
+\newblock arXiv:1707.06347, 2017.
+
+\bibitem{pathak17} D.~Pathak, P.~Agrawal, A.~A.~Efros, and
+T.~Darrell.
+\newblock Curiosity-driven Exploration by Self-supervised
+Prediction.
+\newblock \emph{ICML 2017}, pp.~2778--2787, 2017.
+
+\bibitem{burda19} Y.~Burda, H.~Edwards, A.~Storkey, and O.~Klimov.
+\newblock Exploration by Random Network Distillation.
+\newblock \emph{ICLR 2019}, 2019.
+
+\bibitem{ecoffet21} A.~Ecoffet, J.~Huizinga, J.~Lehman,
+K.~O.~Stanley, and J.~Clune.
+\newblock First return, then explore.
+\newblock \emph{Nature}, 590:580--586, 2021.
+
+\bibitem{shao24} Z.~Shao et al.
+\newblock DeepSeekMath: Pushing the Limits of Mathematical Reasoning
+in Open Language Models.
+\newblock arXiv:2402.03300, 2024.
+
+\bibitem{moritz18} P.~Moritz et al.
+\newblock Ray: A Distributed Framework for Emerging AI Applications.
+\newblock \emph{OSDI 2018}, pp.~561--577, 2018.
+
+\end{thebibliography}
 
 \end{document}

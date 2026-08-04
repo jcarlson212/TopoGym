@@ -176,7 +176,10 @@ legend and live H1 count top-right.
 - [docs/environments/](docs/environments/README.md) — per-environment
   pages (spaces, rewards, registered configurations).
 - [docs/reference.md](docs/reference.md) — library internals: the cell
-  complex, the generator, TDA, the metrics interface.
+  complex, the generator, TDA, the metrics interface, and
+  `VisitedComplex` — the incremental visited-state topology structure
+  (cubical / Vietoris–Rips / witness backends, F_p or Z coefficients,
+  representative cycles) for building custom topological agents.
 - [`croissant.json`](croissant.json) +
   [`docs/manifest.csv`](docs/manifest.csv) — MLCommons Croissant
   metadata over the pinned registry (one record per environment id

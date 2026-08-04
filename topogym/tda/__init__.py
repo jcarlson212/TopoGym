@@ -5,15 +5,19 @@ of it an agent has actually discovered — from its own trajectory, not from
 ground truth — and scores the result against the certified metadata.
 """
 
+from topogym.tda.chains import ChainComplex
 from topogym.tda.pointcloud import (
     betti_at_scale,
     bottleneck_distance,
     rips_diagram,
 )
 from topogym.tda.tracker import ExplorationTracker
+from topogym.tda.visited import VisitedComplex
 
 __all__ = [
+    "ChainComplex",
     "ExplorationTracker",
+    "VisitedComplex",
     "betti_at_scale",
     "bottleneck_distance",
     "rips_diagram",

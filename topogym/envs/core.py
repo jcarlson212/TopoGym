@@ -598,14 +598,18 @@ class TopoEnvCore(gym.Env):
         if self._debug:
             t = info["topology"]
             necks = self.bottlenecks()
+            self._debug_necks = set(necks)
             shown = necks if len(necks) <= 30 else necks[:30]
             logger.debug(
                 "reset  %s seed=%s start=%s goal=%s betti=%s sealed=%s "
+                "chi=%s orientable=%s genus=%s demigenus=%s boundary=%s "
                 "horizon=%s reward_mode=%s bottlenecks=%d %s%s extras=%s",
                 t["base_map"], t["layout_seed"], agent_cell,
                 self.layout.goal if self.goal_exists else None,
-                t["betti_z2"], t["betti_z2_sealed"], self._max_steps,
-                self.reward_mode, len(necks), shown,
+                t["betti_z2"], t["betti_z2_sealed"],
+                t["euler_characteristic"], t["orientable"], t["genus"],
+                t["demigenus"], t["n_boundary_components"],
+                self._max_steps, self.reward_mode, len(necks), shown,
                 "..." if len(necks) > 30 else "", self._debug_extras(),
             )
         return info
@@ -615,16 +619,37 @@ class TopoEnvCore(gym.Env):
         override to expose their mechanics."""
         return {}
 
+    def _observed_chi(self) -> int:
+        """Euler characteristic of the observed region's dual complex
+        (cells - adjacencies + filled corners): cheap, no GUDHI."""
+        observed = self._observed_free
+        base = self.layout.base
+        n_e = n_f = 0
+        for c in sorted(observed):
+            for n in base.neighbors(c):
+                if n in observed and repr(n) > repr(c):
+                    n_e += 1
+        corner_star: dict = {}
+        for c in observed:
+            for v in base.face_cycle(c):
+                corner_star[v] = corner_star.get(v, 0) + 1
+        n_f = sum(1 for k in corner_star.values() if k == 4)
+        return len(observed) - n_e + n_f
+
     def _debug_step(self, action: int, reward: float, terminated: bool,
                     truncated: bool, info: dict) -> None:
+        necks = getattr(self, "_debug_necks", set())
+        seen = sum(1 for c in necks if c in self._observed_free)
         logger.debug(
             "step=%-5d action=%s pos=%s reward=%+.4f return=%+.4f "
             "term=%s trunc=%s coverage=%.3f lifetime=%.3f observed=%.3f "
-            "components=%s h0_merges=%s chambers=%s doors=%s extras=%s",
+            "components=%s h0_merges=%s chi_observed=%s "
+            "bottlenecks_seen=%d/%d chambers=%s doors=%s extras=%s",
             info["steps"], action, info["position"], reward,
             info["episode_return"], terminated, truncated,
             info["coverage"], info["lifetime_coverage"],
             info["observed_frac"], info["known_components"],
-            info["h0_merges"], info["chambers_entered"],
+            info["h0_merges"], self._observed_chi(),
+            seen, len(necks), info["chambers_entered"],
             info["doors_opened"], self._debug_extras(),
         )
