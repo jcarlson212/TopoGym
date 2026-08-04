@@ -173,9 +173,10 @@ FAMILY_DOCS = {
     "SpaceWarp": "Four chambers and wormholes; the treasure chamber "
                  "has no door and is enterable only through a "
                  "wormhole inside another chamber.",
-    "ClownChase": "A clown wanders near the decoys paying a depleting "
-                  "trickle of reward for approach; the treasure "
-                  "chamber is on the opposite side.",
+    "ClownChase": "A troupe of clowns (default two, n_clowns "
+                  "configurable) wanders the carnival tents paying a "
+                  "depleting trickle of reward for approach; the "
+                  "treasure chamber is on the opposite side.",
     "SearchRescue": "A person trapped in the one intact chamber of a "
                     "collapsed concrete structure: 160 rubble blocks "
                     "form a dense maze of small transient holes; the "

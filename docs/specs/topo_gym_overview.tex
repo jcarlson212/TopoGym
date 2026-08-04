@@ -437,19 +437,21 @@ Texture slice of TopoGym-v1:
         traversed. Reachability of every chamber under wormhole
         transitions is guaranteed and unit-tested.
   \item \texttt{TopoGym/ClownChase}. The reward-deception scenario.
-        Three sealed decoys cluster on one side of the map with a
-        clown NPC random-walking among them; every agent step that
-        reduces the distance to the clown pays a tiny reward
-        ($10^{-3}$) from a budget of $2.0$ that spans the agent's
-        lifetime on the layout --- the distractor runs out after a
-        few thousand rewarding steps in total. The treasure chamber
-        sits on the opposite side (the construction rejects layouts
-        where the sides are not genuinely opposite). Texture
-        distinguishes doors, floor, room interiors, the treasure
-        cell, and clown proximity (a slot lights up when the clown is
-        within one cell); the clown's position is otherwise sensed
-        only through the reward gradient --- which is exactly the
-        signal that must be distrusted.
+        Three sealed decoy tents cluster on one side of the map with
+        a troupe of clown NPCs (\texttt{n\_clowns} make-kwarg,
+        default two) random-walking among them, each leashed to its
+        own tent; every agent step that reduces the distance to the
+        \emph{nearest} clown pays a tiny reward ($10^{-3}$) from one
+        shared budget of $2.0$ that spans the agent's lifetime on the
+        layout --- the distractors run out after a few thousand
+        rewarding steps in total. The treasure chamber sits on the
+        opposite side (the construction rejects layouts where the
+        sides are not genuinely opposite). Texture distinguishes
+        doors, floor, room interiors, the treasure cell, and clown
+        proximity (a slot lights up when any clown is within one
+        cell); the clowns are otherwise sensed only through the
+        reward gradient --- which is exactly the signal that must be
+        distrusted.
   \item \texttt{TopoGym/EnvironmentalIceShip}. IceShip with seasons
         and a structured landmass: three cavities --- one holding the
         treasure, two empty --- each behind its own guaranteed

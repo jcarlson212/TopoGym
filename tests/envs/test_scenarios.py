@@ -236,24 +236,48 @@ def test_clown_pays_for_approach_until_budget_dries():
     clown_cfg = env.layout.extras["clown"]
     total = 0.0
     for _ in range(60):
-        cx, cy = env._clown_pos
         x, y = env._state.cell
+        cx, cy = min(env._clowns,
+                     key=lambda c: abs(c[0] - x) + abs(c[1] - y))
         dx, dy = np.sign(cx - x), np.sign(cy - y)
         action = _ACTION.get((dx, 0), _ACTION.get((0, dy), 0))
         _, r, term, trunc, _ = env.step(action)
         total += r
         if term or trunc:
             break
-    assert total > 0  # approaching the clown pays
+    assert total > 0  # approaching the nearest clown pays
     assert env._clown_budget < clown_cfg["budget"]
-    assert total <= clown_cfg["budget"] + 1.0  # clown pay is capped
+    assert total <= clown_cfg["budget"] + 1.0  # troupe pay is capped
 
 
-def test_clown_and_treasure_on_opposite_sides():
+def test_clown_troupe_is_configurable():
+    env, _, _ = _make("ClownChase")
+    assert len(env._clowns) == 2  # the default troupe
+    env4 = gym.make("TopoGym/ClownChase-v0", seed=1,
+                    n_clowns=4).unwrapped
+    env4.reset(seed=0)
+    assert len(env4._clowns) == 4
+    # Every clown is anchored at some decoy tent.
+    tents = [f for f in env4.layout.features if f.kind == "decoy"]
+    for a in env4.layout.extras["clown"]["anchors"]:
+        d = min(abs(a[0] - c[0]) + abs(a[1] - c[1])
+                for f in tents for c in f.cells)
+        assert d <= 4
+    # Clowns move independently but stay leashed to their anchors.
+    for _ in range(30):
+        env4.step(0)
+    radius = env4.layout.extras["clown"]["radius"]
+    for pos, anchor in zip(env4._clowns,
+                           env4.layout.extras["clown"]["anchors"]):
+        assert max(abs(pos[0] - anchor[0]),
+                   abs(pos[1] - anchor[1])) <= radius
+
+
+def test_clowns_and_treasure_on_opposite_sides():
     env, _, _ = _make("ClownChase")
     size = env.layout.base.layout_size()[0]
-    anchor = env.layout.extras["clown"]["anchor"]
-    assert abs(anchor[0] - env.layout.goal[0]) > size / 4
+    for anchor in env.layout.extras["clown"]["anchors"]:
+        assert abs(anchor[0] - env.layout.goal[0]) > size / 4
 
 
 def test_ladders_gem_is_on_top_platform():

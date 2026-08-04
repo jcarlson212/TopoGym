@@ -33,7 +33,8 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
     """A :class:`TopoGrid2DEnv` running a named Texture scenario."""
 
     def __init__(self, scenario: str, *, warp_sep: int = 2,
-                 season: str | None = None, **kwargs):
+                 season: str | None = None, n_clowns: int = 2,
+                 **kwargs):
         if scenario not in SCENARIOS:
             raise ValueError(
                 f"unknown scenario {scenario!r}; choose from "
@@ -43,9 +44,12 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             raise ValueError('season must be "summer" or "winter"')
         self.scenario = scenario
         self.forced_season = season
-        self._scenario_knobs = (
-            {"warp_sep": warp_sep} if scenario == "space_warp" else {}
-        )
+        if scenario == "space_warp":
+            self._scenario_knobs = {"warp_sep": warp_sep}
+        elif scenario == "clown_chase":
+            self._scenario_knobs = {"n_clowns": n_clowns}
+        else:
+            self._scenario_knobs = {}
         size = SCENARIO_SIZES[scenario]
         kwargs.setdefault("config", TopoGenConfig2D(base="square", size=size))
         super().__init__(**kwargs)
@@ -84,16 +88,16 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             self.season = None
         clown = self.layout.extras.get("clown")
         if clown is not None:
-            self._clown_pos = clown["anchor"]
-            # The distractor budget spans the agent's lifetime on this
-            # layout, not one episode: it runs out after a few thousand
-            # rewarding steps in total.
+            self._clowns = list(clown["anchors"])
+            # The troupe's shared budget spans the agent's lifetime on
+            # this layout, not one episode: it runs out after a few
+            # thousand rewarding steps in total.
             if getattr(self, "_clown_layout", None) is not self.layout:
                 self._clown_budget = clown["budget"]
                 self._clown_layout = self.layout
             self._clown_prev = self._dist_to_clown(self.layout.start)
         else:
-            self._clown_pos = None
+            self._clowns = []
 
     # -- mechanics -----------------------------------------------------------
 
@@ -130,20 +134,26 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             self._visited.add(cell)
         if self._state.cell in extras.get("hazards", ()):
             self._fell = True
-        if self._clown_pos is not None:
-            self._move_clown()
+        if self._clowns:
+            self._move_clowns()
 
-    def _move_clown(self) -> None:
+    def _move_clowns(self) -> None:
         clown = self.layout.extras["clown"]
         base = self.layout.base
         free = set(self.layout.free_cells)
-        anchor, radius = clown["anchor"], clown["radius"]
-        options = [
-            n for n in base.neighbors(self._clown_pos)
-            if n in free
-            and max(abs(n[0] - anchor[0]), abs(n[1] - anchor[1])) <= radius
-        ] + [self._clown_pos]
-        self._clown_pos = options[int(self.np_random.integers(len(options)))]
+        radius = clown["radius"]
+        for i, (pos, anchor) in enumerate(
+            zip(self._clowns, clown["anchors"])
+        ):
+            options = [
+                n for n in base.neighbors(pos)
+                if n in free
+                and max(abs(n[0] - anchor[0]),
+                        abs(n[1] - anchor[1])) <= radius
+            ] + [pos]
+            self._clowns[i] = options[
+                int(self.np_random.integers(len(options)))
+            ]
 
     def _try_enter(self, frm: tuple, target: tuple) -> bool:
         boat = self.layout.extras.get("boat", False)
@@ -168,8 +178,11 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         return super()._obs_code(cell)
 
     def _dist_to_clown(self, cell: tuple) -> int:
-        return (abs(cell[0] - self._clown_pos[0])
-                + abs(cell[1] - self._clown_pos[1]))
+        """Manhattan distance to the nearest clown of the troupe."""
+        return min(
+            abs(cell[0] - cx) + abs(cell[1] - cy)
+            for cx, cy in self._clowns
+        )
 
     def _step_outcome(self, agent_cell: tuple) -> tuple:
         reward, terminated, truncated = super()._step_outcome(agent_cell)
@@ -178,7 +191,7 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             self._fell = False
             self._hit_ice = False
             return 0.0, True, False
-        if self._clown_pos is not None and self.reward_mode != "none":
+        if self._clowns and self.reward_mode != "none":
             d = self._dist_to_clown(agent_cell)
             if d < self._clown_prev and self._clown_budget > 0:
                 step_reward = self.layout.extras["clown"]["step_reward"]
@@ -213,11 +226,10 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             vec[slot] = 1.0
         if self.season == "winter" and vec[C.TEX_WATER] == 1.0:
             vec[C.TEX_WATER] = 0.5  # cold water: the season is sensible
-        if self._clown_pos is not None:
-            near = max(abs(x - self._clown_pos[0]),
-                       abs(y - self._clown_pos[1])) <= 1
-            if near:
-                vec[C.TEX_CLOWN_NEAR] = 1.0
+        if self._clowns and any(
+            max(abs(x - cx), abs(y - cy)) <= 1 for cx, cy in self._clowns
+        ):
+            vec[C.TEX_CLOWN_NEAR] = 1.0
         if self.goal_exists and cell == self.layout.goal:
             vec[C.TEX_TREASURE] = 1.0
         return vec
@@ -281,9 +293,9 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         return "boat" if self.layout.extras.get("boat") else None
 
     def _render_overlay(self, img: np.ndarray, tile: int) -> None:
-        if self._clown_pos is None or self._clown_pos == self._state.cell:
-            return
-        x, y = self.layout.base.layout_coords(self._clown_pos)
-        img[y * tile:(y + 1) * tile, x * tile:(x + 1) * tile] = tiles.tile(
-            "clown", tile
-        )
+        for pos in self._clowns:
+            if pos == self._state.cell:
+                continue
+            x, y = self.layout.base.layout_coords(pos)
+            img[y * tile:(y + 1) * tile,
+                x * tile:(x + 1) * tile] = tiles.tile("clown", tile)
