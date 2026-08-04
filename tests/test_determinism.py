@@ -31,7 +31,7 @@ signature = {
     "metadata": layout.metadata.to_dict(),
 }
 
-env = gym.make("TopoGym/Grid2D-v0", config=cfg, layout_seed=5,
+env = gym.make("TopoGym/Grid2D-v0", config=cfg, layout_seed=5, actions="fourway",
                p_slip=0.3).unwrapped
 obs, _ = env.reset(seed=3)
 h = hashlib.sha256(obs.tobytes())

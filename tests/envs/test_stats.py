@@ -8,7 +8,8 @@ from topogym.stats import StatsRecorder
 
 
 def test_info_carries_stats_fields():
-    env = gym.make("TopoGym/Decoys2-50-v0", seed=1).unwrapped
+    env = gym.make("TopoGym/Decoys2-50-v0", seed=1,
+                   actions="fourway").unwrapped
     _, info = env.reset(seed=0)
     for key in ("coverage", "lifetime_coverage", "chambers_entered",
                 "episode_return"):
@@ -17,7 +18,8 @@ def test_info_carries_stats_fields():
 
 
 def test_chamber_entry_recorded():
-    env = gym.make("TopoGym/Dilution-50-v0", seed=1).unwrapped
+    env = gym.make("TopoGym/Dilution-50-v0", seed=1,
+                   actions="fourway").unwrapped
     env.reset(seed=0)
     (chamber,) = [f for f in env.layout.features if f.kind == "chamber"]
     cell = chamber.interior[0]
@@ -29,7 +31,7 @@ def test_chamber_entry_recorded():
 
 
 def test_lifetime_coverage_grows_across_episodes():
-    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15, actions="fourway",
                    n_holes=0, n_chambers=0, n_decoys=0, layout_seed=3,
                    reward_mode="none").unwrapped
     env.reset(seed=0)
@@ -45,7 +47,8 @@ def test_lifetime_coverage_grows_across_episodes():
 
 def test_stats_recorder_episodes_and_steps():
     env = StatsRecorder(
-        gym.make("TopoGym/Decoys1-50-v0", seed=1, max_steps=30),
+        gym.make("TopoGym/Decoys1-50-v0", seed=1, max_steps=30,
+                 actions="fourway"),
         record_steps=True,
     )
     rng = np.random.default_rng(0)
@@ -76,7 +79,8 @@ def _drive(env, path):
 
 
 def test_metrics_facade_on_optimal_runs():
-    env = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1),
+    env = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1,
+                                 actions="fourway"),
                         record_steps=True)
     env.reset(seed=0)
     path = env.env.unwrapped.shortest_path()
@@ -103,7 +107,7 @@ def test_metrics_facade_on_optimal_runs():
 
 def test_metrics_coverage_and_hole_milestones():
     env = StatsRecorder(
-        gym.make("TopoGym/Grid2D-v0", base="square", size=9, n_holes=1,
+        gym.make("TopoGym/Grid2D-v0", base="square", size=9, n_holes=1, actions="fourway",
                  n_chambers=0, n_decoys=0, layout_seed=2,
                  obs_mode="global", reward_mode="none", max_steps=600),
         track_holes=True,
@@ -129,7 +133,8 @@ def test_standardized_run_log(tmp_path, caplog):
     import json
     import logging
 
-    env = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1),
+    env = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1,
+                                 actions="fourway"),
                         record_steps=True)
     env.reset(seed=0)
     with caplog.at_level(logging.INFO, logger="topogym"):
@@ -146,7 +151,8 @@ def test_standardized_run_log(tmp_path, caplog):
     assert len(payload["episodes"]) >= 1
     assert payload["steps"][0]["global_step"] == 1
     # Determinism: the log is a pure function of the run.
-    again = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1),
+    again = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1,
+                                   actions="fourway"),
                           record_steps=True)
     again.reset(seed=0)
     for _ in range(5):

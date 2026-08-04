@@ -66,6 +66,37 @@ def _draw_triangle(img: np.ndarray, cx: int, cy: int, size: int,
                 img[py, max(0, x0):x1] = color
 
 
+_ARROW_CACHE: dict = {}
+
+
+def _agent_arrow(px: int) -> np.ndarray:
+    """A MiniGrid-style triangle pointing up, as a boolean mask."""
+    mask = _ARROW_CACHE.get(px)
+    if mask is None:
+        mask = np.zeros((px, px), dtype=bool)
+        pad = max(1, px // 8)
+        span = px - 2 * pad
+        for r in range(span):
+            half = max(1, round((r + 1) * (span / 2) / span))
+            mid = px / 2
+            mask[pad + r, int(mid - half):int(mid + half)] = True
+        _ARROW_CACHE[px] = mask
+    return mask
+
+
+def _heading_quarter_turns(env, base, ax: int, ay: int) -> int:
+    """np.rot90 turns mapping an up-facing sprite to the heading."""
+    fwd = base.forward(env._state)
+    if fwd is None:
+        return 0
+    fx, fy = base.layout_coords(fwd.cell)
+    dx = int(np.sign(fx - ax)) if abs(fx - ax) <= 1 else 0
+    dy = int(np.sign(fy - ay)) if abs(fy - ay) <= 1 else 0
+    return {(0, -1): 0, (1, 0): 3, (0, 1): 2, (-1, 0): 1}.get(
+        (dx, dy), 0
+    )
+
+
 def _draw_identifications(img: np.ndarray, base, tile: int) -> None:
     """Fundamental-polygon notation on identified edges: chevrons along
     each identified pair (same direction for wrap, opposed for flip),
@@ -125,14 +156,18 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
 
     _draw_identifications(img, base, tile)
 
-    # Agent: a scenario sprite when one exists, else a filled square
-    # with a heading notch toward the forward cell.
+    # Agent: a scenario sprite when one exists, else a MiniGrid-style
+    # arrow; both rotate to the agent's heading so orientation is
+    # always visible.
     ax, ay = base.layout_coords(env._state.cell)
     y0, x0 = ay * tile, ax * tile
+    k = _heading_quarter_turns(env, base, ax, ay)
     sprite = getattr(env, "_agent_tile", None)
     sprite_name = sprite() if sprite is not None else None
     if sprite_name is not None:
-        img[y0:y0 + tile, x0:x0 + tile] = tiles.tile(sprite_name, tile)
+        img[y0:y0 + tile, x0:x0 + tile] = np.rot90(
+            tiles.tile(sprite_name, tile), k
+        )
         overlay = getattr(env, "_render_overlay", None)
         if overlay is not None:
             overlay(img, tile)
@@ -145,15 +180,8 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
 
             draw_h1_overlay(env, img, tile)
         return img
-    pad = max(1, tile // 6)
-    img[y0 + pad:y0 + tile - pad, x0 + pad:x0 + tile - pad] = AGENT_COLOR
-    fwd = base.forward(env._state)
-    if fwd is not None:
-        fx, fy = base.layout_coords(fwd.cell)
-        dx = np.sign(fx - ax) if abs(fx - ax) <= 1 else 0
-        dy = np.sign(fy - ay) if abs(fy - ay) <= 1 else 0
-        cy, cx = y0 + tile // 2 + dy * tile // 4, x0 + tile // 2 + dx * tile // 4
-        img[cy - 1:cy + 2, cx - 1:cx + 2] = (255, 255, 255)
+    mask = np.rot90(_agent_arrow(tile), k) if k else _agent_arrow(tile)
+    img[y0:y0 + tile, x0:x0 + tile][mask] = AGENT_COLOR
     overlay = getattr(env, "_render_overlay", None)
     if overlay is not None:
         overlay(img, tile)

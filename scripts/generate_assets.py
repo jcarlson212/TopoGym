@@ -43,7 +43,6 @@ GIF_SET = [
     "TopTorus-50", "Maze-50", "Bottleneck6-100", "ShapeSt-50",
 ]
 
-_ACTION = {(0, -1): 0, (0, 1): 1, (-1, 0): 2, (1, 0): 3}
 
 GIF_PX = 420  # every GIF frame is exactly GIF_PX x GIF_PX
 STILL_PX = 480  # every still is exactly STILL_PX x STILL_PX
@@ -94,8 +93,52 @@ def _next_step(env, start) -> tuple | None:
     return node
 
 
+def _heading(env) -> tuple | None:
+    """The agent's screen-direction heading (dx, dy), if visible."""
+    base = env.layout.base
+    fwd = base.forward(env._state)
+    if fwd is None:
+        return None
+    ax, ay = base.layout_coords(env._state.cell)
+    fx, fy = base.layout_coords(fwd.cell)
+    if abs(fx - ax) > 1 or abs(fy - ay) > 1:
+        return None
+    return (fx - ax, fy - ay)
+
+
+_DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]  # up, right, down, left
+
+
+def _drive_toward(env, delta, heading, emit) -> int:
+    """Turn (emitting a frame per quarter-turn) then step forward;
+    returns the updated screen-heading index. ``heading`` is tracked
+    driver-side because ``base.forward`` is None when facing a walled
+    edge — resync from the env only when it can actually be sensed."""
+    sensed = _heading(env)
+    if sensed in _DIRS:
+        heading = _DIRS.index(sensed)
+    if delta not in _DIRS:  # a seam-wrapping move: probe by turning
+        before = env._state.cell
+        for _ in range(4):
+            env.step(2)
+            if env._state.cell != before:
+                break
+            env.step(1)
+            heading = (heading + 1) % 4
+            emit()
+    else:
+        turns = (_DIRS.index(delta) - heading) % 4
+        for action in {1: (1,), 2: (1, 1), 3: (0,)}.get(turns, ()):
+            env.step(action)
+            emit()
+        heading = _DIRS.index(delta)
+        env.step(2)  # forward
+    sensed = _heading(env)
+    return _DIRS.index(sensed) if sensed in _DIRS else heading
+
+
 def record_gif(env_id: str, path: pathlib.Path, seed: int = 1,
-               max_steps: int = 400, stride: int = 2) -> None:
+               max_steps: int = 700, stride: int = 3) -> None:
     import imageio.v3 as iio
     import numpy as np
 
@@ -104,23 +147,23 @@ def record_gif(env_id: str, path: pathlib.Path, seed: int = 1,
     w, h = env.layout.base.layout_size()
     tile = max(4, GIF_PX // max(w, h))
     frames = [_fit(render_rgb_2d(env, tile=tile), GIF_PX)]
-    for step in range(max_steps):
+    tick = [0]
+
+    def emit():
+        tick[0] += 1
+        if tick[0] % stride == 0:
+            frames.append(_fit(render_rgb_2d(env, tile=tile), GIF_PX))
+
+    heading = 0
+    for _ in range(max_steps):
         nxt = _next_step(env, env._state.cell)
         if nxt is None:
             break
         cur = env._state.cell
-        delta = (nxt[0] - cur[0], nxt[1] - cur[1])
-        action = _ACTION.get(delta)
-        if action is None:  # a seam-wrapping move: try each direction
-            for action in range(4):
-                before = env._state.cell
-                env.step(action)
-                if env._state.cell != before:
-                    break
-        else:
-            env.step(action)
-        if step % stride == 0:
-            frames.append(_fit(render_rgb_2d(env, tile=tile), GIF_PX))
+        heading = _drive_toward(
+            env, (nxt[0] - cur[0], nxt[1] - cur[1]), heading, emit
+        )
+        emit()
     frames += [frames[-1]] * 6  # hold the final frame
     iio.imwrite(path, np.stack(frames), duration=90, loop=0)
 
@@ -192,19 +235,22 @@ FAMILY_DOCS = {
 _SPACES_BLURB = """\
 ## Action space
 
-`Discrete(4)`: 0 = up, 1 = down, 2 = left, 3 = right (screen
-directions). Moving into an obstacle leaves the agent in place. With
-`p_slip > 0` the executed action is resampled uniformly with that
-probability. The egocentric `Discrete(3)` interface (turn left / turn
-right / forward) is available with `actions="egocentric"`.
+Egocentric `Discrete(3)` (default): 0 = turn left, 1 = turn right,
+2 = step forward; the rendered agent (arrow or scenario sprite) always
+points where it faces. `actions="fourway"` opts into `Discrete(4)`:
+0 = up, 1 = down, 2 = left, 3 = right (screen directions). Moving into
+an obstacle leaves the agent in place. With `p_slip > 0` the executed
+action is resampled uniformly with that probability.
 
 ## Observation space
 
-The universal vector observation: the agent's integer cell coordinates
-`(x, y)` followed by a 16-slot texture block in `[0, 1]` (slots 0-3:
-blocker adjacency left/right/above/below; 4-15: per-scenario semantic
-features, zero outside the Texture variants). `obs_mode="local"` gives
-occluded egocentric patches, `obs_mode="global"` the full symbolic grid.
+Default (egocentric): an occluded egocentric symbolic patch, agent
+centered and facing up. `obs_mode="vector"` (default under fourway)
+gives the universal vector observation: the agent's integer cell
+coordinates `(x, y)` followed by a 16-slot texture block in `[0, 1]`
+(slots 0-3: blocker adjacency left/right/above/below; 4-15:
+per-scenario semantic features, zero outside the Texture variants);
+`obs_mode="global"` the full symbolic grid.
 
 ## Rewards and episodes
 

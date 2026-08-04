@@ -14,7 +14,8 @@ _ACTION = {(0, -1): 0, (0, 1): 1, (-1, 0): 2, (1, 0): 3}
 
 
 def _make(name, seed=1):
-    env = gym.make(f"TopoGym/{name}-v0", seed=seed).unwrapped
+    env = gym.make(f"TopoGym/{name}-v0", seed=seed,
+                   actions="fourway").unwrapped
     obs, info = env.reset(seed=0)
     return env, obs, info
 
@@ -254,7 +255,7 @@ def test_clown_pays_for_approach_until_budget_dries():
 def test_clown_troupe_is_configurable():
     env, _, _ = _make("ClownChase")
     assert len(env._clowns) == 2  # the default troupe
-    env4 = gym.make("TopoGym/ClownChase-v0", seed=1,
+    env4 = gym.make("TopoGym/ClownChase-v0", seed=1, actions="fourway",
                     n_clowns=4).unwrapped
     env4.reset(seed=0)
     assert len(env4._clowns) == 4
@@ -341,7 +342,7 @@ def test_search_rescue_barrels_explode_and_warn():
 def test_search_rescue_gets_a_longer_horizon():
     env, _, _ = _make("SearchRescue")
     assert env._max_steps == int(1.56 * ((6 * 61) // 5))  # 113
-    override = gym.make("TopoGym/SearchRescue-v0", seed=1,
+    override = gym.make("TopoGym/SearchRescue-v0", seed=1, actions="fourway",
                         max_steps=40).unwrapped
     override.reset(seed=0)
     assert override._max_steps == 40

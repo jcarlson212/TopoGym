@@ -28,9 +28,10 @@ and everything else derives from that one object:
 - **Movement** asks the complex. Walking out of a cell's side, the
   complex answers which cell is glued there, through which side you
   enter, and whether the crossing reverses handedness (the `flip` bit).
-  The fourway interface re-canonicalizes the agent's frame every step
-  (actions are always screen directions); the egocentric interface
-  parallel-transports it, so a Möbius seam genuinely mirrors the view.
+  The egocentric interface (the default) parallel-transports the
+  agent's frame, so a Möbius seam genuinely mirrors the view; the
+  fourway override re-canonicalizes it every step (actions are always
+  screen directions).
 - **Homology** is computed by [GUDHI](https://gudhi.inria.fr/): a glued
   cubical complex is fed to GUDHI as the order complex of its face poset
   (the barycentric subdivision — homeomorphic to the space, robust to

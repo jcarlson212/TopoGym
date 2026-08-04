@@ -7,8 +7,8 @@
 
 Controls
 --------
-- fourway (default): arrow keys move up/down/left/right
-- --egocentric: left/right arrows turn, up arrow steps forward
+- egocentric (default): left/right arrows turn, up arrow steps forward
+- --fourway: arrow keys move up/down/left/right (screen directions)
 - tab: toggle reveal mode (hidden doors purple, decoy walls dark red)
 - r: reset the episode        backspace: reset with a new layout seed
 - q / escape: quit
@@ -38,8 +38,8 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("env_id", nargs="?", default="TopoGym/Decoys2-50-v0",
                     help="environment id (see --list)")
     ap.add_argument("--seed", type=int, default=0, help="layout seed")
-    ap.add_argument("--egocentric", action="store_true",
-                    help="drive the Discrete(3) egocentric agent")
+    ap.add_argument("--fourway", action="store_true",
+                    help="drive the Discrete(4) screen-direction agent")
     ap.add_argument("--reveal", action="store_true",
                     help="start with hidden structure revealed")
     ap.add_argument("--reward-mode", default="sparse",
@@ -64,11 +64,11 @@ def main() -> int:
         args.env_id, seed=args.seed, render_mode="human",
         reveal_hidden=args.reveal, reward_mode=args.reward_mode,
         p_slip=args.p_slip,
-        **({"actions": "egocentric"} if args.egocentric else {}),
+        **({"actions": "fourway"} if args.fourway else {}),
     )
     core = env.unwrapped
 
-    if args.egocentric:
+    if not args.fourway:
         keymap = {pygame.K_LEFT: 0, pygame.K_RIGHT: 1, pygame.K_UP: 2}
     else:
         keymap = {pygame.K_UP: 0, pygame.K_DOWN: 1, pygame.K_LEFT: 2,
@@ -109,8 +109,8 @@ def main() -> int:
                         args.env_id, seed=seed, render_mode="human",
                         reveal_hidden=core.reveal_hidden,
                         reward_mode=args.reward_mode, p_slip=args.p_slip,
-                        **({"actions": "egocentric"}
-                           if args.egocentric else {}),
+                        **({"actions": "fourway"}
+                           if args.fourway else {}),
                     )
                     core = env.unwrapped
                     obs, info = env.reset(seed=0)
