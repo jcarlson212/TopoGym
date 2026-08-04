@@ -296,7 +296,7 @@ def test_episode_length_is_predetermined():
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
                    layout_seed=3).unwrapped
     env.reset(seed=0)
-    assert env._max_steps == 4 * 15 * 15
+    assert env._max_steps == 4 * 15
     for other_seed in (4, 5):
         env2 = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
                         layout_seed=other_seed).unwrapped

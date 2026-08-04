@@ -264,8 +264,8 @@ identical layouts, metadata, and rollouts.
 
 Every benchmark variant (GridWorld2D, -Texture, -Top) supports a
 \texttt{reward\_mode} configuration field. Episodes have a
-pre-determined length --- $4WH$ steps for a $W \times H$ world,
-knowable from the configuration alone and overridable via
+pre-determined length --- $4\max(W,H)$ steps for a $W \times H$
+world, knowable from the configuration alone and overridable via
 \texttt{max\_steps} --- and every environment places a goal cell by
 default (removable with \texttt{goal=False} for goal-free
 exploration studies):

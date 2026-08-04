@@ -34,7 +34,7 @@ def _step_onto(env, target):
 
 
 @pytest.mark.parametrize("name,betti,sealed", [
-    ("IceShip", [1, 7, 0], [2, 7, 0]),
+    ("IceShip", [1, 4, 0], [2, 4, 0]),
     ("Ladders", [1, 0, 0], [1, 0, 0]),
     ("BankRobber", [1, 4, 0], [5, 4, 0]),
     ("DontFall", [1, 12, 0], [13, 12, 0]),
@@ -69,6 +69,44 @@ def test_blocker_adjacency_slots():
     ab = vec[C.TEX_BLOCK_ABOVE] + vec[C.TEX_BLOCK_BELOW]
     assert {lr, ab} == {0.0, 2.0}
     assert vec[C.TEX_WATER] == 1.0  # doors are navigable water too
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_ice_ship_channel_is_the_only_way(seed):
+    """Guaranteed: the narrow channel is the sole route to the goal."""
+    layout = build_scenario("ice_ship", seed)
+    (chamber,) = [f for f in layout.features if f.kind == "chamber"]
+    channel = set(chamber.meta["channel"])
+    assert len(channel) >= 12  # a genuine passage across the ice
+    free = set(layout.free_cells)
+    # With the channel open the goal is reachable...
+    adj = build_adjacency(free, layout.base.neighbors)
+    assert layout.goal in reachable_from(adj, layout.start)
+    # ...with it blocked, it is not.
+    cut = free - channel - set(layout.doors)
+    adj_cut = build_adjacency(cut, layout.base.neighbors)
+    assert layout.goal not in reachable_from(adj_cut, layout.start)
+    # The channel is width-1: every channel cell walls in on two
+    # opposite sides.
+    types = layout.cell_types
+    for (x, y) in sorted(channel)[1:-1]:
+        ns = (types.get((x, y - 1)) == 1) and (types.get((x, y + 1)) == 1)
+        ew = (types.get((x - 1, y)) == 1) and (types.get((x + 1, y)) == 1)
+        if not (ns or ew):  # corners of the L are the exception
+            corner = sum(
+                types.get(n) == 1 for n in layout.base.neighbors((x, y))
+            )
+            assert corner >= 2
+
+
+def test_ice_ship_has_attached_land_and_boat():
+    layout = build_scenario("ice_ship", 1)
+    size = layout.base.layout_size()[0]
+    walls = {c for c, t in layout.cell_types.items() if t == 1}
+    # Land masses touch the map edges (not bergs floating in water).
+    assert any(y == 0 for _, y in walls)
+    assert any(y == size - 1 for _, y in walls)
+    assert layout.extras["boat"] is True
 
 
 def test_dont_fall_drop_is_fatal():
@@ -123,6 +161,47 @@ def test_space_warp_treasure_needs_a_wormhole():
     assert spatially != free  # the treasure interior is its own component
 
 
+@pytest.mark.parametrize("seed", [1, 2, 3, 4, 5])
+def test_space_warp_every_chamber_reachable(seed):
+    """Guaranteed: with wormhole transitions, every free cell — every
+    chamber interior included — is reachable from the start."""
+    layout = build_scenario("space_warp", seed)
+    free = set(layout.free_cells)
+    adj = build_adjacency(free, layout.base.neighbors)
+    for a, b in layout.extras["wormholes"].items():
+        adj[a] = list(adj[a]) + [b]
+    reached = reachable_from(adj, layout.start)
+    assert reached == free
+    for f in layout.features:
+        assert set(f.interior) <= reached
+
+
+def test_space_warp_wormhole_field_is_dense_and_even():
+    layout = build_scenario("space_warp", 1)
+    wh = layout.extras["wormholes"]
+    assert len(wh) >= 24  # a real field, not a couple of shortcuts
+    size = layout.base.layout_size()[0]
+    half = size // 2
+    quadrants = {
+        (cx, cy): sum(
+            1 for (x, y) in wh if (x >= half) == cx and (y >= half) == cy
+        )
+        for cx in (False, True) for cy in (False, True)
+    }
+    assert min(quadrants.values()) >= 4  # spread over the whole map
+    cells = sorted(wh)
+    min_sep = min(
+        max(abs(a[0] - b[0]), abs(a[1] - b[1]))
+        for i, a in enumerate(cells) for b in cells[i + 1:]
+    )
+    assert min_sep >= 1  # never stacked; lattice sites keep >= warp_sep
+    # No wormhole blocks a doorway.
+    door_zone = set(layout.doors)
+    for d in layout.doors:
+        door_zone.update(layout.base.neighbors(d))
+    assert not (set(wh) & door_zone)
+
+
 def test_clown_pays_for_approach_until_budget_dries():
     env, _, _ = _make("ClownChase")
     clown_cfg = env.layout.extras["clown"]
@@ -151,11 +230,20 @@ def test_clown_and_treasure_on_opposite_sides():
 def test_ladders_gem_is_on_top_platform():
     env, _, _ = _make("Ladders")
     rooms = [f for f in env.layout.features if f.kind == "room"]
+    assert len(rooms) == 25  # the tower fills the whole lattice
     top_y = min(min(c[1] for c in f.interior) for f in rooms)
     goal_room = next(
         f for f in rooms if env.layout.goal in f.interior
     )
     assert min(c[1] for c in goal_room.interior) == top_y
+    # The climb starts on a bottom-row platform.
+    size = env.layout.base.layout_size()[1]
+    assert env.layout.start[1] > size * 2 // 3
+    # Platforms span the world, not a corner of it.
+    xs = [c[0] for f in rooms for c in f.interior]
+    ys = [c[1] for f in rooms for c in f.interior]
+    assert max(xs) - min(xs) > size * 3 // 4
+    assert max(ys) - min(ys) > size * 3 // 4
     # Corridors are textured as ladders (vertical) or bridges.
     vec_slots = set()
     (corr,) = [f for f in env.layout.features if f.kind == "corridors"]

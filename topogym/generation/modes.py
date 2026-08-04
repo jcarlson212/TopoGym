@@ -126,8 +126,10 @@ def build_corridor(cfg: TopoGenConfig2D, base: BaseMap2D,
     w, h = _rect_dims(cfg)
     room = max(3, cfg.chamber_side or 5)
     pitch = room + cfg.corridor_len
-    cols = (w - 1) // pitch
-    rows_n = (h - 1) // pitch
+    # Nodes at 1 + i*pitch; the last room needs `room` cells of space,
+    # so the lattice runs to the far edge instead of wasting a margin.
+    cols = max(1, (w - 1 - room) // pitch + 1)
+    rows_n = max(1, (h - 1 - room) // pitch + 1)
     if cols * rows_n < cfg.rooms:
         raise ModeError(
             f"{cfg.rooms} rooms of side {room} with corridors of length "

@@ -88,6 +88,7 @@ def _build_registry() -> dict:
     for length in (3, 6):
         add(f"Bottleneck{length}-100", _open_cfg(
             100, style="corridor", corridor_len=length, rooms=6,
+            n_chambers=0,
         ))
     # Maze: seeded perfect maze (braid opens loops).
     for size in (50, 100):

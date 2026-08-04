@@ -190,6 +190,17 @@ def _chest(rng):
     return t
 
 
+def _boat(rng):
+    t = _water(rng)
+    t[11:14, 3:13] = (120, 78, 40)  # hull
+    t[13, 3] = t[13, 12] = (44, 106, 190)  # tapered bow/stern
+    t[2:11, 8] = (70, 46, 24)  # mast
+    for row in range(3, 10):  # the sail
+        t[row, 8 - min(5, 10 - row):8] = (240, 240, 235)
+    t[1, 8:11] = (200, 40, 40)  # pennant
+    return t
+
+
 def _clown(rng):
     t = _flat((248, 148, 24))  # the suit
     t[2:5, 3:13] = (220, 40, 40)  # wig
@@ -220,6 +231,7 @@ BUILDERS = {
     "hole": _hole,
     "chest": _chest,
     "clown": _clown,
+    "boat": _boat,
     "unseen": lambda rng: _flat((130, 130, 140)),
     "out": lambda rng: _flat((28, 28, 36)),
 }
