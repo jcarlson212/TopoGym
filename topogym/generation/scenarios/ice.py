@@ -258,8 +258,8 @@ def build_environmental_ice_ship(seed: int) -> Layout:
     (one treasure, two empty) each behind its own channel, two sealed
     water pockets inside the ice, and seasonal *bergs*. Each episode is
     drawn sunny (summer) or snowing (winter): in winter the floating
-    bergs grow — their water fringe freezes in waves at steps 60 and
-    120, and being on a cell when it freezes ends the episode; in
+    bergs grow — their water fringe freezes in waves at steps 20 and
+    40, and being on a cell when it freezes ends the episode; in
     summer their rims melt away. Channels and the landmass never
     change; certified metadata describes the episode-start geometry."""
     layout = _build_ice_world(seed, "environmental_ice_ship",
@@ -290,6 +290,6 @@ def build_environmental_ice_ship(seed: int) -> Layout:
     layout.extras["seasonal"] = {
         "grow_layers": (tuple(sorted(grow1)), tuple(sorted(grow2))),
         "melt_layers": (tuple(sorted(melt1)), tuple(sorted(melt2))),
-        "wave_steps": (60, 120),
+        "wave_steps": (20, 40),
     }
     return layout

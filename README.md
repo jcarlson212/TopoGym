@@ -96,7 +96,7 @@ info["topology"]["betti_z2"]         # [1, 5, 0] — certified
 info["topology"]["betti_z2_sealed"]  # [2, 5, 0] — doors count as walls
 ```
 
-Episodes truncate after a pre-determined `4 * max(W, H)` steps; the
+Episodes truncate after a pre-determined `1.2 * max(W, H)` steps (60 on a 50-grid); the
 goal pays +1 terminal reward by default (`reward_mode="sparse"`) and
 sits inside a designated chamber. `reward_mode="none"` for pure
 exploration, `"coverage"`, `"deceptive"`; `goal=False` removes the goal;
