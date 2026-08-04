@@ -25,6 +25,10 @@ CODE_TILES = {
     C.OBS_WORMHOLE: "wormhole",
 }
 
+#: fundamental-polygon markers: one color per identified edge pair
+IDENT_X_COLOR = (250, 210, 60)  # left/right identification
+IDENT_Y_COLOR = (70, 210, 220)  # top/bottom identification
+
 REVEAL_BUMP_DOOR = (155, 89, 182)  # hidden bump-doors, revealed for docs
 REVEAL_DECOY = (146, 63, 63)  # decoy walls, revealed for docs
 AGENT_COLOR = (231, 76, 60)
@@ -43,6 +47,54 @@ def _reveal_tint(env: TopoEnvCore, cell: tuple) -> tuple | None:
     return None
 
 
+def _draw_triangle(img: np.ndarray, cx: int, cy: int, size: int,
+                   direction: tuple, color: tuple) -> None:
+    """A filled chevron centered at (cx, cy) pointing along direction."""
+    dx, dy = direction
+    half = size // 2
+    for k in range(size):
+        spread = (size - 1 - k) * half // max(1, size - 1)
+        px = cx + dx * (k - half)
+        py = cy + dy * (k - half)
+        if dx:  # horizontal arrow: vertical extent shrinks toward tip
+            y0, y1 = cy - spread, cy + spread + 1
+            if 0 <= px < img.shape[1]:
+                img[max(0, y0):y1, px] = color
+        else:
+            x0, x1 = cx - spread, cx + spread + 1
+            if 0 <= py < img.shape[0]:
+                img[py, max(0, x0):x1] = color
+
+
+def _draw_identifications(img: np.ndarray, base, tile: int) -> None:
+    """Fundamental-polygon notation on identified edges: chevrons along
+    each identified pair (same direction for wrap, opposed for flip),
+    one color per pair."""
+    from topogym.core.basemap import Boundary, RectGluing2D
+
+    if not isinstance(base, RectGluing2D):
+        return
+    w, h = base.width, base.height
+    size = max(5, tile - 3)
+    marks = (0.25, 0.5, 0.75)
+    if base.rule_x != Boundary.WALL:
+        flip = base.rule_x == Boundary.FLIP
+        for frac in marks:
+            cy = int(frac * h * tile)
+            _draw_triangle(img, tile // 2, cy, size, (0, 1),
+                           IDENT_X_COLOR)
+            _draw_triangle(img, (w * tile) - tile // 2 - 1, cy, size,
+                           (0, -1 if flip else 1), IDENT_X_COLOR)
+    if base.rule_y != Boundary.WALL:
+        flip = base.rule_y == Boundary.FLIP
+        for frac in marks:
+            cx = int(frac * w * tile)
+            _draw_triangle(img, cx, tile // 2, size, (1, 0),
+                           IDENT_Y_COLOR)
+            _draw_triangle(img, cx, (h * tile) - tile // 2 - 1, size,
+                           (-1 if flip else 1, 0), IDENT_Y_COLOR)
+
+
 def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
     base = env.layout.base
     w, h = base.layout_size()
@@ -57,6 +109,8 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
         color = _reveal_tint(env, cell)
         if color is not None:
             tiles.tint(region, color)
+
+    _draw_identifications(img, base, tile)
 
     # Agent: a scenario sprite when one exists, else a filled square
     # with a heading notch toward the forward cell.

@@ -71,3 +71,24 @@ def test_top_wraparound_movement():
     env._state = base.turn_left(base.initial_state((0, row)))
     env.step(env.MOVE_LEFT)
     assert env._state.cell == (49, row)
+
+
+def test_identification_arrows_rendered_per_pair():
+    """Identified edge pairs carry fundamental-polygon chevrons, one
+    color per pair; the walled plane carries none."""
+    import numpy as np
+
+    from topogym.rendering.rgb import IDENT_X_COLOR, IDENT_Y_COLOR
+
+    def has(img, color):
+        return (img == np.array(color)).all(axis=-1).any()
+
+    cases = [("TopTorus", True, True), ("TopMobius", True, False),
+             ("TopRP2", True, True), ("TopPlane", False, False)]
+    for name, x_pair, y_pair in cases:
+        env = gym.make(f"TopoGym/{name}-50-v0", seed=1,
+                       render_mode="rgb_array").unwrapped
+        env.reset(seed=0)
+        img = env.render()
+        assert has(img, IDENT_X_COLOR) == x_pair, name
+        assert has(img, IDENT_Y_COLOR) == y_pair, name
