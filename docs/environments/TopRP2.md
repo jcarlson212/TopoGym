@@ -1,7 +1,5 @@
 # TopRP2
 
-<img src="../envs/TopRP2.png" width="360"/>
-
 Corner chambers on the real projective plane: both identifications flipped.
 
 ## Action space
@@ -32,6 +30,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/TopRP2-50-v0` | `[1, 4, 0]` |
+| `TopoGym/TopRP2-50-v0` | `—` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

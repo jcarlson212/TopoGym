@@ -281,7 +281,8 @@ def write_stills_and_gallery() -> dict:
     rows = []
     for name, env_id in [
         *[(n, f"TopoGym/{n}-v0") for n in registry.REGISTRY],
-        *[(n, f"TopoGym/{n}-50-v0") for n in registry.TOP_TOPOLOGIES],
+        *[(f"{n}-50", f"TopoGym/{n}-50-v0")
+          for n in registry.TOP_TOPOLOGIES],
         *[(n, f"TopoGym/{n}-v0") for n in registry.TEXTURE_SCENARIOS],
     ]:
         import imageio.v3 as iio

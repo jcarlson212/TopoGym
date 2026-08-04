@@ -132,6 +132,8 @@ class TopoEnvCore(gym.Env):
         # only legal teleport-reset targets (archive methods restore to
         # states they have reached before).
         self._ever_visited: set = set()
+        #: cell -> visits across the env's lifetime on this layout
+        self.lifetime_visit_counts: dict = {}
         self.render_mode = render_mode
         self.reveal_hidden = reveal_hidden
 
@@ -169,6 +171,10 @@ class TopoEnvCore(gym.Env):
         if self.layout_seed is not None:
             self._fixed_layout = self._generate(self.layout_seed)
             return self._fixed_layout
+        # Procedural mode resamples the layout each episode: lifetime
+        # records are per-layout and start over.
+        self._ever_visited = set()
+        self.lifetime_visit_counts = {}
         return self._generate(int(self.np_random.integers(2 ** 31 - 1)))
 
     def _note_episode_end(self) -> None:
@@ -201,6 +207,7 @@ class TopoEnvCore(gym.Env):
         self._bumps = {}
         self._open = set()
         self._visited = set()
+        self.visit_counts = {}
         self._steps = 0
         # The episode length is pre-determined by the configured grid
         # size alone (never by the sampled layout): 1.2x the side
@@ -277,6 +284,73 @@ class TopoEnvCore(gym.Env):
             "distractor": self._distractor,
             "field": dict(self._decept_dist),
         }
+
+    # -- environment structure accessors -------------------------------------
+
+    def graph(self):
+        """The free-cell graph as a :class:`networkx.Graph` (nodes are
+        cells, edges are legal moves; doors count as passable).
+        Requires networkx (``pip install networkx``)."""
+        try:
+            import networkx as nx
+        except ImportError as exc:
+            raise ImportError(
+                "env.graph() needs networkx: pip install networkx"
+            ) from exc
+        from topogym.generation.graph import build_adjacency
+
+        adj = build_adjacency(set(self.layout.free_cells),
+                              self.layout.base.neighbors)
+        g = nx.Graph()
+        g.add_nodes_from(adj)
+        for u, outs in adj.items():
+            for v in outs:
+                g.add_edge(u, v)
+        return g
+
+    def shortest_path(self, a: tuple | None = None,
+                      b: tuple | None = None) -> list:
+        """Shortest path between two free cells (BFS over the free-cell
+        graph; doors passable). Defaults: start to goal."""
+        a = tuple(a) if a is not None else self.layout.start
+        b = tuple(b) if b is not None else self.layout.goal
+        free = set(self.layout.free_cells)
+        if a not in free or b not in free:
+            raise ValueError("shortest_path endpoints must be free cells")
+        parents = {a: None}
+        queue = deque([a])
+        while queue:
+            u = queue.popleft()
+            if u == b:
+                break
+            for v in self.layout.base.neighbors(u):
+                if v in free and v not in parents:
+                    parents[v] = u
+                    queue.append(v)
+        if b not in parents:
+            return []
+        path = [b]
+        while parents[path[-1]] is not None:
+            path.append(parents[path[-1]])
+        path.reverse()
+        return path
+
+    def bottlenecks(self) -> list:
+        """Free cells whose only passable neighbors are one opposite
+        pair — straight-through width-1 passage cells (doorways,
+        channels, corridors). Sorted for determinism."""
+        free = set(self.layout.free_cells)
+        base = self.layout.base
+        out = []
+        for cell in sorted(free):
+            nbrs = [n for n in base.neighbors(cell) if n in free]
+            if len(nbrs) != 2:
+                continue
+            (ax, ay), (bx, by) = nbrs
+            x, y = cell
+            if (ax - x, ay - y) == (x - bx, y - by):  # opposite pair
+                out.append(cell)
+        return out
 
     @property
     def topology(self) -> TopologyMetadata:
@@ -411,6 +485,12 @@ class TopoEnvCore(gym.Env):
         self._steps += 1
         newly_visited = agent_cell not in self._visited
         self._visited.add(agent_cell)
+        self.visit_counts[agent_cell] = (
+            self.visit_counts.get(agent_cell, 0) + 1
+        )
+        self.lifetime_visit_counts[agent_cell] = (
+            self.lifetime_visit_counts.get(agent_cell, 0) + 1
+        )
         chamber = self._chamber_of.get(agent_cell)
         if chamber is not None and chamber not in self.chamber_entry_steps:
             self.chamber_entry_steps[chamber] = self._steps
@@ -459,13 +539,16 @@ class TopoEnvCore(gym.Env):
         info["topology"]["complex"] = self.complex_backend
         if self._debug:
             t = info["topology"]
+            necks = self.bottlenecks()
+            shown = necks if len(necks) <= 30 else necks[:30]
             logger.debug(
                 "reset  %s seed=%s start=%s goal=%s betti=%s sealed=%s "
-                "horizon=%s reward_mode=%s extras=%s",
+                "horizon=%s reward_mode=%s bottlenecks=%d %s%s extras=%s",
                 t["base_map"], t["layout_seed"], agent_cell,
                 self.layout.goal if self.goal_exists else None,
                 t["betti_z2"], t["betti_z2_sealed"], self._max_steps,
-                self.reward_mode, self._debug_extras(),
+                self.reward_mode, len(necks), shown,
+                "..." if len(necks) > 30 else "", self._debug_extras(),
             )
         return info
 

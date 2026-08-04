@@ -674,8 +674,20 @@ tracker.reset(seed=0)
 # ... run the policy ...
 tracker.summary()      # coverage, recovery steps, bar counts
 env.episodes           # return, coverage, chamber entry steps, ...
-env.summary()          # aggregates across episodes
+m = env.metrics()      # the standardized metric set (frozen dataclass)
+m.success_rate; m.sample_efficiency; m.visitation_entropy
+m.mean_regret; m.planning_efficiency   # vs env.shortest_path()
+m.steps_to_coverage    # {0.5: step, ..., 1.0: step}
+m.steps_to_holes       # {k: step the k-th loop was discovered}
 \end{lstlisting}
+
+Structure accessors ground the metrics:
+\texttt{env.topology.betti\_numbers\_doors\_count\_as\_walls()} /
+\texttt{\_dont\_count\_as\_walls()} return a \texttt{BettiNumbers}
+value object; \texttt{env.graph()} exposes the free-cell graph as a
+\texttt{networkx.Graph}; \texttt{env.shortest\_path()} the optimal
+baseline; \texttt{env.bottlenecks()} the straight-through width-1
+passage cells (logged at reset under \texttt{TOPOGYM\_DEBUG}).
 
 Per-step \texttt{info} carries \texttt{coverage},
 \texttt{lifetime\_coverage} (across episodes on a layout),

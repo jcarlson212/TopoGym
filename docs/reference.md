@@ -13,6 +13,7 @@ substrate, the generator, certified metadata, and trajectory TDA.
 - [Certified metadata](#certified-metadata)
 - [Topology of experience (TDA)](#topology-of-experience-tda)
 - [Debugging the topology live](#debugging-the-topology-live)
+- [Structure accessors](#structure-accessors)
 - [Stats](#stats)
 
 ## The geometric substrate
@@ -121,11 +122,48 @@ TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 python scripts/play.py TopoGym/Decoys4-50-v0
 Rendering always dims cells outside the agent's current line of sight
 (reveal mode shows the full map undimmed).
 
+## Structure accessors
+
+```python
+env.topology.betti_numbers_doors_dont_count_as_walls()  # BettiNumbers(b0=1, b1=5, b2=0)
+env.topology.betti_numbers_doors_count_as_walls()       # sealed convention
+env.graph()          # networkx.Graph over free cells (pip install networkx)
+env.shortest_path()  # BFS path, defaults start -> goal
+env.bottlenecks()    # straight-through width-1 cells (doorways, channels)
+```
+
+`BettiNumbers` is a frozen dataclass (`b0`, `b1`, `b2`; iterable,
+`as_tuple()`). Bottlenecks are logged at reset under `TOPOGYM_DEBUG=1`.
+
 ## Stats
 
 `info` carries per-step `coverage`, `lifetime_coverage` (across
 episodes on a fixed layout), `observed_frac`, `known_components`,
 `h0_merges`, `doors_opened`, `chambers_entered`, `episode_return`;
 `env.chamber_entry_steps` gives per-chamber first-entry steps.
+
 `topogym.stats.StatsRecorder` accumulates per-episode (and optional
-per-step) pandas-ready rows across episodes with a `summary()`.
+per-step) pandas-ready rows, and `recorder.metrics()` returns the
+standardized metric set as a frozen `Metrics` value object:
+
+```python
+env = StatsRecorder(gym.make("TopoGym/Decoys4-50-v0", seed=1),
+                    record_steps=True, track_holes=True)
+# ... run episodes ...
+m = env.metrics()
+m.success_rate                     # fraction of episodes reaching the goal
+m.interactions_to_first_success    # a.k.a. m.sample_efficiency
+m.unique_states, m.state_coverage  # lifetime, on the fixed layout
+m.visitation_entropy               # bits; _normalized in [0, 1]
+m.mean_regret                      # steps-to-goal minus shortest path
+m.planning_efficiency              # optimality of replays after discovery
+m.steps_to_coverage                # {0.5: step, 0.6: ..., ..., 1.0: ...}
+m.steps_to_holes                   # {k: step the k-th loop was found}
+env.coverage_at(1000)              # lifetime coverage by global step
+m.to_dict()                        # everything, logging-ready
+```
+
+`track_holes=True` timestamps loop discoveries by recomputing the
+observed region's b1 each step (opt-in; it runs GUDHI per step).
+`env.shortest_path()` supplies the optimal baseline for regret and
+planning efficiency.

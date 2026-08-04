@@ -1,7 +1,5 @@
 # TopKlein
 
-<img src="../envs/TopKlein.png" width="360"/>
-
 Corner chambers on a Klein bottle: one wrap, one flip; H1 carries torsion over Z.
 
 ## Action space
@@ -32,6 +30,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/TopKlein-50-v0` | `[1, 5, 0]` |
+| `TopoGym/TopKlein-50-v0` | `—` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

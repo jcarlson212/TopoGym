@@ -115,8 +115,13 @@ class TopoGrid2DEnv(TopoEnvCore):
             # The canonical frame faces +x; a left turn makes "forward"
             # screen-up so fourway actions are screen directions.
             self._state = base.turn_left(self._state)
-        self._visited.add(self._state.cell)
-        return self._obs(), self._reset_info(self._state.cell)
+        cell = self._state.cell
+        self._visited.add(cell)
+        self.visit_counts[cell] = self.visit_counts.get(cell, 0) + 1
+        self.lifetime_visit_counts[cell] = (
+            self.lifetime_visit_counts.get(cell, 0) + 1
+        )
+        return self._obs(), self._reset_info(cell)
 
     def step(self, action: int) -> tuple:
         action = int(action)
