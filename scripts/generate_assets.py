@@ -45,6 +45,20 @@ GIF_SET = [
 
 _ACTION = {(0, -1): 0, (0, 1): 1, (-1, 0): 2, (1, 0): 3}
 
+GIF_PX = 420  # every GIF frame is exactly GIF_PX x GIF_PX
+STILL_PX = 480  # every still is exactly STILL_PX x STILL_PX
+
+
+def _fit(frame, px: int):
+    """Nearest-neighbor resample to exactly (px, px): uniform asset
+    sizes across environments of different grid sizes."""
+    import numpy as np
+
+    h, w = frame.shape[:2]
+    ys = (np.arange(px) * h) // px
+    xs = (np.arange(px) * w) // px
+    return frame[np.ix_(ys, xs)]
+
 
 # ---------------------------------------------------------------------------
 # A purposeful explorer for the animations (full knowledge; docs only)
@@ -88,8 +102,8 @@ def record_gif(env_id: str, path: pathlib.Path, seed: int = 1,
     env = gym.make(env_id, seed=seed, reward_mode="none").unwrapped
     env.reset(seed=0)
     w, h = env.layout.base.layout_size()
-    tile = max(4, 420 // max(w, h))
-    frames = [render_rgb_2d(env, tile=tile)]
+    tile = max(4, GIF_PX // max(w, h))
+    frames = [_fit(render_rgb_2d(env, tile=tile), GIF_PX)]
     for step in range(max_steps):
         nxt = _next_step(env, env._state.cell)
         if nxt is None:
@@ -106,7 +120,7 @@ def record_gif(env_id: str, path: pathlib.Path, seed: int = 1,
         else:
             env.step(action)
         if step % stride == 0:
-            frames.append(render_rgb_2d(env, tile=tile))
+            frames.append(_fit(render_rgb_2d(env, tile=tile), GIF_PX))
     frames += [frames[-1]] * 6  # hold the final frame
     iio.imwrite(path, np.stack(frames), duration=90, loop=0)
 
@@ -275,7 +289,8 @@ def write_stills_and_gallery() -> dict:
         layout = env.layout
         w, _h = layout.base.layout_size()
         iio.imwrite(ENVS_DIR / f"{name}.png",
-                    render_rgb_2d(env, tile=max(2, 480 // w)))
+                    _fit(render_rgb_2d(env, tile=max(2, STILL_PX // w)),
+                         STILL_PX))
         b = list(layout.metadata.betti_z2)
         betti[name] = b
         art = (f"{name}.gif"
