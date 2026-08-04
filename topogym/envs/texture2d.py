@@ -56,7 +56,12 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         clown = self.layout.extras.get("clown")
         if clown is not None:
             self._clown_pos = clown["anchor"]
-            self._clown_budget = clown["budget"]
+            # The distractor budget spans the agent's lifetime on this
+            # layout, not one episode: it runs out after a few thousand
+            # rewarding steps in total.
+            if getattr(self, "_clown_layout", None) is not self.layout:
+                self._clown_budget = clown["budget"]
+                self._clown_layout = self.layout
             self._clown_prev = self._dist_to_clown(self.layout.start)
         else:
             self._clown_pos = None
@@ -170,6 +175,9 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             if slot in slots:
                 return name
         return "floor"
+
+    def _agent_tile(self):
+        return "boat" if self.layout.extras.get("boat") else None
 
     def _render_overlay(self, img, tile: int) -> None:
         if self._clown_pos is None or self._clown_pos == self._state.cell:

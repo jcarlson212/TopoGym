@@ -53,9 +53,18 @@ def render_rgb_2d(env, tile=14):
         if color is not None:
             tiles.tint(region, color)
 
-    # Agent: filled square + a heading notch toward the forward cell.
+    # Agent: a scenario sprite when one exists, else a filled square
+    # with a heading notch toward the forward cell.
     ax, ay = base.layout_coords(env._state.cell)
     y0, x0 = ay * tile, ax * tile
+    sprite = getattr(env, "_agent_tile", None)
+    sprite_name = sprite() if sprite is not None else None
+    if sprite_name is not None:
+        img[y0:y0 + tile, x0:x0 + tile] = tiles.tile(sprite_name, tile)
+        overlay = getattr(env, "_render_overlay", None)
+        if overlay is not None:
+            overlay(img, tile)
+        return img
     pad = max(1, tile // 6)
     img[y0 + pad:y0 + tile - pad, x0 + pad:x0 + tile - pad] = AGENT_COLOR
     fwd = base.forward(env._state)

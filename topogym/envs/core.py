@@ -181,13 +181,13 @@ class TopoEnvCore(gym.Env):
         self._visited = set()
         self._steps = 0
         # The episode length is pre-determined by the configured grid
-        # size alone (never by the sampled layout): 4 cells' worth of
-        # steps per cell of the world unless max_steps overrides it.
+        # size alone (never by the sampled layout): four times the side
+        # length unless max_steps overrides it.
         if self._max_steps_cfg:
             self._max_steps = self._max_steps_cfg
         else:
             w, h = self.layout.base.layout_size()
-            self._max_steps = 4 * w * h
+            self._max_steps = 4 * max(w, h)
         # Observed-region filtration (see module docstring).
         self._observed_free = set()
         self._known_uf = _UnionFind()
