@@ -299,7 +299,6 @@ def test_fourway_stays_screen_aligned_across_flip_seams(base_name):
                    n_holes=0, n_chambers=0, n_decoys=0,
                    layout_seed=3).unwrapped
     env.reset(seed=0)
-    base = env.layout.base
     # Walk to the left edge, cross it, then verify screen semantics.
     for _ in range(20):
         if env._state.cell[0] == 0:
