@@ -29,13 +29,14 @@ def test_same_seed_same_layout():
 
 
 @pytest.mark.parametrize("base,expected_b1", [
-    # 4 obstacles (2 holes + 1 chamber + 1 decoy): b1 = 1 - chi + 4
-    ("square", 4),
-    ("cylinder", 5),
-    ("torus", 5),
-    ("mobius", 5),
-    ("klein", 5),
-    ("rp2", 4),
+    # 3 sealed obstacles (2 holes + 1 decoy) — the doored chamber is
+    # a room, not a hole, in the walkable reading.
+    ("square", 3),
+    ("cylinder", 4),
+    ("torus", 4),
+    ("mobius", 4),
+    ("klein", 4),
+    ("rp2", 3),
 ])
 def test_certified_betti_on_bases(base, expected_b1):
     cfg = TopoGenConfig2D(base=base, size=17, n_holes=2, n_chambers=1,

@@ -32,9 +32,9 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/ShapeSq-50-v0` | `[1, 1, 0]` |
-| `TopoGym/ShapeCi-50-v0` | `[1, 1, 0]` |
-| `TopoGym/ShapeTr-50-v0` | `[1, 1, 0]` |
-| `TopoGym/ShapeSt-50-v0` | `[1, 1, 0]` |
+| `TopoGym/ShapeSq-50-v0` | `[1, 0, 0]` |
+| `TopoGym/ShapeCi-50-v0` | `[1, 0, 0]` |
+| `TopoGym/ShapeTr-50-v0` | `[1, 0, 0]` |
+| `TopoGym/ShapeSt-50-v0` | `[1, 0, 0]` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

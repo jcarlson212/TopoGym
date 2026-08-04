@@ -9,12 +9,12 @@ from topogym.generation.top import build_top
 
 
 @pytest.mark.parametrize("name,betti", [
-    ("TopPlane", [1, 4, 0]),
-    ("TopCylinder", [1, 5, 0]),
-    ("TopMobius", [1, 5, 0]),
-    ("TopTorus", [1, 5, 0]),
-    ("TopKlein", [1, 5, 0]),
-    ("TopRP2", [1, 4, 0]),
+    ("TopPlane", [1, 0, 0]),
+    ("TopCylinder", [1, 1, 0]),
+    ("TopMobius", [1, 1, 0]),
+    ("TopTorus", [1, 2, 1]),
+    ("TopKlein", [1, 2, 1]),
+    ("TopRP2", [1, 1, 1]),
 ])
 def test_top_ambient_classes_certify(name, betti):
     env = gym.make(f"TopoGym/{name}-50-v0", seed=1).unwrapped
@@ -53,9 +53,11 @@ def test_top_start_is_central():
 @pytest.mark.parametrize("topology", ["torus", "mobius", "rp2"])
 def test_top_rips_backend_agrees(topology):
     layout = build_top(topology, seed=1)
-    assert (
-        rips_betti(layout.base, layout.free_cells)
-        == layout.metadata.betti_z2[:2]
+    md = layout.metadata
+    # Rips sees the raw punctured surface; its b1 survives as
+    # sealed[1] minus the door-splitting components.
+    assert rips_betti(layout.base, layout.free_cells) == (
+        1, md.betti_z2_sealed[1]
     )
 
 

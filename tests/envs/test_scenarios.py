@@ -36,11 +36,11 @@ def _step_onto(env, target):
 @pytest.mark.parametrize("name,betti,sealed", [
     ("IceShip", [3, 4, 0], [6, 4, 0]),
     ("Ladders", [1, 0, 0], [1, 0, 0]),
-    ("BankRobber", [1, 4, 0], [5, 4, 0]),
-    ("DontFall", [1, 12, 0], [13, 12, 0]),
-    ("SpaceWarp", [2, 4, 0], [5, 4, 0]),
-    ("ClownChase", [1, 4, 0], [2, 4, 0]),
-    ("SearchRescue", [1, 161, 0], [2, 161, 0]),
+    ("BankRobber", [1, 0, 0], [5, 4, 0]),
+    ("DontFall", [1, 0, 0], [13, 12, 0]),
+    ("SpaceWarp", [2, 1, 0], [5, 4, 0]),
+    ("ClownChase", [1, 3, 0], [2, 4, 0]),
+    ("SearchRescue", [1, 160, 0], [2, 161, 0]),
     ("EnvironmentalIceShip", [3, 4, 0], [6, 4, 0]),
 ])
 def test_scenarios_certify(name, betti, sealed):

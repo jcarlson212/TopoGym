@@ -36,7 +36,9 @@ def test_shaped_open_chambers_certify(shape):
                           n_decoys=0, chamber_shape=shape, chamber_side=8,
                           door_kind="open")
     layout = generate_2d(cfg, seed=2)
-    assert layout.metadata.betti_z2 == (1, 1, 0)
+    # Walkable: a doored chamber is a room, not a hole.
+    assert layout.metadata.betti_z2 == (1, 0, 0)
+    assert layout.metadata.betti_z2_sealed == (2, 1, 0)
     (feature,) = [f for f in layout.features if f.kind == "chamber"]
     assert feature.doors[0].kind == "open"
     assert feature.interior  # enterable through the open door
@@ -52,7 +54,9 @@ def test_two_open_doors_split_the_ring():
                           n_decoys=0, chamber_side=9, door_kind="open",
                           doors_per_chamber=2)
     layout = generate_2d(cfg, seed=1)
-    assert layout.metadata.betti_z2 == (1, 2, 0)  # two wall arcs
+    assert layout.metadata.betti_z2 == (1, 0, 0)  # a room either way
+    # Sealing both doors closes the ring: one loop, sealed interior.
+    assert layout.metadata.betti_z2_sealed == (2, 1, 0)
 
 
 def test_giveup_corridor_attached_outside_door():
@@ -60,7 +64,7 @@ def test_giveup_corridor_attached_outside_door():
                           n_decoys=0, chamber_side=8, door_kind="open",
                           door_corridor_len=3)
     layout = generate_2d(cfg, seed=4)
-    assert layout.metadata.betti_z2 == (1, 1, 0)  # corridor walls attach
+    assert layout.metadata.betti_z2 == (1, 0, 0)  # corridor walls attach
     (feature,) = [f for f in layout.features if f.kind == "chamber"]
     (path,) = feature.meta["corridors"]
     assert len(path) == 3
@@ -79,7 +83,9 @@ def test_nested_shells_certify(depth):
                           nested_depth=depth, door_kind="open", n_holes=0,
                           n_chambers=1, n_decoys=0, goal_in_chamber=True)
     layout = generate_2d(cfg, seed=3)
-    assert layout.metadata.betti_z2 == (1, depth + 1, 0)
+    # Every shell has doors: all of it is enterable, none of it holes.
+    assert layout.metadata.betti_z2 == (1, 0, 0)
+    assert layout.metadata.betti_z2_sealed[0] == depth + 2
     shells = [f for f in layout.features if f.kind == "shell"]
     assert len(shells) == depth
     # The goal sits in the innermost chamber.
@@ -131,8 +137,8 @@ def test_registry_ids_are_registered():
 def test_registry_make_with_seed_and_kwargs():
     env = gym.make("TopoGym/Decoys2-50-v0", seed=1).unwrapped
     _, info = env.reset(seed=0)
-    # 1 chamber + 2 sealed decoys = 3 obstacle components.
-    assert info["topology"]["betti_z2"] == [1, 3, 0]
+    # 2 sealed decoys; the doored chamber is a room, not a hole.
+    assert info["topology"]["betti_z2"] == [1, 2, 0]
     assert env.action_space.n == 4
 
     # Same seed, same env; different seed, different layout.
@@ -179,7 +185,7 @@ def test_sealed_betti_convention():
     # Doors-as-walls: each doored chamber interior becomes a component.
     env = gym.make("TopoGym/Chambers2-50-v0", seed=1).unwrapped
     _, info = env.reset(seed=0)
-    assert info["topology"]["betti_z2"] == [1, 2, 0]
+    assert info["topology"]["betti_z2"] == [1, 0, 0]
     assert info["topology"]["betti_z2_sealed"] == [3, 2, 0]
 
 

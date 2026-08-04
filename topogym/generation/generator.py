@@ -49,6 +49,7 @@ from topogym.generation.layout import (  # noqa: F401
     _translate,
     expected_betti_2d,
     map_offsets,
+    walkable_cells,
 )
 from topogym.generation.partitions import (  # noqa: F401
     _partition_components_2d,
@@ -126,11 +127,10 @@ def _solve_target_2d(cfg: TopoGenConfig2D, base_info: BaseMapInfo,
     """Resolve n_holes from target_b1 if requested."""
     if cfg.target_b1 is None:
         return cfg.n_holes
-    per_chamber = (
-        max(1, cfg.doors_per_chamber) if cfg.door_kind == "open" else 1
-    )
+    # Doored chambers are rooms, not holes, in the walkable reading:
+    # target_b1 counts only sealed structure.
     rooms_k = (
-        cfg.n_chambers * per_chamber + cfg.n_decoys
+        cfg.n_decoys
         + (1 if cfg.base == "annulus" else 0)
         + (cfg.n_base_holes if cfg.base == "x_holes" else 0)
         + partition_k
@@ -430,29 +430,53 @@ def _finalize_metadata(cfg: TopoGenConfig2D, layout: Layout,
         for f in partitions
     )
 
-    summary = analyze_2d(layout.base.face_cycle(c) for c in free)
+    raw = analyze_2d(layout.base.face_cycle(c) for c in free)
     # Second certified reading: doors count as walls (the sealed world).
     sealed = analyze_2d(
         layout.base.face_cycle(c) for c in free if c not in layout.doors
     )
+    # Headline reading: doors walkable — doored enclosures are rooms,
+    # not holes; their walls are filled before computing.
+    walkable = walkable_cells(free, layout.features)
+    summary = analyze_2d(layout.base.face_cycle(c) for c in walkable)
     # Every feature records its obstacle-component contribution at
     # placement (default 1); partitions carry theirs in gap terms.
-    n_components = partition_components + sum(
+    doored = {
+        id(f) for f in layout.features
+        if f.kind in ("chamber", "shell") and f.doors
+    }
+    n_components_raw = partition_components + sum(
         (f.meta or {}).get("components", 1)
         for f in layout.features if f.kind != "partition"
     )
+    n_components_walkable = partition_components + sum(
+        (f.meta or {}).get("components", 1)
+        for f in layout.features
+        if f.kind != "partition" and id(f) not in doored
+    )
     if cfg.style == "zigzag":
-        expected = (1, 0, 0)
+        expected_raw = expected_walkable = (1, 0, 0)
     else:
-        expected = expected_betti_2d(base_info, n_components)
-    if summary.betti_z2 != expected:
-        raise _RetryAttempt(
-            f"computed betti {summary.betti_z2} != expected {expected}"
+        expected_raw = expected_betti_2d(base_info, n_components_raw)
+        expected_walkable = expected_betti_2d(
+            base_info, n_components_walkable
         )
-    if summary.betti_z2[0] != 1:
+    if raw.betti_z2 != expected_raw:
+        raise _RetryAttempt(
+            f"computed betti {raw.betti_z2} != expected {expected_raw}"
+        )
+    if summary.betti_z2 != expected_walkable:
+        raise _RetryAttempt(
+            f"walkable betti {summary.betti_z2} != expected "
+            f"{expected_walkable}"
+        )
+    if raw.betti_z2[0] != 1:
         raise _RetryAttempt("free space disconnected")
     betti_z2 = summary.betti_z2
     if full_free:
+        betti_q, torsion = base_info.betti_q, base_info.h1_torsion
+    elif betti_z2[2]:
+        # Filling every doored enclosure restored the closed surface.
         betti_q, torsion = base_info.betti_q, base_info.h1_torsion
     else:
         betti_q, torsion = (1, betti_z2[1], 0), ()

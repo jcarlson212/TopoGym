@@ -26,9 +26,11 @@ def test_generated_layout_rips_matches_certified(base, seed):
     cfg = TopoGenConfig2D(base=base, size=15, n_holes=2, n_chambers=1,
                           n_decoys=1)
     layout = generate_2d(cfg, seed)
-    assert (
-        rips_betti(layout.base, layout.free_cells)
-        == layout.metadata.betti_z2[:2]
+    md = layout.metadata
+    # Rips sees the raw free space: wall arcs of doored chambers still
+    # count there (that b1 survives as sealed[1]).
+    assert rips_betti(layout.base, layout.free_cells) == (
+        md.betti_z2[0], md.betti_z2_sealed[1]
     )
 
 
@@ -37,8 +39,10 @@ def test_env_complex_override():
                    complex="rips", layout_seed=4).unwrapped
     _, info = env.reset(seed=0)
     assert info["topology"]["complex"] == "rips"
-    certified = tuple(info["topology"]["betti_z2"])
-    assert env.free_betti() == certified[:2]
+    topo = info["topology"]
+    assert env.free_betti() == (
+        topo["betti_z2"][0], topo["betti_z2_sealed"][1]
+    )
     # visited region: a path is contractible under both backends
     assert env.visited_betti() == (1, 0)
 
@@ -51,7 +55,11 @@ def test_cubical_free_betti_is_certified():
     env = gym.make("TopoGym/Grid2D-v0", base="klein", size=15,
                    layout_seed=6).unwrapped
     env.reset(seed=0)
-    assert env.free_betti() == env.topology.betti_z2
+    md = env.topology
+    assert env.free_betti() == (
+        md.betti_z2[0], md.betti_z2_sealed[1], md.betti_z2[2]
+        if md.betti_z2_sealed[1] == md.betti_z2[1] else 0
+    )
 
 
 def test_unknown_backend_rejected():

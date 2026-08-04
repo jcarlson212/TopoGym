@@ -46,18 +46,23 @@ and everything else derives from that one object:
 `complex="cubical"` (default) is the certification source of truth.
 `complex="rips"` builds a Vietoris–Rips complex on free-cell centers at
 scale 1.5 under the quotient metric of the base's gluing group
-(`topogym.complexes.rips`); tests assert both agree on every base.
+(`topogym.complexes.rips`); tests assert both backends agree on the
+raw free space of every base (that reading's b1 = `betti_z2_sealed[1]`).
 
 ## Doors, chambers, and decoys
 
 A **door** is a width-1 cell in a chamber wall. Registry doors are
 `open` — visible, always walkable, rendered as wood. The generator also
 supports hidden `bump` doors (observed as wall until opened by repeated
-bumps). Door state never changes free-space homology; the metadata
-reports both conventions: `betti_z2` (doors walkable) and
-`betti_z2_sealed` (doors count as walls — each doored chamber interior
-becomes its own component). A **decoy** is a sealed ring with a filled
-interior: the same wall footprint as a chamber, nothing inside.
+bumps). The metadata certifies both door conventions: `betti_z2`
+(doors walkable — a doored enclosure is an enterable room, not a hole;
+its wall is filled before computing, so b1 counts only *sealed*
+structure: decoys, doorless chambers, solid obstacles) and
+`betti_z2_sealed` (doors count as walls — each doored interior becomes
+its own component and every wall component, open arcs included, adds a
+class; its b1 equals the raw traversable-space homology). A **decoy**
+is a sealed ring with a filled interior: the same wall footprint as a
+chamber, nothing inside.
 
 ## The generator
 
@@ -106,14 +111,15 @@ hidden states, learned embeddings).
 
 ## Debugging the topology live
 
-`TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) draws the observed
-region's H1 classes on every rendered frame: representative cycles in
-yellow (the known region's inner boundary around each enclosed pocket,
-tightening as walls are hugged) and enclosed-wall rims in green — a
-yellow cycle with no green rim is a transient belief that dies when
-its pocket is explored. A legend with the live H1 count sits top-right.
-`TOPOGYM_DEBUG=1` streams every per-step computation to the console;
-the two compose:
+`TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) draws the
+*strictly-visited* region's H1 classes on every rendered frame: the
+representative cycle in yellow — the innermost closed loop through
+cells the agent has actually stood on (every cell a valid
+archive/teleport target; merely-seen cells never appear) — and the rim
+in green — the part of the cycle adjacent to seen-but-unvisited free
+space, where the loop can still tighten. `env.h1_representatives()`
+returns exactly what is drawn ({cycle, rim, pocket} per class), so
+archive methods consume the same loops the overlay shows.
 
 ```bash
 TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 python scripts/play.py TopoGym/Decoys4-50-v0
