@@ -58,6 +58,7 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
     def _reset_runtime(self) -> None:
         super()._reset_runtime()
         self._fell = False
+        self._hit_ice = False
         self._decoy_cells = frozenset(
             c for f in self.layout.features if f.kind == "decoy"
             for c in f.cells
@@ -93,28 +94,20 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
     # -- mechanics -----------------------------------------------------------
 
     def _advance_season(self) -> None:
+        """Winter grows the floating bergs (their water fringe freezes
+        in waves; being there when it freezes ends the episode); summer
+        melts their rims. Channels and the landmass never change."""
         seasonal = self.layout.extras["seasonal"]
         t = self._steps + 1  # the step being taken
-        if t < seasonal["start_step"]:
-            return
-        frontier = (t - seasonal["start_step"]) // seasonal["interval"] + 1
-        channel = seasonal["channel"]
         waves = [
             i for i, at in enumerate(seasonal["wave_steps"]) if t >= at
         ]
         if self.season == "winter":
-            self._frozen.update(channel[:frontier])
-            for i in waves:  # the icescape freezes outward in waves
+            for i in waves:
                 self._frozen.update(seasonal["grow_layers"][i])
-            cell = self._state.cell
-            channel_closed = self._frozen >= set(channel)
-            if cell in self._frozen:
-                self._fell = True  # crushed by the growing ice
-            elif channel_closed and cell in seasonal["inside"]:
-                self._fell = True  # trapped behind the frozen channel
-        else:  # summer: the flanks melt, and every ice rim recedes
-            for pair in seasonal["flanks"][:frontier]:
-                self._melted.update(pair)
+            if self._state.cell in self._frozen:
+                self._fell = True  # frozen over by the growing berg
+        else:
             for i in waves:
                 self._melted.update(seasonal["melt_layers"][i])
 
@@ -149,11 +142,19 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         self._clown_pos = options[int(self.np_random.integers(len(options)))]
 
     def _try_enter(self, frm: tuple, target: tuple) -> bool:
+        boat = self.layout.extras.get("boat", False)
         if target in self._frozen:
-            return False  # winter ice
+            if boat:
+                self._hit_ice = True  # ramming seasonal ice
+            return False
         if target in self._melted:
             return True  # summer melt
-        return super()._try_enter(frm, target)
+        ok = super()._try_enter(frm, target)
+        if not ok and boat and self.layout.cell_types.get(
+            target, C.EMPTY
+        ) in (C.WALL, C.HOLE):
+            self._hit_ice = True  # hitting ice hurts the sailboat
+        return ok
 
     def _obs_code(self, cell: tuple) -> int:
         if cell in self._frozen:
@@ -168,9 +169,10 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
 
     def _step_outcome(self, agent_cell: tuple) -> tuple:
         reward, terminated, truncated = super()._step_outcome(agent_cell)
-        if self._fell:
-            # The drop: fatal, rewardless, episode over.
+        if self._fell or self._hit_ice:
+            # The drop, growing ice, or an ice collision: episode over.
             self._fell = False
+            self._hit_ice = False
             return 0.0, True, False
         if self._clown_pos is not None and self.reward_mode != "none":
             d = self._dist_to_clown(agent_cell)
