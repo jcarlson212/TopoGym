@@ -1,0 +1,456 @@
+\documentclass[11pt]{article}
+
+% ---------- packages ----------
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[expansion=false]{microtype}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+
+% ---------- macros ----------
+\newcommand{\Hm}[1]{H_{#1}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\Z}{\mathbb{Z}}
+
+\title{\textbf{TopoGym: Library Overview and Environment Specifications}}
+\author{Jason Carlson}
+\date{August 2026}
+
+\begin{document}
+\maketitle
+
+\noindent\textbf{Scope.} This document specifies the TopoGym
+environment library in depth: the base benchmark
+(\textbf{GridWorld2D}), its textured variant
+(\textbf{GridWorld2D-Texture}), and its topological variant
+(\textbf{GridWorld2D-Top}, non-trivial global topology via edge
+identifications). Together the three variants form one benchmark, \textbf{TopoGym-v1}:
+the versioned, pinned registry across all variants under the
+universal action and observation spaces of
+Section~\ref{sec:spaces} --- Plain, Texture, and Top are reporting
+slices of a single suite, and the version pins the environment list
+(future families extend to v2 without altering v1 entries). The
+experiment program that consumes TopoGym-v1 is specified in
+\texttt{papers/method/experiment\_design.tex} (campaign X1);
+this document is the authority on the environments themselves. GridWorld2D is specified fully here; the Texture and Top
+variants are outlined, with their detailed scenario and construction
+specifications to follow.
+
+% =====================================================================
+\section{GridWorld2D}
+\label{sec:gw}
+
+A registry of named environments backed by one parametric generator.
+Everything is generated from a frozen configuration and a seed;
+nothing is hand-placed. The design goals: ground truth matches
+the theory's objects exactly, so mechanism predictions and
+certificates are checkable programmatically; and the interface
+follows existing gym-library conventions --- stable named
+environments with seed variation and a few modifiable parts --- so
+the benchmark is directly usable by others.
+
+\subsection{World model}
+
+A \texttt{size} $\times$ \texttt{size} grid of cells, partitioned
+into free and obstacle cells. The agent occupies one free cell;
+actions are \{up, down, left, right\}; moving into an obstacle leaves
+the agent in place. Standing conventions, inherited from the theory
+document and enforced at generation time:
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item the exterior free space (the component containing the start
+        cell) is 4-connected;
+  \item obstacles are well-composed: no $2 \times 2$ window contains
+        exactly a diagonal pair of obstacle cells (no diagonal
+        pinch);
+  \item every door has width one: a free cell with obstacle cells on
+        two opposite sides and free cells on the other two;
+  \item a chamber is an obstacle wall enclosing free interior once
+        its doors are sealed; a decoy is a sealed ring enclosing no
+        reachable free cell --- its interior is unvisitable by
+        construction, which is what makes it a decoy from the
+        archive's perspective.
+\end{itemize}
+
+\subsection{Registry: named environments (the primary interface)}
+\label{sec:registry}
+
+Following the convention of existing gym libraries, TopoGym's
+canonical interface is a registry of named, pre-defined environments:
+\texttt{gym.make("TopoGym/\{Family\}-\{size\}-v0", seed=$n$)}. Each
+registry entry is a frozen configuration of the underlying generator;
+the seed drives layout variation (placement, door positions, shape
+assignment) within that configuration; and a small set of documented
+parts remains modifiable as \texttt{make} kwargs (\texttt{p\_slip},
+\texttt{reward\_mode}, and per-family knobs noted below). The
+benchmark is the registry crossed with the published seed lists.
+
+\begin{center}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{4.6cm}
+                >{\raggedright\arraybackslash}p{5.6cm}
+                >{\raggedright\arraybackslash}p{3.6cm}@{}}
+\toprule
+\textbf{Family} & \textbf{Description} & \textbf{Sizes / variants} \\
+\midrule
+\texttt{Dilution-\{50,200\}} &
+  one chamber, no decoys & --- \\
+\texttt{Chambers2-\{50,100,200,400\}} &
+  two chambers, fixed geometry; the world-scaling family & --- \\
+\texttt{ChamberCount\{1,2,4,8\}-200} &
+  $k$ separated chambers & kwarg: none \\
+\texttt{Decoys\{0,1,2,4,8\}-50} &
+  one chamber among $k_d$ sealed decoys & kwarg: \texttt{decoy\_side} \\
+\texttt{Shape\{Sq,Ci,Tr,St\}-50} &
+  area-matched chamber shapes & --- \\
+\texttt{Nested\{1,2,3\}-50} &
+  sequentially nested shells & --- \\
+\texttt{GiveUp\{1,2,4\}-50} &
+  door behind a dead-end corridor of the given length & --- \\
+\texttt{Bottleneck\{3,6\}-100} &
+  tree of rooms joined by width-1 corridors of the given length &
+  kwarg: \texttt{rooms} \\
+\texttt{Maze-\{50,100\}} &
+  seeded perfect maze (uniform spanning tree over cells) &
+  kwarg: \texttt{braid} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Registry ids are stable across releases; new families extend the
+registry rather than altering existing entries.
+
+\subsection{Generator API (advanced)}
+\label{sec:generator}
+
+Under the registry sits the full parametric generator, available to
+power users and used to define registry entries. Its configuration
+schema:
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item \texttt{size} --- grid side length; any integer accepted.
+  \item \texttt{chamber\_count}, \texttt{decoy\_count};
+        \texttt{chamber\_side}, \texttt{decoy\_side};
+        \texttt{chamber\_shape}, \texttt{decoy\_shape}
+        (\{square, circle, triangle, star, mixed\}, area-matched at
+        equal \texttt{side} so shape is never confounded with size).
+  \item \texttt{min\_sep} --- minimum pairwise wall separation;
+        configurations claiming the one-entry-per-rollout property
+        must satisfy $\texttt{min\_sep} > L$ (rollout horizon),
+        recorded per configuration in the manifest.
+  \item \texttt{doors\_per\_chamber} (default 1);
+        \texttt{door\_width} fixed at 1 and validated;
+        \texttt{door\_corridor\_len} (default 0), controlling entry
+        probability $q$.
+  \item \texttt{mode} --- \texttt{open}, \texttt{nested},
+        \texttt{corridor}, or \texttt{maze}
+        (Section~\ref{sec:modes}).
+  \item \texttt{p\_slip}, \texttt{reward\_mode}, \texttt{seed}.
+\end{itemize}
+A configuration serializes to the canonical string
+\texttt{TG-GridWorld2D-S\{size\}-C\{c\}-D\{d\}-cs\{n\}-ds\{n\}%
+-sep\{n\}-shp\{..\}-\{mode\}-slip\{p\}-seed\{n\}}, which is the
+run-log key and the manifest row; registry ids are aliases for
+canonical strings. Custom configurations built through this API pass
+the same validity checks and ground-truth generation as registry
+entries, so results on them remain comparable in kind, but only
+registry entries belong to the published benchmark.
+
+\subsection{Modes}
+\label{sec:modes}
+
+\begin{itemize}[leftmargin=2em, itemsep=2pt]
+  \item \texttt{open}: chambers and decoys placed in a free field by
+        seeded rejection sampling subject to \texttt{min\_sep}. The
+        direct realization of the theory's objects: dilution scales
+        with \texttt{size}, discrimination with
+        \texttt{decoy\_count}, parallel entry requires the separation
+        condition. Generation: sample footprints uniformly, reject
+        on overlap or separation violation, carve walls and doors,
+        validate.
+  \item \texttt{nested}: \texttt{depth} concentric shells around one
+        innermost chamber, one door per shell, doors angularly offset
+        so entry forces traversing shells in order. The sequential
+        regime where the parallel-chamber separation deliberately
+        fails, and where learned-persistence baselines are predicted
+        to win. Bars are born sequentially: entering shell $j$ first
+        exposes shell $j{+}1$'s cycle. Validity: shell spacing
+        $\geq 2$; depth $\times$ spacing bounded by half the side.
+  \item \texttt{corridor}: rooms joined by width-1 corridors of
+        parameterized length, the room graph constrained to a tree.
+        The tree constraint is load-bearing: a cyclic room graph
+        would enclose wall blocks and manufacture decoy-like $\Hm{1}$
+        bars, while a tree keeps free space simply connected --- zero
+        environmental homology signal, only transient exploration
+        pockets. The bottleneck regime; corridor length is the
+        bottleneck-depth difficulty axis. Ground truth additionally
+        exposes the room graph and corridor cells.
+  \item \texttt{maze}: seeded perfect-maze carving (a uniform
+        spanning tree over cells), the maximal-corridor-density
+        cousin of \texttt{corridor} mode --- simply connected at
+        \texttt{braid} $= 0$. The \texttt{braid} parameter opens
+        loops with the given density; each opened loop encloses wall
+        and therefore creates an incidental $\Hm{1}$ class, so
+        braided mazes interpolate between the bottleneck regime and
+        the discrimination regime.
+\end{itemize}
+
+\subsection{Validity checking and manifests}
+
+The generator validates before building and rejects with a reason:
+packing feasibility (footprint plus separations fits, by a
+conservative area bound and then detection of rejection-sampling
+failure); exterior 4-connectivity after carving; well-composedness;
+door width; separation claims. The manifest tool emits a CSV of
+(registry id, canonical configuration, validity, satisfied
+assumptions) covering the registry --- and, for power users, any
+custom configuration set. The published benchmark is the registry
+manifest plus fixed seed lists ---
+tuning seeds and evaluation seeds, identical environments, disjoint
+seeds --- as specified in the experiment design.
+
+\subsection{Ground truth, certification, and instrumentation}
+
+Read-only accessors per instance: the wall mask; the chamber list
+with interiors $I(W_i)$, perimeters $P_i$, door cells $D(W_i)$; the
+decoy list with representative rims; per-cell annotations (chamber
+and door membership; full-graph Ollivier--Ricci curvature, computed
+once by the generator); and exact snapshot save/restore. A
+certification checker validates a reported class list against the
+decoy ground truth and each certificate (every rim action tried
+$u_{\max}$ times without discovery, or explicit interior filling)
+directly from the run log. The shared recorder writes the full metric
+catalogue of the experiment design to Parquet at four granularities
+(per step, per epoch, per training run, per evaluation run).
+Registration-time unit tests assert the standing conventions on every
+generated instance.
+
+\subsection{Reward modes (all variants)}
+\label{sec:reward}
+
+Every benchmark variant (GridWorld2D, -Texture, -Top) supports a
+\texttt{reward\_mode} configuration field:
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item \texttt{none} (default) --- no extrinsic reward; the
+        environment is a pure-exploration benchmark, and event-based
+        metrics (entry times, coverage) carry the evaluation.
+  \item \texttt{sparse} --- $+1$ terminal reward on reaching a target
+        cell placed inside a designated chamber (in Texture
+        scenarios, the treasure-chest cell). Placement inside a
+        chamber makes steps-to-first-reward coincide with
+        steps-to-first-entry, so the reward metric stays continuous
+        with the exploration metric.
+  \item \texttt{coverage} --- $+1$ for each cell visited for the
+        first time: a dense pure-exploration reward for methods that
+        require a reward signal.
+  \item \texttt{deceptive} --- the \texttt{sparse} target plus a
+        distractor shaping gradient leading away from the target's
+        door: the reward-deception regime of the novelty-search
+        literature, letting reward deception be measured rather than
+        only structural deception.
+\end{itemize}
+Ground truth exposes the reward cells and (for \texttt{deceptive})
+the shaping field. Reward modes exist for community use, for training
+reward-consuming components (the hole-value and frontier heads, the
+planner's exploitation term), and for deception studies; the
+method experiment program runs \texttt{none} throughout to keep
+an extra variable out of its main results.
+
+\subsection{Universal action and observation spaces}
+\label{sec:spaces}
+
+Both spaces are identical across all variants (GridWorld2D, -Texture,
+-Top); an agent written against them runs on every environment in the
+library unchanged.
+
+\paragraph{Action space.} \texttt{Discrete(4)}: up, down, left,
+right. Moving into an obstacle leaves the agent in place. With
+\texttt{p\_slip} $> 0$ the executed action is resampled uniformly
+with that probability. In GridWorld2D-Top, crossing an identified
+edge applies the identification map (coordinate and orientation
+reversal where the identification is flipped) --- the action space
+itself is unchanged. Family-specific cell mechanics (hazard
+cells that reset the episode, wormhole cells that teleport;
+Section~\ref{sec:tex}) are documented
+with the family and never alter the action set.
+
+\paragraph{Observation space.} The canonical observation is a fixed
+vector: the agent's integer cell coordinates $(x, y)$ followed by a
+texture block $t \in [0, 1]^{16}$. Slots 0--3 are reserved
+library-wide for directional blocker adjacency (obstacle to the left,
+right, above, below of the current cell); slots 4--15 carry
+per-environment semantic features documented with each family. The
+texture block is identically zero in GridWorld2D and GridWorld2D-Top;
+only GridWorld2D-Texture populates it. Optional observation modes for
+learned baselines --- flattened symbolic grid, or an egocentric
+window of configurable radius with per-cell texture --- are available
+on every variant. Snapshot save/restore is exact (deep copy), and the
+environment is deterministic given (configuration, seed, action
+sequence) when \texttt{p\_slip} $= 0$.
+
+% =====================================================================
+\section{GridWorld2D-Texture}
+\label{sec:tex}
+
+The textured variant (\texttt{TG-GridWorld2DTex} prefix): the same
+generator with a per-cell texture channel --- semantic labels such as
+blocker-adjacent (ice), door, ladder, water, and scenario-specific
+others --- exposed in the observation and recorded in ground truth.
+Texture is a third signal family: local like curvature, but semantic
+rather than geometric, and only as trustworthy as the environment's
+labeling.
+
+\paragraph{Design intent.} Texture scenarios are built so the
+taxonomy's boundary is visible: texture discriminates flagged
+structure cheaply where the labeling is faithful, and fails exactly
+where discrimination requires enclosure rather than adjacency. The
+flavor example: arctic sailing --- most holes are ice-cube decoys
+whose neighbors carry ice-adjacent texture (avoidable on sight); the
+target is a treasure chest in an enclosed space reachable through a
+water-only passage; texture flags ice adjacency and doorways (ice on
+both sides), while whether the passage leads anywhere remains
+invisible to any local feature. Scenario suites should include cells
+where texture is absent or misleading, so the boundary is measured
+rather than assumed.
+
+\paragraph{Texture encoding.} Textures populate the universal
+observation's texture block (Section~\ref{sec:spaces}): slots 0--3
+carry directional blocker adjacency (blocker to the left, right,
+above, below --- any combination), and slots 4--15 carry the
+scenario's semantic features, documented per environment below.
+
+\paragraph{Canonical environments.} Five named environments form the
+Texture slice of TopoGym-v1:
+\begin{itemize}[leftmargin=2em, itemsep=3pt]
+  \item \texttt{TopoGym/IceShip}. Arctic ship navigation. The world
+        is water (navigable) and ice (blocker); most holes are
+        sealed ice decoys, and a treasure chest sits inside one true
+        chamber. Ice-adjacent water cells carry the directional
+        adjacency flags (ice to the left, right, above, below, or
+        any combination --- a doorway reads as ice on both sides);
+        open-water cells carry the water feature only. Water cells,
+        ice-adjacent or not, are the only navigable cells. Texture
+        makes decoy avoidance cheap on sight; whether a passage leads
+        anywhere remains invisible to texture.
+  \item \texttt{TopoGym/Ladders}. Platforms, ladders, and bridges;
+        a gem on the top platform is the target. Rooms (platforms),
+        ladders, and bridges each carry their own semantic feature;
+        vertical progress is only possible on ladder cells, and
+        bridges connect platforms across gaps. The textured version
+        of the bottleneck regime: ladders and bridges are the
+        corridors, and their texture advertises them.
+  \item \texttt{TopoGym/BankRobber}. Nested rooms with the money in
+        the center room --- the textured version of the nested
+        regime. Door cells and hallway cells carry their own
+        features, so the sequential structure is advertised locally;
+        the ordering constraint (which door must come first) remains
+        global.
+  \item \texttt{TopoGym/DontFall}. A large world with a large
+        central hole: stepping onto the drop resets the episode (the
+        hazard mechanic). A few dozen much smaller huts surround the
+        hole, and exactly one contains the ruby. Textures
+        distinguish drop-adjacent squares, regular dirt, hut
+        interiors, and hut doorways. The hazard makes local novelty
+        signals actively dangerous --- the most novel direction is
+        the drop --- while the huts reproduce the discrimination
+        regime at scale.
+  \item \texttt{TopoGym/SpaceWarp}. Four chambers and wormholes:
+        paired teleporter cells placed near doors at a configurable
+        separation (kwarg \texttt{warp\_sep}) --- never directly in
+        front, so every door remains enterable. Stepping onto a
+        wormhole teleports the agent to its partner (the teleport
+        mechanic). The treasure chamber has no door at all: from
+        outside it is indistinguishable from a sealed decoy, and it
+        is enterable only through a wormhole inside another chamber.
+        Texture flags a cell as a wormhole but never which one ---
+        all wormholes are purple --- so wormholes are recognizable on
+        sight while their destinations must be explored. The
+        deception cuts both ways: a wormhole can be a shortcut or a
+        stranding, and only entering it tells.
+\end{itemize}
+
+\paragraph{SpaceWarp and the certificate (semantics, not
+soundness).} SpaceWarp does not break the certificate --- it sharpens
+what the certificate says. Both certified statements remain true
+here: the treasure chamber's enclosing class is genuinely permanent
+in the spatial complex (its wall has no door, so the class never dies
+even after wormhole entry archives the interior --- the wall stays
+uncovered and the hugging cycle never bounds), and its gate log is
+genuinely exhausted (no local entry exists). What the environment
+changes is the gloss: a decoy certificate certifies no local entry
+and a permanent spatial $\Hm{1}$ class, not unenterability --- with
+non-local transitions, certified decoys can still be enterable
+through a wormhole. SpaceWarp is included to make that semantic
+boundary measurable; the extension that upgrades the certificate from
+``no local entry'' to ``no entry'' --- evaluating gate evidence and
+the complex on the archive transition graph, where wormhole edges
+appear once traversed --- is future work the environment is built to
+test.
+
+\paragraph{Status.} The scenario constructions above fix the suite;
+exact sizes, layouts, semantic slot assignments, and generation rules
+are to be specified in a forthcoming revision of this document.
+
+% =====================================================================
+\section{GridWorld2D-Top}
+\label{sec:top}
+
+The topological variant (\texttt{TG-GridWorld2DTop} prefix):
+non-trivial global topology via edge identifications of the grid's
+boundary. The \texttt{topology} field selects the identification:
+\begin{center}
+\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Value} & \textbf{Identification} & \textbf{Space} &
+\textbf{$\Hm{1}(\cdot\,; \Z)$} & \textbf{$\Hm{1}(\cdot\,; \F_2)$} \\
+\midrule
+\texttt{plane} & none (walled boundary) & disk & $0$ & $0$ \\
+\texttt{cylinder} & left--right, straight & cylinder & $\Z$ & $\F_2$ \\
+\texttt{mobius} & left--right, flipped & M\"obius band & $\Z$ & $\F_2$ \\
+\texttt{torus} & both pairs, straight & torus & $\Z^2$ & $\F_2^2$ \\
+\texttt{klein} & one straight, one flipped & Klein bottle &
+  $\Z \oplus \Z/2$ & $\F_2^2$ \\
+\texttt{rp2} & both pairs, flipped & real projective plane &
+  $\Z/2$ & $\F_2$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+Movement wraps across identified edges, with coordinate reversal
+where the identification is flipped; obstacles and chambers can be
+placed on top of any topology. Note the torsion: over $\Z$ the Klein
+bottle and $\mathbb{RP}^2$ carry $\Z/2$ classes that integer rank
+alone misses, while $\F_2$ coefficients see them --- one reason the
+library computes homology over $\F_2$.
+
+\paragraph{Why it matters.} These spaces are locally flat everywhere:
+no local signal --- curvature, texture, novelty gradient, count
+statistics --- distinguishes a M\"obius band from a plane at any
+single cell, because every neighborhood is Euclidean. The global
+structure is visible only to signals that aggregate globally, and the
+ambient $\Hm{1}$ is non-trivial with no obstacles at all. This is the
+regime designed to break methods that rely on local exploration
+gradients, and the cleanest possible separation between local and
+global signal families.
+
+\paragraph{Canonical layout.} The Top environments share one
+scenario shape: chambers placed near the corners of the large
+fundamental square, exactly one holding the treasure. The square's
+sides are the edges of the identification diagram (the fundamental
+polygon), so the corner regions meet across the identified edges ---
+on the torus all four corners are a single point of the quotient; on
+the Klein bottle and \(\mathbb{RP}^2\) they meet in pairs with
+orientation reversal. What appears locally as four maximally
+separated chambers is globally a tight cluster reachable across the
+edges; an agent that carries only local structure treats the corners
+as far apart, while the quotient makes them neighbors.
+
+\paragraph{Status.} Identification-aware metric and
+complex construction (the Rips complex on the quotient metric), the
+interaction of wrap-around with the archive and with return-by-replay,
+detection of the ambient classes versus feature classes, and the
+per-topology registry entries are to be specified in a forthcoming
+revision of this document.
+
+\end{document}
