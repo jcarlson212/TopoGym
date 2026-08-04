@@ -31,7 +31,7 @@ from topogym.core.basemap import BaseMap2D, make_base_map_2d
 from topogym.core.constants import DOOR, GOAL, HOLE, WALL
 from topogym.core.homology import analyze_2d
 from topogym.core.metadata import TopologyMetadata, homology_strings
-from topogym.generation import controls, shapes
+from topogym.generation import controls, modes, rooms, shapes
 from topogym.generation.config import TopoGenConfig2D
 from topogym.generation.graph import (
     bfs_distances,
@@ -145,17 +145,39 @@ def _sample_tries(rng: np.random.Generator, bounds: tuple) -> int:
     return int(rng.integers(lo, hi + 1))
 
 
-def _room_doors(rng: np.random.Generator, kind: str, cand_cells: list,
-                cfg: TopoGenConfig2D) -> list:
-    """Door plans ``(door_candidate, tries)`` for a room feature."""
-    if kind == "decoy":
-        return []
-    c = cand_cells[int(rng.integers(len(cand_cells)))]
-    return [(c, _sample_tries(rng, cfg.door_tries))]
+def _pick_doors(rng: np.random.Generator, cands: list, n: int,
+                tries: int = 60) -> list | None:
+    """``n`` door candidates with pairwise Chebyshev distance >= 2
+    between their door cells (independent width-1 doors)."""
+    if len(cands) < n:
+        return None
+    if n == 1:
+        return [cands[int(rng.integers(len(cands)))]]
+    for _ in range(tries):
+        picked: list = []
+        for idx in rng.permutation(len(cands)):
+            c = cands[int(idx)]
+            if all(
+                max(abs(a - b) for a, b in zip(c[0], o[0])) >= 2
+                for o in picked
+            ):
+                picked.append(c)
+            if len(picked) == n:
+                return picked
+    return None
 
 
-#: Contribution of each room kind to obstacle components.
-_ROOM_COMPONENTS_2D = {"chamber": 1, "decoy": 1}
+def _room_side(rng: np.random.Generator, cfg: TopoGenConfig2D,
+               kind: str) -> int:
+    if kind == "decoy" and cfg.decoy_side is not None:
+        return cfg.decoy_side
+    if cfg.chamber_side is not None:
+        return cfg.chamber_side
+    return _sample_tries(rng, cfg.chamber_size)
+
+
+#: Room kinds placed via the rooms module.
+_ROOM_KINDS_2D = ("chamber", "decoy")
 
 
 # ---------------------------------------------------------------------------
@@ -327,8 +349,11 @@ def _solve_target_2d(cfg: TopoGenConfig2D, base_info,
     """Resolve n_holes from target_b1 if requested."""
     if cfg.target_b1 is None:
         return cfg.n_holes
+    per_chamber = (
+        max(1, cfg.doors_per_chamber) if cfg.door_kind == "open" else 1
+    )
     rooms_k = (
-        cfg.n_chambers + cfg.n_decoys
+        cfg.n_chambers * per_chamber + cfg.n_decoys
         + (1 if cfg.base == "annulus" else 0)
         + (cfg.n_base_holes if cfg.base == "x_holes" else 0)
         + partition_k
@@ -379,30 +404,51 @@ def _attempt_2d(cfg: TopoGenConfig2D, rng: np.random.Generator) -> Layout:
     features: list = []
     reserved: set = set()
 
-    if cfg.style in ("maze", "zigzag"):
-        w, h = (cfg.size, cfg.size) if isinstance(cfg.size, int) else cfg.size
-        if cfg.base != "square":
-            raise GenerationError(f"style {cfg.style!r} requires base='square'")
-        walls = (
-            controls.maze_walls_2d(rng, w, h)
-            if cfg.style == "maze" else controls.zigzag_walls_2d(w, h)
-        )
-        for c in walls:
-            cell_types[c] = WALL
-    elif cfg.style == "rooms":
-        partition_plan = _plan_partitions_2d(cfg, base, rng)
-        for spec in partition_plan:
-            _place_partition_2d(
-                cfg, base, rng, spec, cell_types, doors, features, reserved,
-            )
-        plan = _feature_plan_2d(cfg, base, rng, partition_plan)
-        for kind, shape_fn in plan:
-            _place_feature_2d(
-                cfg, base, rng, kind, shape_fn, cell_types, doors, features,
-                reserved,
-            )
-    else:
-        raise GenerationError(f"unknown style {cfg.style!r}")
+    style = "rooms" if cfg.style == "open" else cfg.style
+    try:
+        if style in ("maze", "zigzag"):
+            w, h = (cfg.size, cfg.size) if isinstance(cfg.size, int) \
+                else cfg.size
+            if cfg.base != "square":
+                raise GenerationError(
+                    f"style {cfg.style!r} requires base='square'"
+                )
+            if style == "maze":
+                walls = set(controls.maze_walls_2d(rng, w, h))
+                opened = modes.braid_maze(cfg, rng, walls, cells)
+                if opened:
+                    features.append(Feature(
+                        kind="braid", cells=(), interior=(), doors=(),
+                        meta={"components": len(opened),
+                              "opened": tuple(opened)},
+                    ))
+            else:
+                walls = controls.zigzag_walls_2d(w, h)
+            for c in walls:
+                cell_types[c] = WALL
+        elif style == "nested":
+            modes.build_nested(cfg, base, rng, cell_types, doors, features,
+                               Feature, DoorSpec)
+        elif style == "corridor":
+            modes.build_corridor(cfg, base, rng, cell_types, features,
+                                 Feature)
+        elif style == "rooms":
+            partition_plan = _plan_partitions_2d(cfg, base, rng)
+            for spec in partition_plan:
+                _place_partition_2d(
+                    cfg, base, rng, spec, cell_types, doors, features,
+                    reserved,
+                )
+            plan = _feature_plan_2d(cfg, base, rng, partition_plan)
+            for kind, shape_fn in plan:
+                _place_feature_2d(
+                    cfg, base, rng, kind, shape_fn, cell_types, doors,
+                    features, reserved,
+                )
+        else:
+            raise GenerationError(f"unknown style {cfg.style!r}")
+    except modes.ModeError as exc:
+        raise GenerationError(str(exc)) from exc
 
     return _finalize_layout(cfg, base, cells, cell_types, doors, features, rng)
 
@@ -443,24 +489,45 @@ def _place_feature_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
                       doors: dict, features: list, reserved: set,
                       n_anchor_tries: int = 250) -> None:
     cells = base.cells()
+    margin_radius = max(1, cfg.min_sep - 1)
     for _ in range(n_anchor_tries):
         anchor = cells[int(rng.integers(len(cells)))]
-        if kind in _ROOM_COMPONENTS_2D:
-            walls, interior, cands = shapes.chamber_offsets(
-                rng, *cfg.chamber_size
+        door_free, corridor_paths = [], []
+        if kind in _ROOM_KINDS_2D:
+            shape = cfg.chamber_shape if kind == "chamber" else cfg.decoy_shape
+            walls, interior, cands = rooms.room_offsets(
+                rng, shape, _room_side(rng, cfg, kind)
             )
-            door_plan = _room_doors(rng, kind, cands, cfg)
-            footprint = walls | interior
+            walls, interior = set(walls), set(interior)
+            door_plan = [] if kind == "decoy" else _pick_doors(
+                rng, cands, cfg.doors_per_chamber
+            )
+            if door_plan is None:
+                continue
+            # Open doors are carved out of the ring; a dead-end corridor of
+            # ``door_corridor_len`` may extend outside each one.
+            for door_off, ext_off, _int_off in door_plan:
+                if cfg.door_kind == "open":
+                    walls.discard(door_off)
+                    door_free.append(door_off)
+                if cfg.door_corridor_len > 0:
+                    path, cwalls = rooms.corridor_offsets(
+                        door_off, ext_off, cfg.door_corridor_len
+                    )
+                    corridor_paths.append(tuple(path))
+                    door_free.extend(path)
+                    walls.update(cwalls)
+            footprint = walls | interior | set(door_free)
         else:
             footprint = shape_fn(rng)
-            walls, interior, door_plan = footprint, set(), []
-        margin = shapes.margin_ring(footprint)
+            walls, interior, door_plan = set(footprint), set(), []
+        margin = shapes.margin_ring(footprint, radius=margin_radius)
         mapping = map_offsets(base, anchor, footprint | margin)
         if mapping is None:
             continue
-        # Feature cells must stay Chebyshev distance >= 2 from every other
-        # feature (reserved includes prior footprints + their margins);
-        # margins of different features may overlap each other.
+        # Feature cells must stay min_sep away from every other feature
+        # (reserved includes prior footprints + their margins); margins of
+        # different features may overlap each other.
         if {mapping[o] for o in footprint} & reserved:
             continue
         mapped_all = set(mapping.values())
@@ -475,21 +542,38 @@ def _place_feature_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
                 cell = mapping[off]
                 cell_types[cell] = WALL
                 feature_cells.append(cell)
-        for cand, tries in door_plan:
-            door_off, _ext_off, _int_off = cand
+        for cand in door_plan:
+            door_off = cand[0]
             cell = mapping[door_off]
-            spec = DoorSpec(cell, "bump", tries=tries)
-            cell_types[cell] = DOOR
-            doors[cell] = spec
-            feature_doors.append(spec)
-            feature_cells.remove(cell)
+            if cfg.door_kind == "open":
+                feature_doors.append(DoorSpec(cell, "open", tries=0))
+            else:
+                spec = DoorSpec(
+                    cell, "bump", tries=_sample_tries(rng, cfg.door_tries)
+                )
+                cell_types[cell] = DOOR
+                doors[cell] = spec
+                feature_doors.append(spec)
 
         interior_cells = tuple(
             mapping[off] for off in sorted(interior)
         ) if kind != "decoy" else ()
+        # An open-doored ring falls apart into one wall arc per door; every
+        # other feature is a single obstacle component.
+        components = 1
+        if kind == "chamber" and cfg.door_kind == "open":
+            components = max(1, cfg.doors_per_chamber)
         features.append(Feature(
             kind=kind, cells=tuple(feature_cells),
             interior=interior_cells, doors=tuple(feature_doors),
+            meta={
+                "components": components,
+                "door_cells": tuple(mapping[c[0]] for c in door_plan),
+                "corridors": tuple(
+                    tuple(mapping[p] for p in path)
+                    for path in corridor_paths
+                ),
+            },
         ))
         reserved.update(mapped_all)
         return
@@ -505,7 +589,16 @@ def _finalize_layout(cfg: TopoGenConfig2D, base: BaseMap2D, cells: list,
                      rng: np.random.Generator) -> Layout:
     free = [c for c in cells if cell_types.get(c, 0) not in (WALL, HOLE)]
     free_set = set(free)
-    interiors = {c for f in features for c in f.interior}
+    # Start (and default goal) placement avoids gated/enclosed regions:
+    # chamber and shell interiors. "room" interiors (corridor style) are
+    # the ordinary free space.
+    interiors = {
+        c for f in features if f.kind in ("chamber", "shell")
+        for c in f.interior
+    }
+
+    if modes.diagonal_pinches(cell_types):
+        raise _RetryAttempt("diagonal pinch (not well-composed)")
 
     start_candidates = [
         c for c in free if c not in interiors and c not in doors
@@ -567,12 +660,17 @@ def _finalize_metadata(cfg: TopoGenConfig2D, layout: Layout,
     )
 
     summary = analyze_2d(layout.base.face_cycle(c) for c in free)
-    n_components = (
-        get("hole", 0) + get("base_hole", 0) + get("chamber", 0)
-        + get("decoy", 0) + partition_components
+    # Every feature records its obstacle-component contribution at
+    # placement (default 1); partitions carry theirs in gap terms.
+    n_components = partition_components + sum(
+        (f.meta or {}).get("components", 1)
+        for f in layout.features if f.kind != "partition"
     )
-    expected = expected_betti_2d(base_info, n_components)
-    if cfg.style == "rooms" and summary.betti_z2 != expected:
+    if cfg.style == "zigzag":
+        expected = (1, 0, 0)
+    else:
+        expected = expected_betti_2d(base_info, n_components)
+    if summary.betti_z2 != expected:
         raise _RetryAttempt(
             f"computed betti {summary.betti_z2} != expected {expected}"
         )

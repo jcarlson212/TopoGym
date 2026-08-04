@@ -67,9 +67,14 @@ class TopoEnvCore(gym.Env):
     DECEPTIVE_SHAPING = 0.01
 
     def __init__(self, config=None, *, layout=None, layout_seed=None,
-                 obs_mode=None, view_radius=None, reward_mode="none",
-                 p_slip=0.0, complex="cubical", max_steps=None,
-                 render_mode=None, reveal_hidden=False, **overrides):
+                 seed=None, obs_mode=None, view_radius=None,
+                 reward_mode="none", p_slip=0.0, complex="cubical",
+                 max_steps=None, render_mode=None, reveal_hidden=False,
+                 **overrides):
+        # The registry interface spells the layout seed simply "seed":
+        # gym.make("TopoGym/Dilution-50-v0", seed=3).
+        if layout_seed is None:
+            layout_seed = seed
         cfg = config if config is not None else self._default_config()
         if isinstance(cfg, dict):
             cfg = self._config_class()(**cfg)
