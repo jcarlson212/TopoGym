@@ -95,6 +95,25 @@ def test_space_warp_wormholes_teleport():
     assert info["position"] == wormholes[entry]
 
 
+def test_space_warp_tunnel_is_chamber_to_chamber():
+    env, _, _ = _make("SpaceWarp")
+    wormholes = env.layout.extras["wormholes"]
+    treasure = next(
+        f for f in env.layout.features if f.meta["treasure"]
+    )
+    others_interiors = {
+        c for f in env.layout.features
+        if not f.meta["treasure"] for c in f.interior
+    }
+    tunnels = [
+        (a, b) for a, b in wormholes.items()
+        if b in set(treasure.interior)
+    ]
+    assert tunnels  # some wormhole leads into the treasure chamber...
+    for source, _dest in tunnels:
+        assert source in others_interiors  # ...from inside another chamber
+
+
 def test_space_warp_treasure_needs_a_wormhole():
     env, _, _ = _make("SpaceWarp")
     free = set(env.layout.free_cells)
