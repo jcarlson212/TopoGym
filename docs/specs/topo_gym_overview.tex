@@ -8,7 +8,18 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{xcolor}
+\usepackage{listings}
 \usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+
+\lstset{
+  language=Python, basicstyle=\small\ttfamily,
+  keywordstyle=\color{blue!60!black}\bfseries,
+  commentstyle=\color{green!40!black}\itshape,
+  stringstyle=\color{red!50!black},
+  showstringspaces=false, frame=single, framerule=0.2pt,
+  rulecolor=\color{black!25}, xleftmargin=1em, columns=fullflexible,
+  keepspaces=true, breaklines=true,
+}
 
 % ---------- macros ----------
 \newcommand{\Hm}[1]{H_{#1}}
@@ -33,10 +44,9 @@ universal action and observation spaces of
 Section~\ref{sec:spaces} --- Plain, Texture, and Top are reporting
 slices of a single suite, and the version pins the environment list
 (future families extend to v2 without altering v1 entries). This
-document is the authority on the environments themselves.
-GridWorld2D is specified fully here; the Texture and Top
-variants are outlined, with their detailed scenario and construction
-specifications to follow.
+document is the authority on the environments themselves, and
+Section~\ref{sec:code} documents the library's code interfaces with
+usage examples.
 
 % =====================================================================
 \section{GridWorld2D}
@@ -123,28 +133,37 @@ registry rather than altering existing entries.
 \subsection{Generator API (advanced)}
 \label{sec:generator}
 
-Under the registry sits the full parametric generator, available to
-power users and used to define registry entries. Its configuration
-schema:
+Under the registry sits the full parametric generator
+(\texttt{topogym.generation.TopoGenConfig2D}), available to power
+users and used to define registry entries. Its configuration schema:
 \begin{itemize}[leftmargin=2em, itemsep=1pt]
   \item \texttt{size} --- grid side length; any integer accepted.
-  \item \texttt{chamber\_count}, \texttt{decoy\_count};
+  \item \texttt{n\_chambers}, \texttt{n\_decoys};
         \texttt{chamber\_side}, \texttt{decoy\_side};
         \texttt{chamber\_shape}, \texttt{decoy\_shape}
         (\{square, circle, triangle, star, mixed\}, area-matched at
         equal \texttt{side} so shape is never confounded with size).
-  \item \texttt{min\_sep} --- minimum pairwise wall separation;
-        configurations claiming the one-entry-per-rollout property
-        must satisfy $\texttt{min\_sep} > L$ (rollout horizon),
-        recorded per configuration in the manifest.
+  \item \texttt{min\_sep} --- minimum pairwise Chebyshev wall
+        separation, enforced at placement with an up-front packing
+        feasibility check; configurations claiming the
+        one-entry-per-rollout property must satisfy
+        $\texttt{min\_sep} > L$ (rollout horizon), recorded per
+        configuration in the manifest.
   \item \texttt{doors\_per\_chamber} (default 1);
-        \texttt{door\_width} fixed at 1 and validated;
-        \texttt{door\_corridor\_len} (default 0), controlling entry
+        \texttt{door\_kind} (\texttt{open} --- a visible walkable
+        width-1 doorway, the registry convention --- or \texttt{bump},
+        hidden until opened by repeated bumps); door width fixed at 1
+        and validated; \texttt{door\_corridor\_len} (default 0), a
+        dead-end corridor outside each door controlling entry
         probability $q$.
-  \item \texttt{mode} --- \texttt{open}, \texttt{nested},
-        \texttt{corridor}, or \texttt{maze}
-        (Section~\ref{sec:modes}).
-  \item \texttt{p\_slip}, \texttt{reward\_mode}, \texttt{seed}.
+  \item \texttt{style} --- \texttt{open} (alias \texttt{rooms}),
+        \texttt{nested} (\texttt{nested\_depth},
+        \texttt{shell\_spacing}), \texttt{corridor} (\texttt{rooms},
+        \texttt{corridor\_len}), or \texttt{maze} (\texttt{braid});
+        Section~\ref{sec:modes}.
+  \item \texttt{n\_holes} / \texttt{target\_b1},
+        \texttt{goal\_in\_chamber}, \texttt{seed}; \texttt{p\_slip}
+        and \texttt{reward\_mode} are environment-level knobs.
 \end{itemize}
 A configuration serializes to the canonical string
 \texttt{TG-GridWorld2D-S\{size\}-C\{c\}-D\{d\}-cs\{n\}-ds\{n\}%
@@ -361,19 +380,22 @@ carry directional blocker adjacency (blocker to the left, right,
 above, below --- any combination), and slots 4--15 carry the
 scenario's semantic features, documented per environment below.
 
-\paragraph{Canonical environments.} Five named environments form the
+\paragraph{Canonical environments.} Six named environments form the
 Texture slice of TopoGym-v1:
 \begin{itemize}[leftmargin=2em, itemsep=3pt]
-  \item \texttt{TopoGym/IceShip}. Arctic ship navigation. The world
-        is water (navigable) and ice (blocker); most holes are
-        sealed ice decoys, and a treasure chest sits inside one true
-        chamber. Ice-adjacent water cells carry the directional
-        adjacency flags (ice to the left, right, above, below, or
-        any combination --- a doorway reads as ice on both sides);
-        open-water cells carry the water feature only. Water cells,
-        ice-adjacent or not, are the only navigable cells. Texture
-        makes decoy avoidance cheap on sight; whether a passage leads
-        anywhere remains invisible to texture.
+  \item \texttt{TopoGym/IceShip}. Arctic ship navigation (the agent
+        is the sailboat). Coastal ice sheets attach to the north and
+        south edges --- land masses, not floating obstacles ---
+        octagonal sealed bergs float in the open water as decoys, and
+        the treasure sits in a cavity deep inside the large eastern
+        sheet, reachable \emph{only} through a guaranteed narrow
+        width-1 channel threaded across the ice (the guarantee is
+        unit-tested: blocking the channel disconnects the goal).
+        Ice-adjacent water cells carry the directional adjacency
+        flags (a doorway reads as ice on both sides); open-water
+        cells carry the water feature only. Texture makes berg
+        avoidance cheap on sight; whether the channel leads anywhere
+        remains invisible to any local feature.
   \item \texttt{TopoGym/Ladders}. Platforms, ladders, and bridges;
         a gem on the top platform is the target. Rooms (platforms),
         ladders, and bridges each carry their own semantic feature;
@@ -396,19 +418,37 @@ Texture slice of TopoGym-v1:
         signals actively dangerous --- the most novel direction is
         the drop --- while the huts reproduce the discrimination
         regime at scale.
-  \item \texttt{TopoGym/SpaceWarp}. Four chambers and wormholes:
-        paired teleporter cells placed near doors at a configurable
-        separation (kwarg \texttt{warp\_sep}) --- never directly in
-        front, so every door remains enterable. Stepping onto a
-        wormhole teleports the agent to its partner (the teleport
+  \item \texttt{TopoGym/SpaceWarp}. Four chambers and a \emph{field}
+        of wormholes: 30+ paired teleporter cells scattered evenly
+        across the map on a jittered lattice (kwarg
+        \texttt{warp\_sep} sets the minimum spacing; never on or next
+        to a doorway, so every door remains enterable). Stepping onto
+        a wormhole teleports the agent to its partner (the teleport
         mechanic). The treasure chamber has no door at all: from
         outside it is indistinguishable from a sealed decoy, and it
-        is enterable only through a wormhole inside another chamber.
-        Texture flags a cell as a wormhole but never which one ---
-        all wormholes are purple --- so wormholes are recognizable on
-        sight while their destinations must be explored. The
-        deception cuts both ways: a wormhole can be a shortcut or a
-        stranding, and only entering it tells.
+        is enterable only through one wormhole pair running
+        chamber-interior to chamber-interior. Texture flags a cell as
+        a wormhole but never which one --- all wormholes are purple
+        --- so wormholes are recognizable on sight while their
+        destinations must be explored. The field is the point: it is
+        constant noise for any gradient-follower, while methods that
+        track local transition structure can model each jump once
+        traversed. Reachability of every chamber under wormhole
+        transitions is guaranteed and unit-tested.
+  \item \texttt{TopoGym/ClownChase}. The reward-deception scenario.
+        Three sealed decoys cluster on one side of the map with a
+        clown NPC random-walking among them; every agent step that
+        reduces the distance to the clown pays a tiny reward
+        ($10^{-3}$) from a budget of $2.0$ that spans the agent's
+        lifetime on the layout --- the distractor runs out after a
+        few thousand rewarding steps in total. The treasure chamber
+        sits on the opposite side (the construction rejects layouts
+        where the sides are not genuinely opposite). Texture
+        distinguishes doors, floor, room interiors, the treasure
+        cell, and clown proximity (a slot lights up when the clown is
+        within one cell); the clown's position is otherwise sensed
+        only through the reward gradient --- which is exactly the
+        signal that must be distrusted.
 \end{itemize}
 
 \paragraph{SpaceWarp and local evidence (semantics, not
@@ -426,9 +466,31 @@ the transition graph of experience, where a wormhole edge appears
 once traversed --- can do better. SpaceWarp makes that semantic
 boundary measurable.
 
-\paragraph{Status.} The scenario constructions above fix the suite;
-exact sizes, layouts, semantic slot assignments, and generation rules
-are to be specified in a forthcoming revision of this document.
+\paragraph{Semantic slot assignments.} Slots are assigned
+library-wide so an agent transfers between scenarios; each scenario
+uses the subset relevant to it. Cell mechanics (hazard, wormhole) are
+distinct cell types, visible in every observation mode.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{slot} & \textbf{feature} & \textbf{slot} & \textbf{feature} \\
+\midrule
+0--3 & blocker adjacency (L/R/up/down) & 10 & drop-adjacent \\
+4 & water & 11 & plain ground \\
+5 & platform & 12 & room interior \\
+6 & ladder (vertical corridor) & 13 & standing on a wormhole \\
+7 & bridge (horizontal corridor) & 14 & clown within one cell \\
+8 & doorway & 15 & standing on the treasure \\
+9 & hallway & & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Scenario sizes are fixed (IceShip/Ladders/BankRobber/SpaceWarp: 50;
+DontFall: 61; ClownChase: 60); layouts vary with the seed under each
+scenario's structural guarantees.
 
 % =====================================================================
 \section{GridWorld2D-Top}
@@ -484,11 +546,120 @@ separated chambers is globally a tight cluster reachable across the
 edges; an agent that carries only local structure treats the corners
 as far apart, while the quotient makes them neighbors.
 
-\paragraph{Status.} Identification-aware metric and
-complex construction (the Rips complex on the quotient metric,
-already available as the \texttt{rips} backend of
-Section~\ref{sec:complex}), detection of the ambient classes versus
-feature classes, and the per-topology registry entries are to be
-specified in a forthcoming revision of this document.
+\paragraph{Registry entries.} The canonical layout is registered per
+topology as \texttt{TopoGym/Top\{Plane, Cylinder, Mobius, Torus,
+Klein, RP2\}-50-v0}: four chambers of side 8 near the corners of the
+fundamental square, exactly one holding the treasure, start near the
+center. Certified $b_1$ equals the ambient rank plus the four chamber
+classes (plane and $\mathbb{RP}^2$: 4; cylinder, M\"obius, torus,
+Klein: 5). The identification-aware Rips backend
+(Section~\ref{sec:complex}) computes homology on the quotient metric
+and is tested to agree with the cubical certification on every
+topology. Detection protocols separating the ambient classes from
+feature classes are left to evaluation code; the metadata provides
+both the ambient base facts and the composed totals.
+
+% =====================================================================
+\section{The library: code interfaces}
+\label{sec:code}
+
+TopoGym is a Gymnasium library (\texttt{pip install topogym}; MIT).
+This section documents the key abstractions with usage examples; the
+repository's \texttt{docs/} tree carries per-environment pages and
+the internals reference.
+
+\subsection{The registry (the primary interface)}
+
+Importing \texttt{topogym} registers every TopoGym-v1 id. The seed
+selects the layout within the frozen configuration; documented knobs
+pass through \texttt{gym.make}:
+
+\begin{lstlisting}
+import gymnasium as gym
+import topogym  # registers the TopoGym/* ids
+
+env = gym.make("TopoGym/Decoys4-50-v0", seed=3, p_slip=0.05)
+obs, info = env.reset(seed=0)
+info["topology"]["betti_z2"]         # [1, 5, 0]  (certified)
+info["topology"]["betti_z2_sealed"]  # [2, 5, 0]  (doors count as walls)
+
+from topogym import registry
+registry.registry_ids()              # every pinned id
+registry.canonical_string(
+    registry.get_config("TopoGym/Decoys4-50-v0"), seed=3)
+# 'TG-GridWorld2D-S50-C1-D4-cs8-ds8-sep2-shpSq-open-slip0-seed3'
+registry.manifest(seed=0)            # validity + assumptions per entry
+\end{lstlisting}
+
+Episodes truncate after the pre-determined $4\max(W,H)$ steps; the
+sparse goal pays $+1$ by default (Section~\ref{sec:reward}).
+Archive-style teleport resets are opt-in:
+
+\begin{lstlisting}
+env = gym.make("TopoGym/Maze-100-v0", seed=1, teleport=True)
+env.reset(seed=0)
+# ... explore ...
+env.reset(options={"teleport": (12, 40)})  # any visited cell
+\end{lstlisting}
+
+\subsection{The generator and the fluent spec API}
+
+Custom configurations pass the same validity checks and certification
+as registry entries:
+
+\begin{lstlisting}
+from topogym.generation import TopoGenConfig2D, generate_2d
+
+cfg = TopoGenConfig2D(
+    base="klein", size=25, n_chambers=1, n_decoys=2, n_holes=0,
+    chamber_shape="circle", chamber_side=8, min_sep=3,
+    door_kind="open", door_corridor_len=2,
+)
+layout = generate_2d(cfg, seed=42)  # deterministic + certified
+layout.metadata.betti_z2
+
+from topogym.spec import Torus
+env = Torus(15).holes(3).chambers(1).compile(seed=7)
+\end{lstlisting}
+
+\subsection{Measuring discovery}
+
+\texttt{ExplorationTracker} turns a rollout into discovery-time
+persistence (essential bars are the real topology of the explored
+region; finite bars are transient beliefs), and \texttt{StatsRecorder}
+accumulates per-episode metric rows:
+
+\begin{lstlisting}
+from topogym.stats import StatsRecorder
+from topogym.tda import ExplorationTracker
+
+env = StatsRecorder(gym.make("TopoGym/Nested3-50-v0", seed=1))
+tracker = ExplorationTracker(env)
+tracker.reset(seed=0)
+# ... run the policy ...
+tracker.summary()      # coverage, recovery steps, bar counts
+env.episodes           # return, coverage, chamber entry steps, ...
+env.summary()          # aggregates across episodes
+\end{lstlisting}
+
+Per-step \texttt{info} carries \texttt{coverage},
+\texttt{lifetime\_coverage} (across episodes on a layout),
+\texttt{chambers\_entered}, \texttt{episode\_return},
+\texttt{h0\_merges}, and friends;
+\texttt{env.unwrapped.chamber\_entry\_steps} gives each chamber's
+first-entry step.
+
+\subsection{Playing and rendering}
+
+Every environment renders as \texttt{rgb\_array} (procedural
+pixel-art tiles), \texttt{ansi}, or \texttt{human} (a pygame window;
+\texttt{pip install topogym[play]}). The keyboard driver:
+
+\begin{lstlisting}[language=bash]
+python scripts/play.py --list
+python scripts/play.py TopoGym/SpaceWarp-v0 --seed 2
+# arrows move; tab reveals hidden structure; r resets;
+# backspace regenerates the layout with the next seed
+\end{lstlisting}
 
 \end{document}
