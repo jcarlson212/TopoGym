@@ -807,6 +807,25 @@ topology. Detection protocols separating the ambient classes from
 feature classes are left to evaluation code; the metadata provides
 both the ambient base facts and the composed totals.
 
+\paragraph{Reading the seam markers.} Every rendered frame draws the
+fundamental-polygon notation on identified edges, so the
+identification \emph{and its orientation} are visible in the
+environment itself (and in Figure~\ref{fig:gallery-top}): chevrons
+run along each identified edge pair, one color per pair --- yellow
+for the left/right ($x$) pair, cyan for the top/bottom ($y$) pair.
+Chevrons pointing the \emph{same} direction on both edges mean the
+pair is glued straight (a wrap, as on the cylinder and torus);
+chevrons pointing \emph{opposite} directions mean the gluing
+reverses the edge (a flip, as on the M\"obius $x$-pair, the Klein
+$y$-pair, and both pairs of $\mathbb{RP}^2$). Unmarked boundary
+edges are walls. This is exactly the arrow convention of the standard
+fundamental polygons ($aba^{-1}b^{-1}$ for the torus, $abab^{-1}$
+for the Klein bottle, $abab$ for $\mathbb{RP}^2$), drawn in place on
+the grid. The four corner chambers are anchored symmetrically ---
+chambers in the same row pair share identical row extents and
+same-column pairs share identical column extents --- so any apparent
+asymmetry in a render is the identification, never the layout.
+
 \subsection{Gallery}
 
 Figure~\ref{fig:gallery-top} renders the six Top environments; the colored seam markers show which edge pairs are identified and with what orientation.

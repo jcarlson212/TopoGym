@@ -73,7 +73,9 @@ def _build_registry() -> dict:
     # Shape: area-matched chamber shapes.
     for shape in ("square", "circle", "triangle", "star"):
         add(f"Shape{SHAPE_CODES[shape]}-50",
-            _open_cfg(50, chamber_shape=shape))
+            _open_cfg(50, chamber_shape=shape,
+                      chamber_placement="center",
+                      start_placement="bottom_left"))
     # Nested: sequentially nested shells.
     for depth in (1, 2, 3):
         add(f"Nested{depth}-50", _open_cfg(
@@ -83,12 +85,13 @@ def _build_registry() -> dict:
     for length in (1, 2, 4):
         add(f"GiveUp{length}-50", _open_cfg(
             50, door_corridor_len=length,
+            chamber_placement="center", start_placement="bottom_left",
         ))
     # Bottleneck: a tree of rooms joined by width-1 corridors.
     for length in (3, 6):
         add(f"Bottleneck{length}-100", _open_cfg(
             100, style="corridor", corridor_len=length, rooms=6,
-            n_chambers=0,
+            n_chambers=0, chamber_side=24,
         ))
     # Maze: seeded perfect maze (braid opens loops).
     for size in (50, 100):
@@ -164,9 +167,14 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
     mode = "open" if cfg.style == "rooms" else cfg.style
     cs = cfg.chamber_side if cfg.chamber_side is not None else 0
     ds = cfg.decoy_side if cfg.decoy_side is not None else cs
+    placement = ""
+    if cfg.chamber_placement == "center":
+        placement += "-ctr"
+    if cfg.start_placement == "bottom_left":
+        placement += "-bl"
     return (
         f"TG-GridWorld2D-S{size}-C{cfg.n_chambers}-D{cfg.n_decoys}"
-        f"-cs{cs}-ds{ds}-sep{cfg.min_sep}-shp{shp}-{mode}"
+        f"-cs{cs}-ds{ds}-sep{cfg.min_sep}-shp{shp}{placement}-{mode}"
         f"-slip{p_slip:g}-seed{seed}"
     )
 
