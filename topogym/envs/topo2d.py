@@ -187,6 +187,14 @@ class TopoGrid2DEnv(TopoEnvCore):
         vec[2:] = self._texture_block(self._state.cell)
         return vec
 
+    def visible_cells(self) -> set:
+        """The cells the agent can currently see (line of sight within
+        the view radius); everything else renders dimmed."""
+        if self.obs_mode == "global":
+            return set(self.layout.base.cells())
+        self._sight_patch()
+        return self._visible
+
     def _sight_patch(self) -> np.ndarray:
         """The occluded egocentric patch; also feeds the observed-region
         filtration (what the agent can currently see counts as observed in
@@ -207,9 +215,12 @@ class TopoGrid2DEnv(TopoEnvCore):
                 view[r - a, r + b] = self._obs_code(t.cell)
                 cell_at[(r - a, r + b)] = t.cell
         out = self._occlude(view, (r, r), self._BLOCKING)
+        visible = set()
         for idx, cell in cell_at.items():
             if out[idx] != C.OBS_UNSEEN:
+                visible.add(cell)
                 self._note_observed(cell, int(out[idx]))
+        self._visible = visible
         return out
 
     def _global_obs(self) -> np.ndarray:

@@ -140,9 +140,14 @@ python scripts/play.py TopoGym/SpaceWarp-v0
 ```
 
 Arrow keys move; `Tab` reveals hidden structure; `r` resets;
-`Backspace` regenerates the layout. Set `TOPOGYM_DEBUG=1` to stream
-everything the env computes each step (position, rewards, coverage,
-scenario state) to the console.
+`Backspace` regenerates the layout. Rendering dims everything outside
+the agent's current line of sight (reveal mode shows all). Set
+`TOPOGYM_DEBUG=1` to stream everything the env computes each step to
+the console, and `TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) for
+the live H1 overlay: every step, the known region's holes are drawn on
+the grid — representative cycles in yellow, enclosed-wall rims in
+green (a yellow cycle with no green rim is a transient belief), with a
+legend and live H1 count top-right.
 
 ## Determinism, certification, and stats
 
