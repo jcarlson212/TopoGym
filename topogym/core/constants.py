@@ -47,3 +47,14 @@ TEX_INTERIOR = 12  # room interior
 TEX_WORMHOLE = 13  # standing on a wormhole (SpaceWarp)
 TEX_CLOWN_NEAR = 14  # the clown is within one cell (ClownChase)
 TEX_TREASURE = 15  # standing on the treasure cell
+
+#: slot index -> human-readable name (TOPOGYM_DEBUG observation lines)
+TEX_SLOT_NAMES = {
+    TEX_BLOCK_LEFT: "blocked_left", TEX_BLOCK_RIGHT: "blocked_right",
+    TEX_BLOCK_ABOVE: "blocked_above", TEX_BLOCK_BELOW: "blocked_below",
+    TEX_WATER: "water", TEX_PLATFORM: "platform", TEX_LADDER: "ladder",
+    TEX_BRIDGE: "bridge", TEX_DOOR: "door", TEX_HALLWAY: "hallway",
+    TEX_DROP_ADJ: "drop_adjacent", TEX_DIRT: "ground",
+    TEX_INTERIOR: "room_interior", TEX_WORMHOLE: "on_wormhole",
+    TEX_CLOWN_NEAR: "clown_near", TEX_TREASURE: "on_treasure",
+}
