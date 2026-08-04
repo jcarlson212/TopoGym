@@ -163,7 +163,12 @@ class TopoEnvCore(gym.Env):
         raise NotImplementedError
 
     def _generate(self, seed: int) -> Layout:
-        return generate_2d(self.cfg, seed)
+        from topogym.generation.cache import cached_layout
+
+        return cached_layout(
+            ("grid2d", repr(self.cfg), seed),
+            lambda: generate_2d(self.cfg, seed),
+        )
 
     # -- layout / episode state ---------------------------------------------
 
@@ -450,6 +455,12 @@ class TopoEnvCore(gym.Env):
         return s.betti_z2
 
     _KNOWN_FREE_CODES = (C.OBS_EMPTY, C.OBS_GOAL, C.OBS_DOOR_OPEN)
+
+    def _sight_state(self) -> tuple:
+        """Hashable token of everything that can change what a cell
+        looks like (part of the sight-cache key); variants with
+        dynamic appearance extend it."""
+        return tuple(sorted(self._open, key=repr))
 
     def _note_observed(self, cell: tuple, code: int) -> None:
         """Add a sighted cell to the observed-region filtration."""
