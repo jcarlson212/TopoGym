@@ -162,10 +162,10 @@ FAMILY_DOCS = {
     "ClownChase": "A clown wanders near the decoys paying a depleting "
                   "trickle of reward for approach; the treasure "
                   "chamber is on the opposite side.",
-    "SearchRescue": "A person trapped in one large open chamber inside "
-                    "a dense shrapnel field: every shard is a small "
-                    "transient hole, the chamber the only large "
-                    "persistent one.",
+    "SearchRescue": "A person trapped in the one intact chamber of a "
+                    "collapsed concrete structure: 160 rubble blocks "
+                    "form a dense maze of small transient holes; the "
+                    "chamber is the only large persistent one.",
     "EnvironmentalIceShip": "IceShip with seasons: winters grow the "
                             "floating bergs (their fringe freezes in "
                             "waves), summers shrink them; three "

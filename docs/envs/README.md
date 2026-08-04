@@ -47,5 +47,5 @@ GIFs show a coverage explorer navigating. Regenerate with
 | **DontFall** | `TopoGym/DontFall-v0` | `[1, 12, 0]` | <img src="DontFall.gif" width="200"/> |
 | **SpaceWarp** | `TopoGym/SpaceWarp-v0` | `[2, 4, 0]` | <img src="SpaceWarp.gif" width="200"/> |
 | **ClownChase** | `TopoGym/ClownChase-v0` | `[1, 4, 0]` | <img src="ClownChase.gif" width="200"/> |
-| **SearchRescue** | `TopoGym/SearchRescue-v0` | `[1, 27, 0]` | <img src="SearchRescue.gif" width="200"/> |
+| **SearchRescue** | `TopoGym/SearchRescue-v0` | `[1, 161, 0]` | <img src="SearchRescue.gif" width="200"/> |
 | **EnvironmentalIceShip** | `TopoGym/EnvironmentalIceShip-v0` | `[3, 4, 0]` | <img src="EnvironmentalIceShip.gif" width="200"/> |

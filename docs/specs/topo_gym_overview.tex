@@ -465,16 +465,17 @@ Texture slice of TopoGym-v1:
         never change. The certified metadata describes the
         episode-start geometry; a \texttt{season} make-kwarg forces
         either season for controlled evaluation.
-  \item \texttt{TopoGym/SearchRescue}. Search and rescue. A person is
-        trapped in one large open chamber buried in a dense field of
-        shrapnel (26 small transient obstacles, each a small
-        $\Hm{1}$ class of its own). The victim's chamber is the only
-        \emph{large, persistent} hole: in the agent's own discovery
-        filtration --- the archive --- shrapnel loops are born small
-        and die quickly as their shards are circumnavigated, while the
-        chamber's enclosing class grows large and refuses to die.
-        Persistence, not luck, finds the person; certified
-        $b_1 = 27$.
+  \item \texttt{TopoGym/SearchRescue}. Search and rescue in a
+        collapsed concrete structure. A person is trapped in the one
+        large intact chamber; around it, 160 rubble blocks on a dense
+        lattice leave only width-1/2 passages --- a maze the rescuer
+        must thread, with the start placed far from the chamber. Every
+        block is a small $\Hm{1}$ class of its own (certified
+        $b_1 = 161$); in the agent's own discovery filtration --- the
+        archive --- rubble loops are born small and die quickly as
+        their blocks are circumnavigated, while the chamber's
+        enclosing class grows large and refuses to die. Persistence,
+        not luck, finds the person.
 \end{itemize}
 
 \paragraph{SpaceWarp and local evidence (semantics, not
