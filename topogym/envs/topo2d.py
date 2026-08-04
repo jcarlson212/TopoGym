@@ -11,8 +11,7 @@ Two agent interfaces (``actions=``):
   obstacle leaves the agent in place.
 - ``"egocentric"`` — ``Discrete(3)``: 0 = turn left, 1 = turn right,
   2 = forward. The agent's local frame is parallel-transported as it
-  moves: a Mobius/Klein/RP^2 seam mirrors its view, and walking around a
-  cube-sphere corner reveals the curvature.
+  moves: a Mobius/Klein/RP^2 seam mirrors its view.
 
 Observations (``obs_mode=``): ``"vector"`` (default for fourway, the
 spec's universal observation) — the agent's integer cell coordinates
@@ -223,7 +222,7 @@ class TopoGrid2DEnv(TopoEnvCore):
     _ANSI = {
         C.OBS_EMPTY: "·", C.OBS_WALL: "#", C.OBS_HOLE: "O",
         C.OBS_DOOR_OPEN: "/", C.OBS_GOAL: "G", C.OBS_OUT_OF_WORLD: " ",
-        C.OBS_UNSEEN: "?", C.OBS_DOOR_ONEWAY: ">", C.OBS_TRAPDOOR: "v",
+        C.OBS_UNSEEN: "?",
     }
 
     def _render_ansi(self):

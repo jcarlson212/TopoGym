@@ -2,9 +2,9 @@
 
 import pytest
 
-from topogym.core import make_base_map_2d, make_base_map_3d
+from topogym.core import make_base_map_2d
 
-ALL_2D = ["square", "cylinder", "torus", "mobius", "klein", "rp2", "sphere"]
+ALL_2D = ["square", "cylinder", "torus", "mobius", "klein", "rp2"]
 
 
 def walk(base, state, n):
@@ -82,50 +82,6 @@ def test_wall_blocks():
     assert base.forward(s) is None
 
 
-def test_cube_sphere_counts_and_symmetry():
-    n = 4
-    base = make_base_map_2d("sphere", n)
-    cells = base.cells()
-    assert len(cells) == 6 * n * n
-    for cell in cells:
-        nbrs = base.neighbors(cell)
-        assert len(nbrs) == 4
-        assert len(set(nbrs)) == 4
-        for other in nbrs:
-            assert cell in base.neighbors(other)
-
-
-def test_cube_sphere_belt_holonomy_trivial():
-    n = 4
-    base = make_base_map_2d("sphere", n)
-    top = [c for c in base.cells() if c[2] == 2 * n]
-    s = base.initial_state(top[5])
-    assert walk(base, s, 4 * n) == s  # once around the belt
-
-
-def test_cube_sphere_corner_holonomy_is_quarter_turn():
-    # The cube-sphere concentrates curvature at its 8 corners. Walking
-    # (forward, turn-left) three times around a corner closes a triangle
-    # and returns the frame exactly — a 90-degree angle deficit. On a flat
-    # base map the same walk does not close.
-    n = 4
-    sphere = make_base_map_2d("sphere", n)
-    start = sphere.initial_state((1, 1, 2 * n))
-    start = sphere.turn_left(sphere.turn_left(start))  # face the corner
-    s = start
-    for _ in range(3):  # three faces meet at a corner
-        s = sphere.forward(s)
-        assert s is not None
-        s = sphere.turn_left(s)
-    assert s == start
-
-    flat = make_base_map_2d("torus", 8)
-    t = flat.initial_state((4, 4))
-    for _ in range(3):
-        t = flat.turn_left(flat.forward(t))
-    assert t != flat.initial_state((4, 4))
-
-
 def test_layout_coords_unique():
     for name in ALL_2D:
         base = make_base_map_2d(name, 5)
@@ -133,14 +89,3 @@ def test_layout_coords_unique():
         assert len(set(coords)) == len(coords)
         w, h = base.layout_size()
         assert all(0 <= x < w and 0 <= y < h for x, y in coords)
-
-
-def test_3d_wrap_and_wall():
-    base = make_base_map_3d("solid_torus", (5, 4, 4))
-    assert base.step_dir((4, 2, 2), (1, 0, 0)) == (0, 2, 2)  # x wraps
-    assert base.step_dir((2, 3, 2), (0, 1, 0)) is None  # y walls
-    t3 = make_base_map_3d("torus3", 4)
-    assert t3.step_dir((0, 0, 0), (0, 0, -1)) == (0, 0, 3)
-    box = make_base_map_3d("box", 4)
-    assert len(box.neighbors((0, 0, 0))) == 3
-    assert len(t3.neighbors((0, 0, 0))) == 6

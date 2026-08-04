@@ -23,7 +23,7 @@ print(f"target: b1 = {target_b1}")
 rng = np.random.default_rng(0)
 milestones = {}
 for step in range(1, 4001):
-    obs, *_ , info = env.step(int(rng.integers(3)))
+    obs, *_ , info = env.step(int(rng.integers(4)))
     if step % 200 == 0:
         b = env.unwrapped.visited_betti()
         for k in range(b[1] + 1):

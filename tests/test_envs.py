@@ -12,21 +12,13 @@ from topogym.generation import TopoGenConfig2D
 @pytest.mark.parametrize("kwargs", [
     dict(layout_seed=3),
     dict(base="torus", size=15, layout_seed=4),
-    dict(base="sphere", size=6, layout_seed=5),
     dict(base="mobius", size=15, layout_seed=6),
-    dict(base="square", size=19, n_trap_rooms=1, n_holes=1, layout_seed=7),
+    dict(base="rp2", size=15, layout_seed=7),
     dict(actions="egocentric", layout_seed=3),
     dict(obs_mode="local", layout_seed=3),
 ])
 def test_check_env_2d(kwargs):
     env = gym.make("TopoGym/Grid2D-v0", **kwargs).unwrapped
-    check_env(env, skip_render_check=True)
-
-
-def test_check_env_3d():
-    env = gym.make(
-        "TopoGym/Grid3D-v0", size=9, n_chambers=0, n_decoys=0, layout_seed=2,
-    ).unwrapped
     check_env(env, skip_render_check=True)
 
 
@@ -83,32 +75,6 @@ def test_bump_door_hidden_in_observation():
     assert env._obs_code(door_cell) == 1  # OBS_WALL: hidden until opened
 
 
-def test_one_way_door_mechanic():
-    env = _door_env(base="square", size=19, n_holes=0, n_chambers=0,
-                    n_decoys=0, n_trap_rooms=1, layout_seed=2)
-    (door_cell, spec), = env.layout.doors.items()
-    assert spec.kind == "one_way"
-    assert env._try_enter(spec.allowed_from, door_cell)
-    others = [
-        c for c in env.layout.base.neighbors(door_cell)
-        if c != spec.allowed_from
-    ]
-    assert all(not env._try_enter(c, door_cell) for c in others)
-
-
-def test_trapdoor_seals_after_use():
-    env = _door_env(base="square", size=19, n_holes=0, n_chambers=0,
-                    n_decoys=0, n_trapdoor_rooms=1, layout_seed=3)
-    trapdoor = next(
-        c for c, d in env.layout.doors.items() if d.kind == "trapdoor"
-    )
-    nbr = env.layout.base.neighbors(trapdoor)[0]
-    assert env._try_enter(nbr, trapdoor)
-    env._on_leave(trapdoor)  # stepping off seals it
-    assert not env._try_enter(nbr, trapdoor)
-    assert env._obs_code(trapdoor) == 1  # now observed as a wall
-
-
 def test_goal_reward_and_termination():
     env = _door_env(base="square", size=15, n_holes=1, n_chambers=0,
                     n_decoys=0, layout_seed=4, actions="egocentric",
@@ -161,13 +127,12 @@ def test_global_obs_mode():
 
 
 def test_render_modes():
-    env = gym.make("TopoGym/Grid2D-v0", base="sphere", size=5,
-                   chamber_size=(3, 4), render_mode="rgb_array",
-                   layout_seed=9).unwrapped
+    env = gym.make("TopoGym/Grid2D-v0", base="torus", size=13,
+                   render_mode="rgb_array", layout_seed=9).unwrapped
     env.reset(seed=0)
     img = env.render()
     assert img.ndim == 3 and img.shape[2] == 3
-    env = gym.make("TopoGym/Grid3D-v0", size=9, n_chambers=0, n_decoys=0,
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=13,
                    render_mode="ansi", layout_seed=9).unwrapped
     env.reset(seed=0)
     assert "@" in env.render()

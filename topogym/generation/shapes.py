@@ -3,7 +3,7 @@
 Shapes are generated as sets of integer offsets around an anchor and then
 mapped onto a base manifold by parallel transport (see
 :func:`topogym.generation.generator.map_offsets`), so the same shape works
-on a square, a torus seam, or across a cube-sphere edge.
+on a square or across a torus seam.
 """
 
 from __future__ import annotations
@@ -101,93 +101,4 @@ def margin_ring(footprint):
         for dx in (-1, 0, 1):
             for dy in (-1, 0, 1):
                 ring.add((x + dx, y + dy))
-    return ring - set(footprint)
-
-
-# ---------------------------------------------------------------------------
-# 3D shapes
-# ---------------------------------------------------------------------------
-
-def box_offsets3(rng, lo, hi):
-    dims = [int(rng.integers(lo, hi + 1)) for _ in range(3)]
-    return {(x, y, z) for x in range(dims[0]) for y in range(dims[1])
-            for z in range(dims[2])}
-
-def ball_offsets3(rng, lo, hi):
-    r = int(rng.integers(max(1, lo - 1), max(2, hi - 1) + 1))
-    return {(x, y, z)
-            for x in range(-r, r + 1) for y in range(-r, r + 1)
-            for z in range(-r, r + 1) if abs(x) + abs(y) + abs(z) <= r}
-
-def blob_offsets3(rng, lo, hi):
-    target = int(rng.integers(max(3, lo ** 3 // 3), max(4, hi ** 3 // 3) + 1))
-    cells = {(0, 0, 0)}
-    frontier = [(0, 0, 0)]
-    dirs = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
-    while len(cells) < target and frontier:
-        base = frontier[int(rng.integers(len(frontier)))]
-        candidates = [tuple(b + d for b, d in zip(base, dd)) for dd in dirs]
-        candidates = [c for c in candidates if c not in cells]
-        if not candidates:
-            frontier.remove(base)
-            continue
-        new = candidates[int(rng.integers(len(candidates)))]
-        cells.add(new)
-        frontier.append(new)
-    return cells
-
-BLOB_SHAPES_3D = {"box": box_offsets3, "ball": ball_offsets3, "blob": blob_offsets3}
-
-
-def ring_offsets3(rng, lo, hi):
-    """A solid-torus obstacle: a rectangular ring in a random axis plane.
-    Its complement gains one loop (b1) and one enclosing shell (b2)."""
-    w = int(rng.integers(max(3, lo), max(3, hi) + 1))
-    h = int(rng.integers(max(3, lo), max(3, hi) + 1))
-    axis = int(rng.integers(3))
-    ring2d = {(x, y) for x in range(w) for y in range(h)
-              if x in (0, w - 1) or y in (0, h - 1)}
-    out = set()
-    for x, y in ring2d:
-        coords = [0, 0, 0]
-        others = [k for k in range(3) if k != axis]
-        coords[others[0]] = x
-        coords[others[1]] = y
-        out.add(tuple(coords))
-    return out
-
-
-def chamber_offsets3(rng, lo, hi):
-    """A hollow box room. Returns ``(walls, interior, candidates)`` with
-    candidates ``(door_offset, exterior_offset, interior_offset)`` on face
-    cells away from box edges."""
-    dims = [int(rng.integers(max(3, lo), max(3, hi) + 1)) for _ in range(3)]
-    walls, interior, candidates = set(), set(), []
-    for x in range(dims[0]):
-        for y in range(dims[1]):
-            for z in range(dims[2]):
-                cell = (x, y, z)
-                on = [
-                    (1 if c == d - 1 else (-1 if c == 0 else 0))
-                    for c, d in zip(cell, dims)
-                ]
-                n_on = sum(1 for o in on if o != 0)
-                if n_on == 0:
-                    interior.add(cell)
-                    continue
-                walls.add(cell)
-                if n_on == 1:  # a face cell (not an edge/corner of the box)
-                    ext = tuple(c + o for c, o in zip(cell, on))
-                    inn = tuple(c - o for c, o in zip(cell, on))
-                    candidates.append((cell, ext, inn))
-    return walls, interior, candidates
-
-
-def margin_ring3(footprint):
-    ring = set()
-    for x, y, z in footprint:
-        for dx in (-1, 0, 1):
-            for dy in (-1, 0, 1):
-                for dz in (-1, 0, 1):
-                    ring.add((x + dx, y + dy, z + dz))
     return ring - set(footprint)

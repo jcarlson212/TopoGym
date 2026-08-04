@@ -14,8 +14,6 @@ CODE_COLORS = {
     C.OBS_GOAL: (39, 174, 96),
     C.OBS_OUT_OF_WORLD: (28, 28, 36),
     C.OBS_UNSEEN: (130, 130, 140),
-    C.OBS_DOOR_ONEWAY: (241, 196, 15),
-    C.OBS_TRAPDOOR: (230, 126, 34),
 }
 REVEAL_BUMP_DOOR = (155, 89, 182)  # hidden doors, revealed for docs
 REVEAL_DECOY = (146, 63, 63)  # decoy walls, revealed for docs
@@ -67,23 +65,4 @@ def render_rgb_2d(env, tile=14):
         dy = np.sign(fy - ay) if abs(fy - ay) <= 1 else 0
         cy, cx = y0 + tile // 2 + dy * tile // 4, x0 + tile // 2 + dx * tile // 4
         img[cy - 1:cy + 2, cx - 1:cx + 2] = (255, 255, 255)
-    return img
-
-
-def render_rgb_3d(env, tile=12, gap=1):
-    base = env.layout.base
-    w, h, d = base.size
-    img = np.zeros((h * tile, (w * d + gap * (d - 1)) * tile, 3), np.uint8)
-    img[:] = CODE_COLORS[C.OBS_OUT_OF_WORLD]
-    for cell in base.cells():
-        x, y, z = cell
-        col = z * (w + gap) + x
-        img[y * tile:(y + 1) * tile, col * tile:(col + 1) * tile] = (
-            _cell_color(env, cell)
-        )
-    ax, ay, az = env._agent_cell
-    col = az * (w + gap) + ax
-    y0, x0 = ay * tile, col * tile
-    pad = max(1, tile // 6)
-    img[y0 + pad:y0 + tile - pad, x0 + pad:x0 + tile - pad] = AGENT_COLOR
     return img

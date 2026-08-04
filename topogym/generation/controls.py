@@ -2,7 +2,7 @@
 
 These let experiments separate "my agent exploits topology" from "my agent
 is just good at generic novelty-seeking": a control maze is size-matched to
-the interesting environments but has b1 = 0 (2D) / b1 = b2 = 0 (3D).
+the interesting environments but has b1 = 0.
 """
 
 from __future__ import annotations
@@ -63,37 +63,3 @@ def zigzag_walls_2d(width, height):
         walls.update((x, y) for x in xs)
         k += 1
     return walls
-
-
-def maze_walls_3d(rng, width, height, depth):
-    """Perfect 3D maze on odd coordinates: contractible, b1 = b2 = 0."""
-    rooms = tuple((s - 1) // 2 for s in (width, height, depth))
-    if min(rooms) < 2:
-        raise ValueError("3D maze needs size >= 5")
-    room = (0, 0, 0)
-    visited = {room}
-    stack = [room]
-    passages = set()
-    dirs = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
-    while stack:
-        cur = stack[-1]
-        options = []
-        for d in dirs:
-            nxt = tuple(c + dd for c, dd in zip(cur, d))
-            if all(0 <= n < r for n, r in zip(nxt, rooms)) and nxt not in visited:
-                options.append(nxt)
-        if not options:
-            stack.pop()
-            continue
-        nxt = options[int(rng.integers(len(options)))]
-        visited.add(nxt)
-        passages.add((cur, nxt))
-        stack.append(nxt)
-
-    free = {tuple(2 * c + 1 for c in room) for room in visited}
-    for a, b in passages:
-        free.add(tuple(aa + bb + 1 for aa, bb in zip(a, b)))
-    return {
-        (x, y, z)
-        for x in range(width) for y in range(height) for z in range(depth)
-    } - free
