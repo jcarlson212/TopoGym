@@ -246,11 +246,13 @@ def _build_ice_world(seed: int, scenario: str, n_cavities: int = 1,
 
 
 def build_ice_ship(seed: int) -> Layout:
-    """Arctic sailing: coastal land, four floating berg decoys, and the
-    treasure cavity behind a guaranteed narrow channel through the
-    eastern landmass. The agent is the sailboat, and hitting ice ends
-    the episode."""
-    return _build_ice_world(seed, "ice_ship", n_cavities=1, n_pockets=0)
+    """Arctic sailing: coastal land, four floating berg decoys, and a
+    structured eastern landmass — three cavities (one treasure, two
+    empty) each behind its own guaranteed narrow channel, plus two
+    sealed water pockets. The agent is the sailboat, and hitting ice
+    ends the episode. Identical geometry to the seasonal variant,
+    without the seasons."""
+    return _build_ice_world(seed, "ice_ship", n_cavities=3, n_pockets=2)
 
 
 def build_environmental_ice_ship(seed: int) -> Layout:

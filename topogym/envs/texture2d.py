@@ -276,19 +276,19 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             if self.scenario == "clown_chase" \
                     and cell in self._decoy_cells:
                 return "tent"  # the carnival grounds
+            if self.scenario == "search_rescue":
+                # Intact chamber walls read as stone; everything else
+                # collapsed into rubble.
+                return ("stone" if cell in self._chamber_walls
+                        else "rubble")
             return "hull" if space else "stone"
         if self.scenario == "search_rescue":
             if code == C.OBS_GOAL:
                 return "person"
             if code == C.OBS_HAZARD:
                 return "barrel"
-            if code == C.OBS_WALL:
-                # Intact chamber walls read as stone; everything else
-                # collapsed into rubble.
-                return ("stone" if cell in self._chamber_walls
-                        else "rubble")
-            if code in (C.OBS_EMPTY, C.OBS_DOOR_OPEN):
-                return "door" if code == C.OBS_DOOR_OPEN else "concrete"
+            if code == C.OBS_EMPTY:
+                return "concrete"
         if code == C.OBS_HAZARD:
             return "drop"
         if code == C.OBS_WORMHOLE:
@@ -303,6 +303,14 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
                     else "water_cold")
         if space:  # outer space; station interiors are deck plating
             return "deck" if C.TEX_INTERIOR in slots else "space"
+        if self.scenario == "dont_fall":
+            if C.TEX_INTERIOR in slots:
+                return "carpet"
+            if cell in self.layout.extras.get("forest", ()):
+                x, y = cell
+                return "tree" if (x * 7 + y * 13) % 5 < 3 \
+                    else "dirt_dark"
+            return "dirt_dark"
         for slot, name in self._SLOT_TILES:
             if slot in slots:
                 return name

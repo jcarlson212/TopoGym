@@ -17,14 +17,14 @@ against the analytic expectation at generation time. Everything is
 
 <table>
 <tr>
-<td align="center"><img src="docs/envs/IceShip.gif" width="215"/><br><sub><b>IceShip</b></sub></td>
+<td align="center"><img src="docs/envs/EnvironmentalIceShip.gif" width="215"/><br><sub><b>EnvironmentalIceShip</b></sub></td>
 <td align="center"><img src="docs/envs/ClownChase.gif" width="215"/><br><sub><b>ClownChase</b></sub></td>
 <td align="center"><img src="docs/envs/SpaceWarp.gif" width="215"/><br><sub><b>SpaceWarp</b></sub></td>
 <td align="center"><img src="docs/envs/DontFall.gif" width="215"/><br><sub><b>DontFall</b></sub></td>
 </tr>
 <tr>
 <td align="center"><img src="docs/envs/SearchRescue.gif" width="215"/><br><sub><b>SearchRescue</b></sub></td>
-<td align="center"><img src="docs/envs/EnvironmentalIceShip.gif" width="215"/><br><sub><b>EnvironmentalIceShip</b></sub></td>
+<td align="center"><img src="docs/envs/BankRobber.gif" width="215"/><br><sub><b>BankRobber</b></sub></td>
 <td align="center"><img src="docs/envs/Nested3-50.gif" width="215"/><br><sub><b>Nested3-50</b></sub></td>
 <td align="center"><img src="docs/envs/TopTorus-50.gif" width="215"/><br><sub><b>TopTorus-50</b></sub></td>
 </tr>

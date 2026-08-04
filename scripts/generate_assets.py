@@ -37,7 +37,7 @@ PAGES_DIR = ROOT / "docs" / "environments"
 
 #: envs that get an animated showcase GIF (README hero set first)
 GIF_SET = [
-    "IceShip", "ClownChase", "SpaceWarp", "DontFall", "SearchRescue",
+    "ClownChase", "SpaceWarp", "DontFall", "SearchRescue",
     "EnvironmentalIceShip",
     "Ladders", "BankRobber", "Nested3-50", "Decoys4-50",
     "TopTorus-50", "Maze-50", "Bottleneck6-100", "ShapeSt-50",
