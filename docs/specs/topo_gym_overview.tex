@@ -697,4 +697,64 @@ python scripts/play.py TopoGym/SpaceWarp-v0 --seed 2
 # backspace regenerates the layout with the next seed
 \end{lstlisting}
 
+Rendering always dims cells outside the agent's current line of
+sight, so what the agent can and cannot see is visible at a glance
+(reveal mode shows the full map undimmed; it exists for
+documentation).
+
+\subsection{Debugging the topology live}
+\label{sec:overlay}
+
+Two environment variables turn the simulator into a topology
+debugger; both are off by default and cost nothing when unset.
+
+\paragraph{The H1 overlay.} \texttt{TOPOGYM\_OVERLAY=1} (alias
+\texttt{OVERLAY\_ENABLED=1}) recomputes, on every rendered frame, the
+$\Hm{1}$ classes of the \emph{observed region} --- the region the
+agent has seen and believes free --- and draws each class on the
+grid:
+
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item the \textbf{representative cycle} (yellow): the observed
+        cells that currently witness the class, i.e.\ the inner
+        boundary of the known region around the enclosed pocket. It
+        is loose when the agent has only encircled from afar and
+        tightens as the wall is hugged;
+  \item the \textbf{rim} (green): the free cells directly adjacent to
+        the wall component enclosed by the class. A class \emph{with}
+        a rim encloses real structure and will persist; a yellow
+        cycle with \emph{no} green rim encloses only unexplored free
+        space --- a transient belief that dies the moment the pocket
+        is explored. Watching transient cycles appear and collapse
+        while real ones tighten onto their rims is the fastest way to
+        build intuition for the discovery filtration of
+        Section~\ref{sec:gw}.
+\end{itemize}
+
+A legend with the live $\Hm{1}$ count sits in the top-right corner.
+The overlay uses the library's own machinery (observed-region
+filtration, movement connectivity, the pinch convention), so what it
+draws is exactly what \texttt{observed\_betti()} and the
+\texttt{ExplorationTracker} count.
+
+\begin{lstlisting}[language=bash]
+# watch loops be conjectured, confirmed, and refuted as you drive:
+TOPOGYM_OVERLAY=1 python scripts/play.py TopoGym/Decoys4-50-v0
+\end{lstlisting}
+
+\paragraph{The step stream.} \texttt{TOPOGYM\_DEBUG=1} streams
+everything the environment computes to the console: a reset line
+(layout, seed, certified Betti numbers in both door conventions,
+horizon, reward mode) and one line per step with position, action,
+reward, running return, termination flags, coverage, lifetime
+coverage, observed fraction, known components, H0 merges, chamber
+entries, doors opened, and live scenario state (season and
+frozen/melted counts, clown positions and remaining budget, hazard
+counts). The two variables compose:
+
+\begin{lstlisting}[language=bash]
+TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 \
+    python scripts/play.py TopoGym/SearchRescue-v0
+\end{lstlisting}
+
 \end{document}

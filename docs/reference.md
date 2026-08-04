@@ -102,6 +102,24 @@ agent was fooled. `rips_diagram` / `betti_at_scale` /
 `bottleneck_distance` run Rips persistence on any point cloud (policy
 hidden states, learned embeddings).
 
+## Debugging the topology live
+
+`TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) draws the observed
+region's H1 classes on every rendered frame: representative cycles in
+yellow (the known region's inner boundary around each enclosed pocket,
+tightening as walls are hugged) and enclosed-wall rims in green — a
+yellow cycle with no green rim is a transient belief that dies when
+its pocket is explored. A legend with the live H1 count sits top-right.
+`TOPOGYM_DEBUG=1` streams every per-step computation to the console;
+the two compose:
+
+```bash
+TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 python scripts/play.py TopoGym/Decoys4-50-v0
+```
+
+Rendering always dims cells outside the agent's current line of sight
+(reveal mode shows the full map undimmed).
+
 ## Stats
 
 `info` carries per-step `coverage`, `lifetime_coverage` (across
