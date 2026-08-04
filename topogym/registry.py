@@ -41,8 +41,15 @@ def _open_cfg(size: int, **kw) -> TopoGenConfig2D:
         n_holes=0, n_chambers=1, n_decoys=0,
         chamber_side=_SIDE, decoy_side=_SIDE,
         door_kind="open", min_sep=2,
+        # The spec's sparse-target convention: the goal sits inside a
+        # designated chamber, so steps-to-first-reward coincides with
+        # steps-to-first-entry.
+        goal_in_chamber=True,
     )
-    return dataclasses.replace(base, **kw) if kw else base
+    cfg = dataclasses.replace(base, **kw) if kw else base
+    if cfg.n_chambers == 0 and cfg.goal_in_chamber:
+        cfg = dataclasses.replace(cfg, goal_in_chamber=False)
+    return cfg
 
 
 def _build_registry() -> dict:
@@ -70,7 +77,7 @@ def _build_registry() -> dict:
     # Nested: sequentially nested shells.
     for depth in (1, 2, 3):
         add(f"Nested{depth}-50", _open_cfg(
-            50, style="nested", nested_depth=depth, goal_in_chamber=True,
+            50, style="nested", nested_depth=depth,
         ))
     # GiveUp: the door hides behind a dead-end corridor.
     for length in (1, 2, 4):

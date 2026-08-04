@@ -41,8 +41,8 @@ from topogym.core.homology import _UnionFind, analyze_2d
 from topogym.generation.generator import generate_2d
 
 #: Reward modes shared by every variant (see docs/specs/topo_gym_overview).
-#: "none" (default) — pure exploration, no extrinsic reward.
-#: "sparse" — +1 terminal on reaching the goal cell.
+#: "sparse" (default) — +1 terminal on reaching the goal cell.
+#: "none" — pure exploration, no extrinsic reward.
 #: "coverage" — +1 for each cell visited for the first time.
 #: "deceptive" — sparse goal plus a small potential-based shaping gradient
 #:   toward a distractor cell placed as far from the goal as possible.
@@ -69,9 +69,9 @@ class TopoEnvCore(gym.Env):
 
     def __init__(self, config=None, *, layout=None, layout_seed=None,
                  seed=None, obs_mode=None, view_radius=None,
-                 reward_mode="none", p_slip=0.0, complex="cubical",
-                 max_steps=None, teleport=False, render_mode=None,
-                 reveal_hidden=False, **overrides):
+                 reward_mode="sparse", goal=True, p_slip=0.0,
+                 complex="cubical", max_steps=None, teleport=False,
+                 render_mode=None, reveal_hidden=False, **overrides):
         # The registry interface spells the layout seed simply "seed":
         # gym.make("TopoGym/Dilution-50-v0", seed=3).
         if layout_seed is None:
@@ -95,6 +95,9 @@ class TopoEnvCore(gym.Env):
                 f"{REWARD_MODES}"
             )
         self.reward_mode = reward_mode
+        #: goal=False removes the goal: no terminal payout, and its cell
+        #: reads as ordinary floor.
+        self.goal_exists = goal
         if not 0.0 <= p_slip <= 1.0:
             raise ValueError(f"p_slip must be in [0, 1], got {p_slip!r}")
         self.p_slip = p_slip
@@ -329,10 +332,11 @@ class TopoEnvCore(gym.Env):
             if spec.kind == "open" or cell in self._open:
                 return C.OBS_DOOR_OPEN  # a visible walk-through doorway
             return C.OBS_WALL  # bump doors hide until opened
+        if t == C.GOAL:
+            return C.OBS_GOAL if self.goal_exists else C.OBS_EMPTY
         return {
             C.EMPTY: C.OBS_EMPTY, C.WALL: C.OBS_WALL, C.HOLE: C.OBS_HOLE,
-            C.GOAL: C.OBS_GOAL, C.HAZARD: C.OBS_HAZARD,
-            C.WORMHOLE: C.OBS_WORMHOLE,
+            C.HAZARD: C.OBS_HAZARD, C.WORMHOLE: C.OBS_WORMHOLE,
         }[t]
 
     @staticmethod
@@ -375,7 +379,7 @@ class TopoEnvCore(gym.Env):
         self._visited.add(agent_cell)
         reward, terminated = 0.0, False
         mode = self.reward_mode
-        at_goal = agent_cell == self.layout.goal
+        at_goal = self.goal_exists and agent_cell == self.layout.goal
         if mode == "sparse" and at_goal:
             reward, terminated = 1.0, True
         elif mode == "goal" and at_goal:  # legacy step-decayed sparse

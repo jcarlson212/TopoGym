@@ -42,8 +42,9 @@ def parse_args() -> argparse.Namespace:
                     help="drive the Discrete(3) egocentric agent")
     ap.add_argument("--reveal", action="store_true",
                     help="start with hidden structure revealed")
-    ap.add_argument("--reward-mode", default="none",
-                    help="none | sparse | coverage | deceptive")
+    ap.add_argument("--reward-mode", default="sparse",
+                    help="none | sparse | coverage | deceptive "
+                         "(sparse: reaching the goal ends the episode)")
     ap.add_argument("--p-slip", type=float, default=0.0)
     ap.add_argument("--list", action="store_true", help="list env ids")
     return ap.parse_args()
@@ -78,11 +79,16 @@ def main() -> int:
     total = 0.0
     env.render()
     print(f"{args.env_id}  seed={seed}")
-    print("certified betti_z2:", info["topology"]["betti_z2"])
+    print("certified betti_z2:", info["topology"]["betti_z2"],
+          "(doors walkable)  /",
+          info["topology"]["betti_z2_sealed"],
+          "(doors count as walls)")
 
     def caption() -> str:
-        return (f"{args.env_id}  steps {info['steps']}  "
-                f"coverage {info['coverage']:.0%}  return {total:.2f}")
+        remaining = core._max_steps - info["steps"]
+        return (f"{args.env_id}  reward {total:.2f}  "
+                f"steps left {remaining}/{core._max_steps}  "
+                f"coverage {info['coverage']:.0%}")
 
     running = True
     while running:

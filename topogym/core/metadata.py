@@ -66,7 +66,14 @@ class TopologyMetadata:
     n_free_cells: int
 
     # -- certified topology of the free space ------------------------------
+    #: Betti numbers of the *traversable* free space: door cells count as
+    #: free, so homology is door-state invariant and b0 = 1.
     betti_z2: tuple
+    #: The sealed-world convention: doors count as walls. Each doored
+    #: chamber's interior becomes its own component (b0 grows) and its
+    #: enclosing wall reads as one closed class. Same complex, second
+    #: certified reading.
+    betti_z2_sealed: tuple
     euler_characteristic: int
     orientable: bool | None
     genus: int | None  # orientable free space
