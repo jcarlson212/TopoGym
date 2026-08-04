@@ -52,6 +52,9 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             self._scenario_knobs = {}
         size = SCENARIO_SIZES[scenario]
         kwargs.setdefault("config", TopoGenConfig2D(base="square", size=size))
+        if scenario == "search_rescue":
+            # The rescue traversal earns 30% more steps by default.
+            kwargs.setdefault("max_steps", int(1.3 * ((6 * size) // 5)))
         super().__init__(**kwargs)
 
     def _generate(self, seed: int) -> Layout:

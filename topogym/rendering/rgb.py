@@ -100,6 +100,13 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
     w, h = base.layout_size()
     img = np.tile(tiles.tile("out", tile), (h, w, 1))
     namer = getattr(env, "_tile_name", None)
+    # Line-of-sight dimming: cells the agent cannot currently see render
+    # darker (skipped in reveal mode, which exists for documentation).
+    visible = None
+    if not env.reveal_hidden:
+        vis_fn = getattr(env, "visible_cells", None)
+        if vis_fn is not None:
+            visible = vis_fn()
     for cell in base.cells():
         x, y = base.layout_coords(cell)
         code = env._obs_code(cell)
@@ -109,6 +116,8 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
         color = _reveal_tint(env, cell)
         if color is not None:
             tiles.tint(region, color)
+        if visible is not None and cell not in visible:
+            region[:] = (region * 0.55).astype(np.uint8)
 
     _draw_identifications(img, base, tile)
 
@@ -123,6 +132,10 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
         overlay = getattr(env, "_render_overlay", None)
         if overlay is not None:
             overlay(img, tile)
+        if getattr(env, "_overlay", False):
+            from topogym.rendering.overlay import draw_h1_overlay
+
+            draw_h1_overlay(env, img, tile)
         return img
     pad = max(1, tile // 6)
     img[y0 + pad:y0 + tile - pad, x0 + pad:x0 + tile - pad] = AGENT_COLOR
@@ -136,4 +149,8 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
     overlay = getattr(env, "_render_overlay", None)
     if overlay is not None:
         overlay(img, tile)
+    if getattr(env, "_overlay", False):
+        from topogym.rendering.overlay import draw_h1_overlay
+
+        draw_h1_overlay(env, img, tile)
     return img

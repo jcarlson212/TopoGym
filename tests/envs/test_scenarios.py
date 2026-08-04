@@ -335,3 +335,12 @@ def test_search_rescue_barrels_explode_and_warn():
         and n not in env.layout.extras["hazards"]
     )
     assert env._texture_block(nbr)[C.TEX_DROP_ADJ] == 1.0
+
+
+def test_search_rescue_gets_a_longer_horizon():
+    env, _, _ = _make("SearchRescue")
+    assert env._max_steps == int(1.3 * ((6 * 61) // 5))  # 95, +30%
+    override = gym.make("TopoGym/SearchRescue-v0", seed=1,
+                        max_steps=40).unwrapped
+    override.reset(seed=0)
+    assert override._max_steps == 40

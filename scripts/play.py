@@ -83,6 +83,7 @@ def main() -> int:
           "(doors walkable)  /",
           info["topology"]["betti_z2_sealed"],
           "(doors count as walls)")
+    print("homology:", info["topology"]["homology"])
 
     def caption() -> str:
         remaining = core._max_steps - info["steps"]
