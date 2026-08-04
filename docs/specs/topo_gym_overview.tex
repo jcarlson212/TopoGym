@@ -302,12 +302,16 @@ Both spaces are identical across all variants (GridWorld2D, -Texture,
 library unchanged.
 
 \paragraph{Action space.} \texttt{Discrete(4)}: up, down, left,
-right. Moving into an obstacle leaves the agent in place. With
+right, always denoting \emph{screen} directions (up decreases $y$).
+Moving into an obstacle leaves the agent in place. With
 \texttt{p\_slip} $> 0$ the executed action is resampled uniformly
 with that probability. In GridWorld2D-Top, crossing an identified
-edge applies the identification map (coordinate and orientation
-reversal where the identification is flipped) --- the action space
-itself is unchanged. Family-specific cell mechanics (hazard
+edge applies the identification map to the agent's \emph{position}
+(coordinate reversal where the identification is flipped) --- the
+action space and the meaning of each action are unchanged: left is
+still screen-left after any crossing. (The optional egocentric
+\texttt{Discrete(3)} interface instead carries a parallel-transported
+frame, where a flipped seam genuinely mirrors the agent's view.) Family-specific cell mechanics (hazard
 cells that reset the episode, wormhole cells that teleport;
 Section~\ref{sec:tex}) are documented
 with the family and never alter the action set.
