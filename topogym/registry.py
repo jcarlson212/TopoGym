@@ -100,10 +100,23 @@ def _build_registry() -> dict:
 #: name -> frozen generator configuration (the registry itself).
 REGISTRY: dict = _build_registry()
 
+#: The Texture slice of TopoGym-v1: registry name -> scenario name.
+TEXTURE_SCENARIOS = {
+    "IceShip": "ice_ship",
+    "Ladders": "ladders",
+    "BankRobber": "bank_robber",
+    "DontFall": "dont_fall",
+    "SpaceWarp": "space_warp",
+    "ClownChase": "clown_chase",
+}
+
 
 def registry_ids() -> list:
-    """All registry env ids, ``TopoGym/{Family}-{size}-v0``."""
-    return [f"TopoGym/{name}-v0" for name in REGISTRY]
+    """All registry env ids, ``TopoGym/{Family}-{size}-v0`` plus the
+    Texture scenarios ``TopoGym/{Scenario}-v0``."""
+    return [f"TopoGym/{name}-v0" for name in REGISTRY] + [
+        f"TopoGym/{name}-v0" for name in TEXTURE_SCENARIOS
+    ]
 
 
 def _normalize(env_id: str) -> str:
@@ -156,6 +169,15 @@ def register_all() -> None:
             id=env_id,
             entry_point="topogym.envs:TopoGrid2DEnv",
             kwargs={"config": cfg},
+        )
+    for name, scenario in TEXTURE_SCENARIOS.items():
+        env_id = f"TopoGym/{name}-v0"
+        if env_id in gym.registry:
+            continue
+        register(
+            id=env_id,
+            entry_point="topogym.envs:TextureGrid2DEnv",
+            kwargs={"scenario": scenario},
         )
 
 

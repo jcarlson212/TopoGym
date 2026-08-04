@@ -67,4 +67,7 @@ def render_rgb_2d(env, tile=14):
         dy = np.sign(fy - ay) if abs(fy - ay) <= 1 else 0
         cy, cx = y0 + tile // 2 + dy * tile // 4, x0 + tile // 2 + dx * tile // 4
         img[cy - 1:cy + 2, cx - 1:cx + 2] = (255, 255, 255)
+    overlay = getattr(env, "_render_overlay", None)
+    if overlay is not None:
+        overlay(img, tile)
     return img
