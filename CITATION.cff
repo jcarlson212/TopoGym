@@ -7,7 +7,7 @@ authors:
 date-released: 2026-07-10
 url: "https://github.com/jcarlson212/TopoGym"
 repository-code: "https://github.com/jcarlson212/TopoGym"
-license: Apache-2.0
+license: MIT
 version: 0.1.0
 keywords:
   - reinforcement learning

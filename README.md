@@ -1,7 +1,7 @@
 # TopoGym
 
 [![CI](https://github.com/jcarlson212/TopoGym/actions/workflows/ci.yml/badge.svg)](https://github.com/jcarlson212/TopoGym/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/2Sn6cTYbbw)
 
@@ -192,4 +192,4 @@ compilation (cells as charts), larger benchmark tiers.
 }
 ```
 
-[Apache 2.0](LICENSE). See also [`CITATION.cff`](CITATION.cff).
+[MIT](LICENSE). See also [`CITATION.cff`](CITATION.cff).
