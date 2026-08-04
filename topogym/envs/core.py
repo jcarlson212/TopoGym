@@ -49,6 +49,13 @@ from topogym.generation.generator import generate_2d
 #: "goal" — legacy alias of sparse with a step-decayed payout.
 REWARD_MODES = ("none", "sparse", "coverage", "deceptive", "goal")
 
+#: Homology backends for the free-space complex (the ``complex`` kwarg).
+#: "cubical" (default) — the glued cubical complex, GUDHI on the order
+#:   complex of its face poset; the certification source of truth.
+#: "rips" — a Vietoris-Rips complex on free-cell centers in the quotient
+#:   metric (topogym.complexes.rips); reports dimensions 0 and 1.
+COMPLEX_BACKENDS = ("cubical", "rips")
+
 
 class TopoEnvCore(gym.Env):
     metadata = {"render_modes": ["rgb_array", "ansi"], "render_fps": 8}
@@ -61,8 +68,8 @@ class TopoEnvCore(gym.Env):
 
     def __init__(self, config=None, *, layout=None, layout_seed=None,
                  obs_mode=None, view_radius=None, reward_mode="none",
-                 p_slip=0.0, max_steps=None, render_mode=None,
-                 reveal_hidden=False, **overrides):
+                 p_slip=0.0, complex="cubical", max_steps=None,
+                 render_mode=None, reveal_hidden=False, **overrides):
         cfg = config if config is not None else self._default_config()
         if isinstance(cfg, dict):
             cfg = self._config_class()(**cfg)
@@ -85,6 +92,12 @@ class TopoEnvCore(gym.Env):
         if not 0.0 <= p_slip <= 1.0:
             raise ValueError(f"p_slip must be in [0, 1], got {p_slip!r}")
         self.p_slip = p_slip
+        if complex not in COMPLEX_BACKENDS:
+            raise ValueError(
+                f"unknown complex backend {complex!r}; expected one of "
+                f"{COMPLEX_BACKENDS}"
+            )
+        self.complex_backend = complex
         self._max_steps_cfg = max_steps
         self.render_mode = render_mode
         self.reveal_hidden = reveal_hidden
@@ -211,7 +224,17 @@ class TopoEnvCore(gym.Env):
         are maintained incrementally and are free."""
         return self._betti_of(self._observed_free)
 
+    def free_betti(self):
+        """Betti numbers of the full free space under the selected
+        backend: the cubical numbers equal the certified
+        ``topology.betti_z2``; the Rips backend reports (b0, b1)."""
+        return self._betti_of(self.layout.free_cells)
+
     def _betti_of(self, cells):
+        if self.complex_backend == "rips":
+            from topogym.complexes.rips import rips_betti
+
+            return rips_betti(self.layout.base, cells)
         s = analyze_2d(self.layout.base.face_cycle(c) for c in cells)
         return s.betti_z2
 
@@ -339,4 +362,5 @@ class TopoEnvCore(gym.Env):
     def _reset_info(self, agent_cell):
         info = self._step_info(agent_cell)
         info["topology"] = self.layout.metadata.to_dict()
+        info["topology"]["complex"] = self.complex_backend
         return info

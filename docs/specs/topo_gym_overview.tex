@@ -226,6 +226,47 @@ catalogue of the experiment design to Parquet at four granularities
 Registration-time unit tests assert the standing conventions on every
 generated instance.
 
+\subsection{Complex backends (all variants)}
+\label{sec:complex}
+
+Every environment exposes a \texttt{complex} configuration field
+selecting the geometric substrate used for free-space homology:
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item \texttt{cubical} (default) --- the glued cubical cell complex of
+        the free cells; homology is computed by GUDHI on the order
+        complex of its face poset (the barycentric subdivision), which is
+        robust to every edge identification of
+        Section~\ref{sec:top}. This backend is the certification source
+        of truth: the metadata's Betti numbers are computed here and
+        cross-checked against the analytic expectation at generation
+        time.
+  \item \texttt{rips} --- a Vietoris--Rips complex built by GUDHI on the
+        centers of the free cells at a fixed scale
+        $t \in (\sqrt{2}, 2)$, under the quotient metric induced by the
+        base's identification group (wrap translates and flip glide
+        reflections). Orthogonal and diagonal neighbors connect, cells
+        separated by a width-one wall (ambient distance 2) do not, so
+        obstacles produce classes exactly as in the cubical complex; the
+        backend reports dimensions 0 and 1, and the library's tests
+        assert agreement with the certified cubical numbers on every
+        base.
+\end{itemize}
+The backend governs the environment-side homology computations
+(\texttt{free\_betti}, \texttt{visited\_betti},
+\texttt{observed\_betti}) and is recorded in the metadata; certification
+always comes from the cubical complex.
+
+\paragraph{Determinism.} The library guarantees end-to-end determinism
+up to seeds: (configuration, seed) fixes the generated layout and its
+certified metadata byte-for-byte --- including everything computed
+through GUDHI, since homology is exact linear algebra over
+$\F_p$ with no randomness --- and (environment, reset seed, action
+sequence) fixes the episode, including \texttt{p\_slip} resampling,
+which draws from the episode's seeded generator. Internal iteration
+orders are sorted so no result depends on interpreter hash state; a
+cross-process test asserts that two fresh interpreters produce
+identical layouts, metadata, and rollouts.
+
 \subsection{Reward modes (all variants)}
 \label{sec:reward}
 
