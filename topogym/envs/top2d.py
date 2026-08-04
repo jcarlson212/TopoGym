@@ -29,4 +29,10 @@ class TopGrid2DEnv(TopoGrid2DEnv):
         super().__init__(**kwargs)
 
     def _generate(self, seed: int) -> Layout:
-        return build_top(self.identification, seed, size=self._top_size)
+        from topogym.generation.cache import cached_layout
+
+        return cached_layout(
+            ("top", self.identification, self._top_size, seed),
+            lambda: build_top(self.identification, seed,
+                              size=self._top_size),
+        )

@@ -59,7 +59,14 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         super().__init__(**kwargs)
 
     def _generate(self, seed: int) -> Layout:
-        return build_scenario(self.scenario, seed, **self._scenario_knobs)
+        from topogym.generation.cache import cached_layout
+
+        return cached_layout(
+            ("texture", self.scenario,
+             tuple(sorted(self._scenario_knobs.items())), seed),
+            lambda: build_scenario(self.scenario, seed,
+                                   **self._scenario_knobs),
+        )
 
     # -- episode state -------------------------------------------------------
 
@@ -104,6 +111,11 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             self._clowns = []
 
     # -- mechanics -----------------------------------------------------------
+
+    def _sight_state(self) -> tuple:
+        return super()._sight_state() + (
+            self.season, len(self._frozen), len(self._melted)
+        )
 
     def _advance_season(self) -> None:
         """Winter grows the floating bergs (their water fringe freezes

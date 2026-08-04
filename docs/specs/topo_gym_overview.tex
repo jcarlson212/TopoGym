@@ -6,6 +6,7 @@
 \usepackage[expansion=false]{microtype}
 \usepackage{enumitem}
 \usepackage{booktabs}
+\usepackage{graphicx}
 \usepackage{array}
 \usepackage{xcolor}
 \usepackage{listings}
@@ -390,6 +391,138 @@ three are available on every variant. Snapshot save/restore is exact (deep copy)
 environment is deterministic given (configuration, seed, action
 sequence) when \texttt{p\_slip} $= 0$.
 
+\subsection{Gallery}
+
+Figures~\ref{fig:gallery-gw1} and~\ref{fig:gallery-gw2} render every pinned GridWorld2D id at the reference seed (reveal mode, uniform frame size).
+
+\begin{figure}[p]
+  \centering
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Dilution-50.png}\\[-1pt]
+      {\tiny \texttt{Dilution-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Dilution-200.png}\\[-1pt]
+      {\tiny \texttt{Dilution-200}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Chambers2-50.png}\\[-1pt]
+      {\tiny \texttt{Chambers2-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Chambers2-100.png}\\[-1pt]
+      {\tiny \texttt{Chambers2-100}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Chambers2-200.png}\\[-1pt]
+      {\tiny \texttt{Chambers2-200}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Chambers2-400.png}\\[-1pt]
+      {\tiny \texttt{Chambers2-400}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ChamberCount1-200.png}\\[-1pt]
+      {\tiny \texttt{ChamberCount1-200}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ChamberCount2-200.png}\\[-1pt]
+      {\tiny \texttt{ChamberCount2-200}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ChamberCount4-200.png}\\[-1pt]
+      {\tiny \texttt{ChamberCount4-200}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ChamberCount8-200.png}\\[-1pt]
+      {\tiny \texttt{ChamberCount8-200}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Decoys0-50.png}\\[-1pt]
+      {\tiny \texttt{Decoys0-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Decoys1-50.png}\\[-1pt]
+      {\tiny \texttt{Decoys1-50}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Decoys2-50.png}\\[-1pt]
+      {\tiny \texttt{Decoys2-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Decoys4-50.png}\\[-1pt]
+      {\tiny \texttt{Decoys4-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Decoys8-50.png}\\[-1pt]
+      {\tiny \texttt{Decoys8-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ShapeSq-50.png}\\[-1pt]
+      {\tiny \texttt{ShapeSq-50}}
+    \end{minipage}
+  \caption{The GridWorld2D registry (1 of 2): reference-seed renders, reveal mode.}
+  \label{fig:gallery-gw1}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ShapeCi-50.png}\\[-1pt]
+      {\tiny \texttt{ShapeCi-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ShapeTr-50.png}\\[-1pt]
+      {\tiny \texttt{ShapeTr-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ShapeSt-50.png}\\[-1pt]
+      {\tiny \texttt{ShapeSt-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Nested1-50.png}\\[-1pt]
+      {\tiny \texttt{Nested1-50}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Nested2-50.png}\\[-1pt]
+      {\tiny \texttt{Nested2-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Nested3-50.png}\\[-1pt]
+      {\tiny \texttt{Nested3-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/GiveUp1-50.png}\\[-1pt]
+      {\tiny \texttt{GiveUp1-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/GiveUp2-50.png}\\[-1pt]
+      {\tiny \texttt{GiveUp2-50}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/GiveUp4-50.png}\\[-1pt]
+      {\tiny \texttt{GiveUp4-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Bottleneck3-100.png}\\[-1pt]
+      {\tiny \texttt{Bottleneck3-100}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Bottleneck6-100.png}\\[-1pt]
+      {\tiny \texttt{Bottleneck6-100}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Maze-50.png}\\[-1pt]
+      {\tiny \texttt{Maze-50}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Maze-100.png}\\[-1pt]
+      {\tiny \texttt{Maze-100}}
+    \end{minipage}
+  \caption{The GridWorld2D registry (2 of 2).}
+  \label{fig:gallery-gw2}
+\end{figure}
+
 % =====================================================================
 \section{GridWorld2D-Texture}
 \label{sec:tex}
@@ -565,6 +698,48 @@ Scenario sizes are fixed (IceShip/EnvironmentalIceShip/Ladders/%
 BankRobber/SpaceWarp: 50; DontFall/SearchRescue: 61; ClownChase: 60); layouts vary with the seed under each
 scenario's structural guarantees.
 
+\subsection{Gallery}
+
+Figure~\ref{fig:gallery-tex} renders every Texture scenario at the reference seed.
+
+\begin{figure}[p]
+  \centering
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/IceShip.png}\\[-1pt]
+      {\tiny \texttt{IceShip}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/EnvironmentalIceShip.png}\\[-1pt]
+      {\tiny \texttt{EnvironmentalIceShip}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/Ladders.png}\\[-1pt]
+      {\tiny \texttt{Ladders}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/BankRobber.png}\\[-1pt]
+      {\tiny \texttt{BankRobber}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/DontFall.png}\\[-1pt]
+      {\tiny \texttt{DontFall}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/SpaceWarp.png}\\[-1pt]
+      {\tiny \texttt{SpaceWarp}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/ClownChase.png}\\[-1pt]
+      {\tiny \texttt{ClownChase}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/SearchRescue.png}\\[-1pt]
+      {\tiny \texttt{SearchRescue}}
+    \end{minipage}
+  \caption{The Texture scenarios: reference-seed renders, reveal mode.}
+  \label{fig:gallery-tex}
+\end{figure}
+
 % =====================================================================
 \section{GridWorld2D-Top}
 \label{sec:top}
@@ -631,6 +806,40 @@ and is tested to agree with the cubical certification on every
 topology. Detection protocols separating the ambient classes from
 feature classes are left to evaluation code; the metadata provides
 both the ambient base facts and the composed totals.
+
+\subsection{Gallery}
+
+Figure~\ref{fig:gallery-top} renders the six Top environments; the colored seam markers show which edge pairs are identified and with what orientation.
+
+\begin{figure}[p]
+  \centering
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/TopPlane-50.png}\\[-1pt]
+      {\tiny \texttt{TopPlane-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/TopCylinder-50.png}\\[-1pt]
+      {\tiny \texttt{TopCylinder-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/TopMobius-50.png}\\[-1pt]
+      {\tiny \texttt{TopMobius-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/TopTorus-50.png}\\[-1pt]
+      {\tiny \texttt{TopTorus-50}}
+    \end{minipage}\\[4pt]
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/TopKlein-50.png}\\[-1pt]
+      {\tiny \texttt{TopKlein-50}}
+    \end{minipage}\hfill
+    \begin{minipage}{.24\linewidth}\centering
+      \includegraphics[width=\linewidth]{../envs/TopRP2-50.png}\\[-1pt]
+      {\tiny \texttt{TopRP2-50}}
+    \end{minipage}
+  \caption{The Top slice: corner chambers on each identification surface (edge identifications marked on the seams).}
+  \label{fig:gallery-top}
+\end{figure}
 
 % =====================================================================
 \section{The library: code interfaces}
@@ -959,6 +1168,66 @@ in local mode). The variables compose:
 TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 \
     python scripts/play.py TopoGym/SearchRescue-v0
 \end{lstlisting}
+
+\section{Performance Considerations}
+\label{sec:performance}
+
+The library keeps certification exact while making the training loop
+cheap; all figures below were measured on one workstation
+(single-threaded CPython) and matter as ratios, not absolutes.
+
+\paragraph{The step path does no topology.} Homology never runs
+inside \texttt{step()}: certification happens once at generation,
+and every potentially expensive statistic (per-step recording, hole
+timestamps, curvature) is an opt-in toggle
+(Section~\ref{sec:code}). What remains per step is movement, reward,
+and sight.
+
+\paragraph{Sight memoization.} Line-of-sight is the step path's only
+real cost --- an occlusion flood over the egocentric window. Layouts
+are frozen, so the flood is a pure function of the agent state plus a
+small \emph{sight token}: everything that can change how a cell
+looks (opened hidden doors; in seasonal scenarios the season and its
+freeze/melt progress). Patches are memoized per layout keyed on
+(state, token) --- turning in place and revisiting cells become
+dictionary lookups, and the token invalidates exactly when appearance
+changes. The observed-region bookkeeping is replayed on every hit, so
+discovery accounting (and therefore every metric) is identical with
+and without the cache; a test pins a cached rollout byte-for-byte
+against a cold one. Measured effect: the default environment goes
+from ${\sim}6$k to ${\sim}220$k steps/s ($37\times$); Texture
+scenarios reach ${\sim}130$k.
+
+\paragraph{Layout cache.} Generation is deterministic, so a
+(configuration, seed) key names exactly one certified layout;
+building it twice is pure waste. A process-wide bounded LRU stores
+the first build and hands every later construction an independent
+copy (immutable base map and metadata shared; mutable containers
+copied, so instances cannot leak state into one another).
+\texttt{gym.make} + \texttt{reset} of a cached id drops from
+${\sim}190$\,ms to ${\sim}0.6$\,ms --- which is what makes vector
+environments cheap to build.
+
+\paragraph{Vector environments.} The standard Gymnasium scaling path
+works unchanged:
+
+\begin{lstlisting}
+venv = gymnasium.make_vec("TopoGym/Decoys4-50-v0", num_envs=8,
+                          vectorization_mode="sync", seed=1)
+\end{lstlisting}
+
+\noindent With the caches in place the per-copy construction cost is
+negligible and the base environment is fast enough that the vector
+wrapper itself dominates; for throughput beyond a few hundred
+thousand steps/s, batch at the experiment level (e.g.\ Ray via
+\texttt{topogym[benchmarks]}) rather than expecting more from a
+single process.
+
+\paragraph{Determinism is unaffected.} Both caches are keyed on
+exactly the state that generation and sight depend on, and cached
+results are replayed, not approximated --- the end-to-end determinism
+guarantee (Section~\ref{sec:complex}) holds with caches warm or
+cold, and the cross-process determinism test runs with them enabled.
 
 \section{Benchmarks}
 \label{sec:benchmarks}

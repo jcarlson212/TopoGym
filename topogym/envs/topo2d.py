@@ -51,6 +51,8 @@ class TopoGrid2DEnv(TopoEnvCore):
                 f'actions must be "fourway" or "egocentric", got {actions!r}'
             )
         self.actions = actions
+        self._sight_cache: dict = {}
+        self._sight_layout = None
         super().__init__(config, **kwargs)
 
     def _default_config(self) -> TopoGenConfig2D:
@@ -234,7 +236,27 @@ class TopoGrid2DEnv(TopoEnvCore):
     def _sight_patch(self) -> np.ndarray:
         """The occluded egocentric patch; also feeds the observed-region
         filtration (what the agent can currently see counts as observed in
-        every observation mode)."""
+        every observation mode).
+
+        Layouts are frozen, so the patch is a pure function of (agent
+        state, sight state) — memoized per layout, which makes turns
+        and revisits nearly free. The observed-region bookkeeping is
+        replayed on every hit, so discovery accounting is identical
+        with and without the cache."""
+        if self._sight_layout is not self.layout:
+            self._sight_cache = {}
+            self._sight_layout = self.layout
+        key = (self._state, self._sight_state())
+        hit = self._sight_cache.get(key)
+        if hit is None:
+            hit = self._sight_cache[key] = self._compute_sight_patch()
+        out, visible_codes = hit
+        for cell, code in visible_codes.items():
+            self._note_observed(cell, code)
+        self._visible = set(visible_codes)
+        return out.copy()  # callers may write into the observation
+
+    def _compute_sight_patch(self) -> tuple:
         r = self.view_radius
         base = self.layout.base
         view = np.full((2 * r + 1, 2 * r + 1), C.OBS_OUT_OF_WORLD, np.uint8)
@@ -251,13 +273,11 @@ class TopoGrid2DEnv(TopoEnvCore):
                 view[r - a, r + b] = self._obs_code(t.cell)
                 cell_at[(r - a, r + b)] = t.cell
         out = self._occlude(view, (r, r), self._BLOCKING)
-        visible = set()
-        for idx, cell in cell_at.items():
-            if out[idx] != C.OBS_UNSEEN:
-                visible.add(cell)
-                self._note_observed(cell, int(out[idx]))
-        self._visible = visible
-        return out
+        visible_codes = {
+            cell: int(out[idx]) for idx, cell in cell_at.items()
+            if out[idx] != C.OBS_UNSEEN
+        }
+        return out, visible_codes
 
     def _global_obs(self) -> np.ndarray:
         base = self.layout.base
