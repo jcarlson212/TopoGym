@@ -24,6 +24,8 @@ registry ids are aliases for canonical strings.
 
 from __future__ import annotations
 
+import dataclasses
+
 from topogym.generation.config import TopoGenConfig2D
 from topogym.generation.rooms import SHAPE_CODES
 
@@ -34,14 +36,13 @@ _SIDE = 8
 
 def _open_cfg(size: int, **kw) -> TopoGenConfig2D:
     """The registry's open-mode base: no holes, open width-1 doors."""
-    defaults = dict(
+    base = TopoGenConfig2D(
         base="square", size=size, style="rooms",
         n_holes=0, n_chambers=1, n_decoys=0,
         chamber_side=_SIDE, decoy_side=_SIDE,
         door_kind="open", min_sep=2,
     )
-    defaults.update(kw)
-    return TopoGenConfig2D(**defaults)
+    return dataclasses.replace(base, **kw) if kw else base
 
 
 def _build_registry() -> dict:
