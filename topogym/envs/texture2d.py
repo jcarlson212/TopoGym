@@ -25,9 +25,7 @@ from topogym.generation.scenarios import (
     SCENARIOS,
     build_scenario,
 )
-from topogym.rendering.rgb import AGENT_COLOR
-
-CLOWN_COLOR = (255, 140, 0)  # the clown wears orange
+from topogym.rendering import tiles
 
 
 class TextureGrid2DEnv(TopoGrid2DEnv):
@@ -143,13 +141,40 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
 
     # -- rendering -------------------------------------------------------------
 
+    #: semantic texture slot -> floor tile, in display priority order
+    _SLOT_TILES = (
+        (C.TEX_LADDER, "ladder"),
+        (C.TEX_BRIDGE, "bridge"),
+        (C.TEX_WATER, "water"),
+        (C.TEX_PLATFORM, "slab"),
+        (C.TEX_HALLWAY, "hall"),
+        (C.TEX_INTERIOR, "carpet"),
+        (C.TEX_DIRT, "dirt"),
+    )
+
+    def _tile_name(self, cell, code) -> str:
+        if code in (C.OBS_UNSEEN, C.OBS_OUT_OF_WORLD):
+            return "unseen" if code == C.OBS_UNSEEN else "out"
+        if code == C.OBS_WALL:
+            return "ice" if self.scenario == "ice_ship" else "stone"
+        if code == C.OBS_HAZARD:
+            return "drop"
+        if code == C.OBS_WORMHOLE:
+            return "wormhole"
+        if code == C.OBS_DOOR_OPEN:
+            return "door"
+        if code == C.OBS_GOAL:
+            return "chest"
+        slots = self.layout.extras.get("textures", {}).get(cell, ())
+        for slot, name in self._SLOT_TILES:
+            if slot in slots:
+                return name
+        return "floor"
+
     def _render_overlay(self, img, tile: int) -> None:
-        if self._clown_pos is None:
+        if self._clown_pos is None or self._clown_pos == self._state.cell:
             return
         x, y = self.layout.base.layout_coords(self._clown_pos)
-        pad = max(1, tile // 4)
-        img[y * tile + pad:(y + 1) * tile - pad,
-            x * tile + pad:(x + 1) * tile - pad] = (
-            CLOWN_COLOR if self._clown_pos != self._state.cell
-            else AGENT_COLOR
+        img[y * tile:(y + 1) * tile, x * tile:(x + 1) * tile] = tiles.tile(
+            "clown", tile
         )
