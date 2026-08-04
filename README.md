@@ -23,9 +23,9 @@ against the analytic expectation at generation time. Everything is
 <td align="center"><img src="docs/envs/DontFall.gif" width="215"/><br><sub><b>DontFall</b></sub></td>
 </tr>
 <tr>
+<td align="center"><img src="docs/envs/SearchRescue.gif" width="215"/><br><sub><b>SearchRescue</b></sub></td>
+<td align="center"><img src="docs/envs/EnvironmentalIceShip.gif" width="215"/><br><sub><b>EnvironmentalIceShip</b></sub></td>
 <td align="center"><img src="docs/envs/Nested3-50.gif" width="215"/><br><sub><b>Nested3-50</b></sub></td>
-<td align="center"><img src="docs/envs/Decoys4-50.gif" width="215"/><br><sub><b>Decoys4-50</b></sub></td>
-<td align="center"><img src="docs/envs/Maze-50.gif" width="215"/><br><sub><b>Maze-50</b></sub></td>
 <td align="center"><img src="docs/envs/TopTorus-50.gif" width="215"/><br><sub><b>TopTorus-50</b></sub></td>
 </tr>
 </table>
@@ -56,7 +56,7 @@ interface (`Discrete(4)` screen-direction actions; observation =
 | slice | families | axis |
 |---|---|---|
 | **GridWorld2D** | `Dilution`, `Chambers2`, `ChamberCount`, `Decoys`, `Shape{Sq,Ci,Tr,St}`, `Nested`, `GiveUp`, `Bottleneck`, `Maze` | world size, chamber/decoy count, shape, nesting depth, corridor length, braiding |
-| **Texture** | `IceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase` | semantic local signals — and exactly where they fail |
+| **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail |
 | **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal |
 
 Highlights: sealed **decoys** indistinguishable from chambers from the
@@ -65,8 +65,12 @@ the worst one; **SpaceWarp**'s doorless treasure chamber, enterable
 only through one wormhole in a field of thirty (noise for
 gradient-followers, tractable for anything modeling transitions);
 **ClownChase**'s wandering distractor paying a depleting trickle of
-reward away from the treasure; Möbius/Klein/RP² worlds that are locally
-flat everywhere — only globally aggregated signals can tell them apart.
+reward away from the treasure; **SearchRescue**'s trapped survivor in
+the only large persistent hole of a shrapnel field; seasons in
+**EnvironmentalIceShip**, where winter grows the ice until the channel
+freezes shut around you; and Möbius/Klein/RP² worlds that are locally
+flat everywhere — only globally aggregated signals (the identified
+edges are drawn with fundamental-polygon arrows) can tell them apart.
 
 Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`.
 Details per family: [docs/environments/](docs/environments/README.md).
