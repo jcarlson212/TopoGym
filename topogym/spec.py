@@ -19,12 +19,16 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from topogym.complexes.cell_complex import CellComplex2D
 from topogym.core.homology import free_complex_2d
 from topogym.core.metadata import TopologyMetadata
 from topogym.generation.config import TopoGenConfig2D
 from topogym.generation.generator import Layout, generate_2d
+
+if TYPE_CHECKING:
+    from topogym.envs.topo2d import TopoGrid2DEnv
 
 __all__ = [
     "Annulus", "Cylinder", "Klein", "Mobius", "RP2", "Spec2D", "Square",
@@ -110,7 +114,7 @@ class Spec2D:
             (c, lay.base.face_cycle(c)) for c in lay.free_cells
         )
 
-    def compile(self, seed: int | None = None, **env_kwargs):
+    def compile(self, seed: int | None = None, **env_kwargs) -> TopoGrid2DEnv:
         """A ``TopoGrid2DEnv``; ``seed=None`` regenerates per episode."""
         from topogym.envs import TopoGrid2DEnv
 

@@ -22,6 +22,7 @@ so complexes can be composed into products without id collisions.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Hashable, Iterable
 from functools import cached_property
 
 from topogym.complexes.gudhi_backend import betti_of_poset
@@ -31,7 +32,7 @@ class _UnionFind:
     def __init__(self):
         self.parent = {}
 
-    def find(self, a):
+    def find(self, a: Hashable) -> Hashable:
         parent = self.parent
         if a not in parent:
             parent[a] = a
@@ -43,7 +44,7 @@ class _UnionFind:
             parent[a], a = root, parent[a]
         return root
 
-    def union(self, a, b):
+    def union(self, a: Hashable, b: Hashable) -> None:
         ra, rb = self.find(a), self.find(b)
         if ra != rb:
             self.parent[max(ra, rb, key=repr)] = min(ra, rb, key=repr)
@@ -67,7 +68,7 @@ class CellComplex2D:
 
     dim = 2
 
-    def __init__(self, faces):
+    def __init__(self, faces: Iterable):
         self.cycles = {}
         edge_uses = defaultdict(list)  # frozenset(u, v) -> [(face, side)]
         for key, cyc in faces:
@@ -87,39 +88,39 @@ class CellComplex2D:
         self.edge_uses = dict(edge_uses)
 
     @property
-    def n_faces(self):
+    def n_faces(self) -> int:
         return len(self.cycles)
 
     @property
-    def n_edges(self):
+    def n_edges(self) -> int:
         return len(self.edge_uses)
 
     @cached_property
-    def _vertices(self):
+    def _vertices(self) -> set:
         return {v for cyc in self.cycles.values() for v in cyc}
 
     @property
-    def n_vertices(self):
+    def n_vertices(self) -> int:
         return len(self._vertices)
 
     @property
-    def euler_characteristic(self):
+    def euler_characteristic(self) -> int:
         return self.n_vertices - self.n_edges + self.n_faces
 
     @cached_property
     def is_manifold(self) -> bool:
         return all(len(uses) <= 2 for uses in self.edge_uses.values())
 
-    def _edge_key(self, face, side):
+    def _edge_key(self, face: Hashable, side: int) -> frozenset:
         cyc = self.cycles[face]
         return frozenset((cyc[side], cyc[(side + 1) % 4]))
 
-    def _traversal(self, face, side):
+    def _traversal(self, face: Hashable, side: int) -> tuple:
         cyc = self.cycles[face]
         return (cyc[side], cyc[(side + 1) % 4])
 
     @cached_property
-    def _adjacency(self):
+    def _adjacency(self) -> dict:
         adj = {}
         for uses in self.edge_uses.values():
             if len(uses) == 1:
@@ -132,7 +133,7 @@ class CellComplex2D:
             # >2 uses (non-manifold): no entry; cross() raises KeyError.
         return adj
 
-    def cross(self, face, side):
+    def cross(self, face: Hashable, side: int) -> tuple | None:
         """Cross side ``side`` of ``face``.
 
         Returns ``(neighbor, entered_side, flip)``, or ``None`` at a
@@ -143,10 +144,10 @@ class CellComplex2D:
         return self._adjacency[(face, side)]
 
     @cached_property
-    def boundary_edges(self):
+    def boundary_edges(self) -> list:
         return [e for e, uses in self.edge_uses.items() if len(uses) == 1]
 
-    def n_boundary_components(self):
+    def n_boundary_components(self) -> int:
         """Number of boundary circles (manifold complexes only)."""
         uf = _UnionFind()
         verts = set()
@@ -156,7 +157,7 @@ class CellComplex2D:
             uf.union(a, b)
         return len({uf.find(v) for v in verts})
 
-    def orientable(self):
+    def orientable(self) -> bool:
         """Whether all faces can be oriented consistently (manifold only)."""
         orient = {}
         for start in self.cycles:
@@ -181,10 +182,10 @@ class CellComplex2D:
 
     # -- poset view ---------------------------------------------------------
 
-    def top_cells(self):
+    def top_cells(self) -> list:
         return [("f", k) for k in self.cycles]
 
-    def faces_of(self, cell):
+    def faces_of(self, cell: tuple) -> list:
         tag, key = cell
         if tag == "f":
             cyc = self.cycles[key]

@@ -7,7 +7,12 @@ fills, start and goal are shown — they document what an environment
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from topogym.core import constants as C
+
+if TYPE_CHECKING:
+    from topogym.generation.generator import Layout
 
 _PALETTE = {
     "empty": "#f2f2f5",
@@ -24,7 +29,7 @@ _PALETTE = {
 }
 
 
-def _decoy_cells(layout):
+def _decoy_cells(layout: Layout) -> set:
     out = set()
     for f in layout.features:
         if f.kind == "decoy":
@@ -32,7 +37,7 @@ def _decoy_cells(layout):
     return out
 
 
-def _cell_fill(layout, cell, decoys, reveal):
+def _cell_fill(layout: Layout, cell: tuple, decoys: set, reveal: bool) -> str:
     if cell == layout.start:
         return _PALETTE["start"]
     t = layout.cell_types.get(cell, C.EMPTY)
@@ -55,7 +60,7 @@ def _cell_fill(layout, cell, decoys, reveal):
     return _PALETTE["empty"]
 
 
-def layout_to_svg_2d(layout, cell_px=16, reveal=True) -> str:
+def layout_to_svg_2d(layout: Layout, cell_px: int = 16, reveal: bool = True) -> str:
     base = layout.base
     w, h = base.layout_size()
     decoys = _decoy_cells(layout)
@@ -77,5 +82,5 @@ def layout_to_svg_2d(layout, cell_px=16, reveal=True) -> str:
     return "\n".join(parts)
 
 
-def layout_to_svg(layout, **kwargs) -> str:
+def layout_to_svg(layout: Layout, **kwargs) -> str:
     return layout_to_svg_2d(layout, **kwargs)

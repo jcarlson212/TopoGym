@@ -32,13 +32,16 @@ from __future__ import annotations
 
 import dataclasses
 from collections import deque
+from collections.abc import Iterable
 
 import gymnasium as gym
 import numpy as np
 
 from topogym.core import constants as C
 from topogym.core.homology import _UnionFind, analyze_2d
-from topogym.generation.generator import generate_2d
+from topogym.core.metadata import TopologyMetadata
+from topogym.generation.config import TopoGenConfig2D
+from topogym.generation.generator import Layout, generate_2d
 
 #: Reward modes shared by every variant (see docs/specs/topo_gym_overview).
 #: "sparse" (default) — +1 terminal on reaching the goal cell.
@@ -67,11 +70,16 @@ class TopoEnvCore(gym.Env):
     #: per-step magnitude of the "deceptive" shaping gradient
     DECEPTIVE_SHAPING = 0.01
 
-    def __init__(self, config=None, *, layout=None, layout_seed=None,
-                 seed=None, obs_mode=None, view_radius=None,
-                 reward_mode="sparse", goal=True, p_slip=0.0,
-                 complex="cubical", max_steps=None, teleport=False,
-                 render_mode=None, reveal_hidden=False, **overrides):
+    def __init__(self, config: TopoGenConfig2D | dict | None = None, *,
+                 layout: Layout | None = None, layout_seed: int | None = None,
+                 seed: int | None = None, obs_mode: str | None = None,
+                 view_radius: int | None = None,
+                 reward_mode: str = "sparse", goal: bool = True,
+                 p_slip: float = 0.0,
+                 complex: str = "cubical", max_steps: int | None = None,
+                 teleport: bool = False,
+                 render_mode: str | None = None, reveal_hidden: bool = False,
+                 **overrides):
         # The registry interface spells the layout seed simply "seed":
         # gym.make("TopoGym/Dilution-50-v0", seed=3).
         if layout_seed is None:
@@ -124,24 +132,24 @@ class TopoEnvCore(gym.Env):
 
     # -- subclass hooks -----------------------------------------------------
 
-    def _default_config(self):
+    def _default_config(self) -> TopoGenConfig2D:
         raise NotImplementedError
 
-    def _config_class(self):
+    def _config_class(self) -> type:
         raise NotImplementedError
 
-    def _default_obs_mode(self):
+    def _default_obs_mode(self) -> str:
         return "local"
 
-    def _build_spaces(self):
+    def _build_spaces(self) -> None:
         raise NotImplementedError
 
-    def _generate(self, seed):
+    def _generate(self, seed: int) -> Layout:
         return generate_2d(self.cfg, seed)
 
     # -- layout / episode state ---------------------------------------------
 
-    def _obtain_layout(self):
+    def _obtain_layout(self) -> Layout:
         if self._fixed_layout is not None:
             return self._fixed_layout
         if self.layout_seed is not None:
@@ -149,14 +157,14 @@ class TopoEnvCore(gym.Env):
             return self._fixed_layout
         return self._generate(int(self.np_random.integers(2 ** 31 - 1)))
 
-    def _note_episode_end(self):
+    def _note_episode_end(self) -> None:
         """Fold the finished episode's visits into the teleport archive
         (called at reset, before the layout may change)."""
         prev = getattr(self, "_visited", None)
         if prev and self.layout is not None:
             self._ever_visited |= prev
 
-    def _resolve_start(self, options) -> tuple:
+    def _resolve_start(self, options: dict | None) -> tuple:
         """The episode's start cell: the layout's, or a teleport target
         (``reset(options={"teleport": (x, y)})``, previously visited)."""
         target = (options or {}).get("teleport")
@@ -175,7 +183,7 @@ class TopoEnvCore(gym.Env):
             )
         return target
 
-    def _reset_runtime(self):
+    def _reset_runtime(self) -> None:
         self._bumps = {}
         self._open = set()
         self._visited = set()
@@ -210,7 +218,7 @@ class TopoEnvCore(gym.Env):
 
     # -- stochasticity ------------------------------------------------------
 
-    def _maybe_slip(self, action):
+    def _maybe_slip(self, action: int) -> int:
         """With probability ``p_slip`` the executed action is resampled
         uniformly (the spec's slip model)."""
         if self.p_slip > 0.0 and self.np_random.random() < self.p_slip:
@@ -219,7 +227,7 @@ class TopoEnvCore(gym.Env):
 
     # -- deceptive-reward ground truth --------------------------------------
 
-    def _free_bfs(self, source):
+    def _free_bfs(self, source: tuple) -> dict:
         """Graph distance from ``source`` over the free-cell graph
         (doors count as free: distance describes the map, not door state)."""
         free = set(self.layout.free_cells)
@@ -233,7 +241,7 @@ class TopoEnvCore(gym.Env):
                     q.append(v)
         return dist
 
-    def _setup_deception(self):
+    def _setup_deception(self) -> None:
         from_goal = self._free_bfs(self.layout.goal)
         # The distractor sits as far from the goal as the map allows, so
         # its shaping gradient leads away from the goal's neighborhood.
@@ -244,7 +252,7 @@ class TopoEnvCore(gym.Env):
         self._decept_prev = self._decept_dist.get(self.layout.start)
 
     @property
-    def deception(self):
+    def deception(self) -> dict:
         """Ground truth for ``reward_mode="deceptive"``: the distractor
         cell and the full shaping field (graph distance per free cell)."""
         if self._decept_dist is None:
@@ -255,7 +263,7 @@ class TopoEnvCore(gym.Env):
         }
 
     @property
-    def topology(self):
+    def topology(self) -> TopologyMetadata:
         """Certified :class:`TopologyMetadata` of the current layout."""
         layout = self.layout if self.layout is not None else self._fixed_layout
         if layout is None:
@@ -264,14 +272,14 @@ class TopoEnvCore(gym.Env):
             )
         return layout.metadata
 
-    def visited_betti(self):
+    def visited_betti(self) -> tuple:
         """Z/2 Betti numbers of the region *physically visited* so far.
 
         A trajectory is path-connected, so b0 stays 1 here; use
         :meth:`observed_betti` for H0-merge / loop-closure analysis."""
         return self._betti_of(self._visited)
 
-    def observed_betti(self):
+    def observed_betti(self) -> tuple:
         """Z/2 Betti numbers of the region the agent has *seen and believes
         free*. Its b0 drops on H0 merges; jumps in its b1 are loop
         closures. Compute at your evaluation cadence (it builds the
@@ -279,13 +287,13 @@ class TopoEnvCore(gym.Env):
         are maintained incrementally and are free."""
         return self._betti_of(self._observed_free)
 
-    def free_betti(self):
+    def free_betti(self) -> tuple:
         """Betti numbers of the full free space under the selected
         backend: the cubical numbers equal the certified
         ``topology.betti_z2``; the Rips backend reports (b0, b1)."""
         return self._betti_of(self.layout.free_cells)
 
-    def _betti_of(self, cells):
+    def _betti_of(self, cells: Iterable) -> tuple:
         if self.complex_backend == "rips":
             from topogym.complexes.rips import rips_betti
 
@@ -295,7 +303,7 @@ class TopoEnvCore(gym.Env):
 
     _KNOWN_FREE_CODES = (C.OBS_EMPTY, C.OBS_GOAL, C.OBS_DOOR_OPEN)
 
-    def _note_observed(self, cell, code):
+    def _note_observed(self, cell: tuple, code: int) -> None:
         """Add a sighted cell to the observed-region filtration."""
         if code not in self._KNOWN_FREE_CODES or cell in self._observed_free:
             return
@@ -315,7 +323,7 @@ class TopoEnvCore(gym.Env):
 
     # -- door mechanics -----------------------------------------------------
 
-    def _try_enter(self, frm, target) -> bool:
+    def _try_enter(self, frm: tuple, target: tuple) -> bool:
         """Whether the agent may move onto ``target``; bumping a hidden
         door counts a try as a side effect."""
         t = self.layout.cell_types.get(target, C.EMPTY)
@@ -331,10 +339,10 @@ class TopoEnvCore(gym.Env):
             return False
         return True
 
-    def _on_leave(self, cell):
+    def _on_leave(self, cell: tuple) -> None:
         pass  # hook for mechanics that trigger on leaving a cell
 
-    def _obs_code(self, cell) -> int:
+    def _obs_code(self, cell: tuple) -> int:
         t = self.layout.cell_types.get(cell, C.EMPTY)
         if t == C.DOOR:
             spec = self.layout.doors[cell]
@@ -349,7 +357,8 @@ class TopoEnvCore(gym.Env):
         }[t]
 
     @staticmethod
-    def _occlude(view, center_index, blocking_codes):
+    def _occlude(view: np.ndarray, center_index: tuple,
+                 blocking_codes: tuple) -> np.ndarray:
         """Mask view cells not connected to the agent by sight: BFS from
         the center through non-blocking cells, marking blocking cells that
         line the visible region. Everything else becomes OBS_UNSEEN."""
@@ -382,7 +391,7 @@ class TopoEnvCore(gym.Env):
 
     # -- reward / bookkeeping -------------------------------------------------
 
-    def _step_outcome(self, agent_cell):
+    def _step_outcome(self, agent_cell: tuple) -> tuple:
         self._steps += 1
         newly_visited = agent_cell not in self._visited
         self._visited.add(agent_cell)
@@ -411,7 +420,7 @@ class TopoEnvCore(gym.Env):
         self._episode_return += reward
         return reward, terminated, truncated
 
-    def _step_info(self, agent_cell):
+    def _step_info(self, agent_cell: tuple) -> dict:
         n_free = len(self.layout.free_cells)
         return {
             "position": agent_cell,
@@ -429,7 +438,7 @@ class TopoEnvCore(gym.Env):
             "episode_return": self._episode_return,
         }
 
-    def _reset_info(self, agent_cell):
+    def _reset_info(self, agent_cell: tuple) -> dict:
         info = self._step_info(agent_cell)
         info["topology"] = self.layout.metadata.to_dict()
         info["topology"]["complex"] = self.complex_backend

@@ -22,6 +22,7 @@ nearest-copy enumeration is exact for this purpose.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 
 import gudhi
 
@@ -31,7 +32,7 @@ from topogym.core.basemap import Boundary, RectGluing2D
 RIPS_SCALE = 1.5
 
 
-def _deck_transforms(base: RectGluing2D):
+def _deck_transforms(base: RectGluing2D) -> list:
     """Isometries of the plane mapping the fundamental domain onto its
     adjacent copies (cell-index coordinates), identity included. Closed
     under inverses."""
@@ -61,7 +62,7 @@ def _deck_transforms(base: RectGluing2D):
     return out
 
 
-def rips_edges(base: RectGluing2D, cells, scale: float = RIPS_SCALE):
+def rips_edges(base: RectGluing2D, cells: list, scale: float = RIPS_SCALE) -> list:
     """Pairs ``(i, j)`` of cell indices at quotient distance <= scale
     (indices into ``cells``, which must be sorted for determinism)."""
     index = {c: k for k, c in enumerate(cells)}
@@ -84,7 +85,9 @@ def rips_edges(base: RectGluing2D, cells, scale: float = RIPS_SCALE):
     return [pair for pair, d in best.items() if d <= scale]
 
 
-def rips_betti(base, cells, scale: float = RIPS_SCALE, field: int = 2):
+def rips_betti(
+    base: RectGluing2D, cells: Iterable, scale: float = RIPS_SCALE, field: int = 2
+) -> tuple:
     """Betti numbers ``(b0, b1)`` of the Vietoris-Rips complex at
     ``scale`` on the given cells' centers, over Z/field."""
     if not isinstance(base, RectGluing2D):

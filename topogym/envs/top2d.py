@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from topogym.envs.topo2d import TopoGrid2DEnv
 from topogym.generation.config import TopoGenConfig2D
+from topogym.generation.generator import Layout
 from topogym.generation.top import TOPOLOGIES, build_top
 
 
@@ -27,5 +28,5 @@ class TopGrid2DEnv(TopoGrid2DEnv):
         )
         super().__init__(**kwargs)
 
-    def _generate(self, seed):
+    def _generate(self, seed: int) -> Layout:
         return build_top(self.identification, seed, size=self._top_size)

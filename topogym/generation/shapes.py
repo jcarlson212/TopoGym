@@ -8,28 +8,30 @@ on a square or across a torus seam.
 
 from __future__ import annotations
 
+import numpy as np
+
 # ---------------------------------------------------------------------------
 # 2D hole shapes
 # ---------------------------------------------------------------------------
 
-def rect_offsets(rng, lo, hi):
+def rect_offsets(rng: np.random.Generator, lo: int, hi: int) -> set:
     w = int(rng.integers(lo, hi + 1))
     h = int(rng.integers(lo, hi + 1))
     return {(x, y) for x in range(w) for y in range(h)}
 
-def disc_offsets(rng, lo, hi):
+def disc_offsets(rng: np.random.Generator, lo: int, hi: int) -> set:
     r = int(rng.integers(max(1, lo - 1), max(2, hi - 1) + 1))
     return {(x, y) for x in range(-r, r + 1) for y in range(-r, r + 1)
             if abs(x) + abs(y) <= r}
 
-def plus_offsets(rng, lo, hi):
+def plus_offsets(rng: np.random.Generator, lo: int, hi: int) -> set:
     arm = int(rng.integers(max(1, lo - 1), max(2, hi - 1) + 1))
     out = {(0, 0)}
     for i in range(1, arm + 1):
         out.update({(i, 0), (-i, 0), (0, i), (0, -i)})
     return out
 
-def blob_offsets(rng, lo, hi):
+def blob_offsets(rng: np.random.Generator, lo: int, hi: int) -> set:
     """Random edge-connected growth of roughly hole_size^2 / 2 cells."""
     target = int(rng.integers(max(3, lo * lo // 2), max(4, hi * hi // 2) + 1))
     cells = {(0, 0)}
@@ -57,7 +59,7 @@ HOLE_SHAPES_2D = {
 }
 
 
-def disc_offsets_radius(r):
+def disc_offsets_radius(r: int) -> set:
     """Deterministic Manhattan disc (used by base presets like annulus)."""
     return {(x, y) for x in range(-r, r + 1) for y in range(-r, r + 1)
             if abs(x) + abs(y) <= r}
@@ -67,7 +69,7 @@ def disc_offsets_radius(r):
 # 2D chambers (rooms)
 # ---------------------------------------------------------------------------
 
-def chamber_offsets(rng, lo, hi):
+def chamber_offsets(rng: np.random.Generator, lo: int, hi: int) -> tuple:
     """A rectangular room: wall ring, interior, and door candidates.
 
     Returns ``(walls, interior, candidates)`` where each candidate is
@@ -93,7 +95,7 @@ def chamber_offsets(rng, lo, hi):
     return walls, interior, candidates
 
 
-def margin_ring(footprint, radius=1):
+def margin_ring(footprint: set, radius: int = 1) -> set:
     """Chebyshev-``radius`` ring around a 2D footprint (keeps features
     ``radius + 1`` apart so each contributes independent homology)."""
     ring = set()

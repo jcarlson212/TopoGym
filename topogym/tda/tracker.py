@@ -23,11 +23,16 @@ metadata) is used to *score* the record, e.g. :meth:`recovery_steps`.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 import gymnasium as gym
 
 from topogym.complexes.gudhi_backend import persistence_of_poset
 from topogym.core.homology import analyze_2d, free_complex_2d
+
+if TYPE_CHECKING:
+    from topogym.envs.core import TopoEnvCore
 
 
 class ExplorationTracker(gym.Wrapper):
@@ -40,7 +45,7 @@ class ExplorationTracker(gym.Wrapper):
     those logs, for the current episode.
     """
 
-    def __init__(self, env):
+    def __init__(self, env: gym.Env):
         super().__init__(env)
         self.visit_step: dict = {}
         self.observed_step: dict = {}
@@ -48,22 +53,22 @@ class ExplorationTracker(gym.Wrapper):
     # -- recording -----------------------------------------------------------
 
     @property
-    def _core(self):
+    def _core(self) -> TopoEnvCore:
         return self.env.unwrapped
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs) -> tuple:
         out = self.env.reset(**kwargs)
         self.visit_step = {}
         self.observed_step = {}
         self._snapshot()
         return out
 
-    def step(self, action):
+    def step(self, action: int) -> tuple:
         out = self.env.step(action)
         self._snapshot()
         return out
 
-    def _snapshot(self):
+    def _snapshot(self) -> None:
         core = self._core
         t = core._steps
         if len(self.visit_step) != len(core._visited):
@@ -84,7 +89,7 @@ class ExplorationTracker(gym.Wrapper):
             return self.observed_step
         raise ValueError(f"which must be 'visited' or 'observed', got {which!r}")
 
-    def _betti_of_cells(self, cells) -> tuple:
+    def _betti_of_cells(self, cells: Iterable) -> tuple:
         base = self._core.layout.base
         return analyze_2d(base.face_cycle(c) for c in cells).betti_z2
 

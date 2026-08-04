@@ -53,7 +53,7 @@ _SIDE_CELLS = {
 
 def build_nested(cfg: TopoGenConfig2D, base: BaseMap2D,
                  rng: np.random.Generator, cell_types: dict, doors: dict,
-                 features: list, feature_cls, door_cls) -> None:
+                 features: list, feature_cls: type, door_cls: type) -> None:
     """Carve ``cfg.nested_depth`` shells around one core chamber."""
     if cfg.base != "square":
         raise ModeError('style "nested" requires base="square"')
@@ -119,7 +119,7 @@ def build_nested(cfg: TopoGenConfig2D, base: BaseMap2D,
 
 def build_corridor(cfg: TopoGenConfig2D, base: BaseMap2D,
                    rng: np.random.Generator, cell_types: dict,
-                   features: list, feature_cls) -> None:
+                   features: list, feature_cls: type) -> None:
     """Carve a tree of rooms out of a solid wall mass."""
     if cfg.base != "square":
         raise ModeError('style "corridor" requires base="square"')

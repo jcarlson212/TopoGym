@@ -32,7 +32,7 @@ from gymnasium import spaces
 from topogym.core import constants as C
 from topogym.envs.core import TopoEnvCore
 from topogym.generation.config import TopoGenConfig2D
-from topogym.generation.generator import _translate
+from topogym.generation.generator import Layout, _translate
 from topogym.rendering.rgb import render_rgb_2d
 
 
@@ -47,7 +47,8 @@ class TopoGrid2DEnv(TopoEnvCore):
     #: quarter-turns right to face each fourway direction from "up"
     _FOURWAY_TURNS = {MOVE_UP: 0, MOVE_DOWN: 2, MOVE_LEFT: 3, MOVE_RIGHT: 1}
 
-    def __init__(self, config=None, *, actions="fourway", **kwargs):
+    def __init__(self, config: TopoGenConfig2D | dict | None = None, *,
+                 actions: str = "fourway", **kwargs):
         if actions not in ("fourway", "egocentric"):
             raise ValueError(
                 f'actions must be "fourway" or "egocentric", got {actions!r}'
@@ -55,16 +56,16 @@ class TopoGrid2DEnv(TopoEnvCore):
         self.actions = actions
         super().__init__(config, **kwargs)
 
-    def _default_config(self):
+    def _default_config(self) -> TopoGenConfig2D:
         return TopoGenConfig2D()
 
-    def _config_class(self):
+    def _config_class(self) -> type:
         return TopoGenConfig2D
 
-    def _default_obs_mode(self):
+    def _default_obs_mode(self) -> str:
         return "vector" if self.actions == "fourway" else "local"
 
-    def _probe_layout(self):
+    def _probe_layout(self) -> Layout:
         probe = self._fixed_layout
         if probe is None:
             probe = self._generate(self.layout_seed or 0)
@@ -72,7 +73,7 @@ class TopoGrid2DEnv(TopoEnvCore):
                 self._fixed_layout = probe
         return probe
 
-    def _build_spaces(self):
+    def _build_spaces(self) -> None:
         self.action_space = spaces.Discrete(
             4 if self.actions == "fourway" else 3
         )
@@ -99,7 +100,8 @@ class TopoGrid2DEnv(TopoEnvCore):
 
     # -- gym API --------------------------------------------------------------
 
-    def reset(self, *, seed=None, options=None):
+    def reset(self, *, seed: int | None = None,
+              options: dict | None = None) -> tuple:
         super().reset(seed=seed)
         self._note_episode_end()
         self.layout = self._obtain_layout()
@@ -116,7 +118,7 @@ class TopoGrid2DEnv(TopoEnvCore):
         self._visited.add(self._state.cell)
         return self._obs(), self._reset_info(self._state.cell)
 
-    def step(self, action):
+    def step(self, action: int) -> tuple:
         action = int(action)
         if not self.action_space.contains(action):
             raise ValueError(f"invalid action {action!r}")
@@ -131,7 +133,7 @@ class TopoGrid2DEnv(TopoEnvCore):
             self._state.cell
         )
 
-    def _step_egocentric(self, action):
+    def _step_egocentric(self, action: int) -> None:
         base = self.layout.base
         if action == self.ACTION_LEFT:
             self._state = base.turn_left(self._state)
@@ -143,7 +145,7 @@ class TopoGrid2DEnv(TopoEnvCore):
                 self._on_leave(self._state.cell)
                 self._state = nxt
 
-    def _step_fourway(self, action):
+    def _step_fourway(self, action: int) -> None:
         """Move one cell in the given *screen* direction. The frame is
         re-canonicalized (screen-up) after every move: crossing an
         identified edge remaps the agent's position per the gluing, but
@@ -160,18 +162,18 @@ class TopoGrid2DEnv(TopoEnvCore):
             self._on_leave(self._state.cell)
             self._state = base.turn_left(base.initial_state(nxt.cell))
 
-    def _post_move_hook(self):
+    def _post_move_hook(self) -> None:
         """Cell mechanics that trigger after movement (hazards, wormholes,
         NPCs); the Texture variants override this."""
 
     # -- observations -----------------------------------------------------------
 
-    def _texture_block(self, cell):
+    def _texture_block(self, cell: tuple) -> np.ndarray:
         """The 16-slot texture block of the universal observation.
         Identically zero outside the Texture variants, which override it."""
         return np.zeros(C.TEXTURE_DIM, dtype=np.float32)
 
-    def _obs(self):
+    def _obs(self) -> np.ndarray:
         if self.obs_mode == "global":
             return self._global_obs()
         patch = self._sight_patch()
@@ -183,7 +185,7 @@ class TopoGrid2DEnv(TopoEnvCore):
         vec[2:] = self._texture_block(self._state.cell)
         return vec
 
-    def _sight_patch(self):
+    def _sight_patch(self) -> np.ndarray:
         """The occluded egocentric patch; also feeds the observed-region
         filtration (what the agent can currently see counts as observed in
         every observation mode)."""
@@ -208,7 +210,7 @@ class TopoGrid2DEnv(TopoEnvCore):
                 self._note_observed(cell, int(out[idx]))
         return out
 
-    def _global_obs(self):
+    def _global_obs(self) -> np.ndarray:
         base = self.layout.base
         w, h = base.layout_size()
         grid = np.full((h, w), C.OBS_OUT_OF_WORLD, np.uint8)
@@ -224,7 +226,7 @@ class TopoGrid2DEnv(TopoEnvCore):
 
     # -- rendering -----------------------------------------------------------------
 
-    def render(self):
+    def render(self) -> np.ndarray | str | None:
         if self.render_mode == "rgb_array":
             return render_rgb_2d(self)
         if self.render_mode == "human":
@@ -243,7 +245,7 @@ class TopoGrid2DEnv(TopoEnvCore):
             return self._render_ansi()
         return None
 
-    def close(self):
+    def close(self) -> None:
         window = getattr(self, "_window", None)
         if window is not None:
             window.close()
@@ -255,7 +257,7 @@ class TopoGrid2DEnv(TopoEnvCore):
         C.OBS_UNSEEN: "?", C.OBS_HAZARD: "!", C.OBS_WORMHOLE: "*",
     }
 
-    def _render_ansi(self):
+    def _render_ansi(self) -> str:
         base = self.layout.base
         w, h = base.layout_size()
         rows = [[" "] * w for _ in range(h)]
