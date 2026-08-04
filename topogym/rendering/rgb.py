@@ -113,6 +113,10 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
         name = namer(cell, code) if namer is not None else CODE_TILES[code]
         region = img[y * tile:(y + 1) * tile, x * tile:(x + 1) * tile]
         region[:] = tiles.tile(name, tile, (x, y))
+        if code == C.OBS_GOAL and tile < 8:
+            # The chest sprite is unreadable at tiny tiles (large
+            # worlds): mark the goal with a solid high-contrast block.
+            region[:] = (46, 230, 70)
         color = _reveal_tint(env, cell)
         if color is not None:
             tiles.tint(region, color)
