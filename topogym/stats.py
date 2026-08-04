@@ -20,11 +20,16 @@ Rows are plain dicts, ready for pandas::
 from __future__ import annotations
 
 import dataclasses
+import json
+import logging
 import math
+import pathlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import gymnasium as gym
+
+logger = logging.getLogger("topogym")
 
 if TYPE_CHECKING:
     from topogym.envs.core import TopoEnvCore
@@ -209,6 +214,16 @@ class StatsRecorder(gym.Wrapper):
             "visitation_entropy":
                 _entropy_bits(self._core.visit_counts),
         })
+        if logger.isEnabledFor(logging.INFO):
+            row = self.episodes[-1]
+            logger.info(
+                "episode=%d length=%d return=%.4f coverage=%.3f "
+                "lifetime=%.3f chambers=%d goal=%s regret=%s",
+                row["episode"], row["length"], row["return"],
+                row["coverage"], row["lifetime_coverage"],
+                row["chambers_entered"], row["goal_reached"],
+                row["regret"],
+            )
         self._last_info = {}
 
     def coverage_at(self, global_step: int) -> float:
@@ -279,6 +294,45 @@ class StatsRecorder(gym.Wrapper):
             return 1.0
         reached = core.lifetime_visit_counts
         return sum(1 for c in low if c in reached) / len(low)
+
+    def run_key(self) -> str:
+        """The canonical run-log key for this env (configuration and
+        layout seed serialized to the spec's canonical string)."""
+        from topogym.registry import canonical_string
+
+        core = self._core
+        return canonical_string(core.cfg, core.layout_seed or 0,
+                                p_slip=core.p_slip)
+
+    def save(self, path: str | pathlib.Path) -> pathlib.Path:
+        """Write the standardized run log as JSON: a header (run key,
+        library version, topology, horizon, reward mode), the episode
+        rows, the metric set, and — with ``record_steps`` — the step
+        rows. Content is a pure function of the run (no wall-clock
+        timestamps), preserving determinism up to seeds."""
+        import topogym
+
+        core = self._core
+        self._flush()
+        payload = {
+            "run": {
+                "key": self.run_key(),
+                "topogym_version": topogym.__version__,
+                "layout_seed": core.layout_seed,
+                "reward_mode": core.reward_mode,
+                "horizon": getattr(core, "_max_steps", None),
+                "topology": core.layout.metadata.to_dict()
+                if core.layout else None,
+            },
+            "metrics": self.metrics().to_dict(),
+            "episodes": self.episodes,
+        }
+        if self.record_steps:
+            payload["steps"] = self.steps
+        path = pathlib.Path(path)
+        path.write_text(json.dumps(payload, indent=2, default=repr)
+                        + "\n")
+        return path
 
     def summary(self) -> dict:
         """Aggregates over all recorded episodes."""

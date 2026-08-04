@@ -123,3 +123,34 @@ def test_metrics_coverage_and_hole_milestones():
     fracs = sorted(m.steps_to_coverage)
     steps = [m.steps_to_coverage[f] for f in fracs]
     assert steps == sorted(steps)  # milestones are monotone
+
+
+def test_standardized_run_log(tmp_path, caplog):
+    import json
+    import logging
+
+    env = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1),
+                        record_steps=True)
+    env.reset(seed=0)
+    with caplog.at_level(logging.INFO, logger="topogym"):
+        for _ in range(5):
+            env.step(0)
+        env.reset(seed=0)  # episode boundary -> INFO line
+    assert "episode=0" in caplog.text and "coverage=" in caplog.text
+
+    out = env.save(tmp_path / "run.json")
+    payload = json.loads(out.read_text())
+    assert payload["run"]["key"].startswith("TG-GridWorld2D-S50-")
+    assert payload["run"]["topology"]["betti_z2"] == [1, 1, 0]
+    assert payload["metrics"]["success_rate"] == 0.0
+    assert len(payload["episodes"]) >= 1
+    assert payload["steps"][0]["global_step"] == 1
+    # Determinism: the log is a pure function of the run.
+    again = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=1),
+                          record_steps=True)
+    again.reset(seed=0)
+    for _ in range(5):
+        again.step(0)
+    again.reset(seed=0)
+    assert json.loads(again.save(tmp_path / "run2.json").read_text()) \
+        == payload

@@ -727,6 +727,19 @@ counts as a \texttt{HomologyStats} value object for
 $h_2$/$h_3$ optional (\texttt{None} where the dimension does not
 apply).
 
+\paragraph{Standardized logging.} All library logging flows through
+the \texttt{topogym} logger (with a \texttt{NullHandler} installed,
+so it is silent until the host configures \texttt{logging}): episode
+summaries at INFO, the \texttt{TOPOGYM\_DEBUG} stream at DEBUG.
+\texttt{recorder.save(path)} writes the standardized run log as JSON
+--- a header carrying the canonical run key
+(\texttt{recorder.run\_key()}, the configuration serialized to the
+canonical string of Section~\ref{sec:generator}), the library
+version, and the certified topology; then the episode rows, the
+metric set, and optionally the step rows. The log is a pure function
+of the run --- no wall-clock timestamps --- so replaying a seed
+reproduces it byte for byte.
+
 Structure accessors ground the metrics:
 \texttt{env.topology.betti\_numbers\_doors\_count\_as\_walls()} /
 \texttt{\_dont\_count\_as\_walls()} return a \texttt{BettiNumbers}

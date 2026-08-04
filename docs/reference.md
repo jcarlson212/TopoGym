@@ -165,6 +165,15 @@ env.coverage_at(1000)              # lifetime coverage by global step
 m.to_dict()                        # everything, logging-ready
 ```
 
+Logging is standardized on the `topogym` logger (a `NullHandler` is
+installed, per library convention — configure `logging` to see it):
+episode summaries emit at INFO, the `TOPOGYM_DEBUG` stream at DEBUG.
+`recorder.save(path)` writes the run log as JSON — a header keyed by
+the canonical config string (`recorder.run_key()`) with the library
+version and certified topology, plus episode rows, the metric set, and
+(with `record_steps`) step rows. The file is a pure function of the
+run: no timestamps, byte-identical across replays.
+
 Expensive stats are opt-in toggles, off by default: `track_holes`
 timestamps hole discoveries by recomputing observed homology each step
 (GUDHI per step); `track_curvature` adds Ollivier–Ricci curvature
