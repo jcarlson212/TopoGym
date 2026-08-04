@@ -144,9 +144,12 @@ class TopoGrid2DEnv(TopoEnvCore):
                 self._state = nxt
 
     def _step_fourway(self, action):
-        """Move one cell in the given direction of the agent's transported
-        grid frame; the frame's orientation is restored after the move, so
-        only seam crossings (which transport the frame) change it."""
+        """Move one cell in the given *screen* direction. The frame is
+        re-canonicalized (screen-up) after every move: crossing an
+        identified edge remaps the agent's position per the gluing, but
+        never reinterprets its actions — up stays up on every base.
+        (The egocentric interface keeps true frame transport; there the
+        Möbius mirror is the point.)"""
         base = self.layout.base
         turns = self._FOURWAY_TURNS[action]
         t = self._state
@@ -155,9 +158,7 @@ class TopoGrid2DEnv(TopoEnvCore):
         nxt = base.forward(t)
         if nxt is not None and self._try_enter(t.cell, nxt.cell):
             self._on_leave(self._state.cell)
-            for _ in range(turns):
-                nxt = base.turn_left(nxt)
-            self._state = nxt
+            self._state = base.turn_left(base.initial_state(nxt.cell))
 
     def _post_move_hook(self):
         """Cell mechanics that trigger after movement (hazards, wormholes,

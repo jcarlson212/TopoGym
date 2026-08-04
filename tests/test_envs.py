@@ -291,6 +291,38 @@ def test_fourway_actions_are_screen_directions():
             assert (x1 - x0, y1 - y0) == (dx, dy), action
 
 
+@pytest.mark.parametrize("base_name", ["mobius", "klein", "rp2"])
+def test_fourway_stays_screen_aligned_across_flip_seams(base_name):
+    """Crossing a flipped edge remaps position, never the controls:
+    after any crossing, left is still screen-left and up screen-up."""
+    env = gym.make("TopoGym/Grid2D-v0", base=base_name, size=15,
+                   n_holes=0, n_chambers=0, n_decoys=0,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    base = env.layout.base
+    # Walk to the left edge, cross it, then verify screen semantics.
+    for _ in range(20):
+        if env._state.cell[0] == 0:
+            break
+        env.step(env.MOVE_LEFT)
+    x0 = env._state.cell[0]
+    env.step(env.MOVE_LEFT)  # cross (or bump) the seam
+    if env._state.cell[0] != x0:  # crossed to the far column
+        assert env._state.cell[0] == 14
+        # Controls must still be screen directions.
+        x, y = env._state.cell
+        env.step(env.MOVE_UP)
+        nx, ny = env._state.cell
+        if (nx, ny) != (x, y):
+            assert nx == x and ny == y - 1, "up must stay screen-up"
+        x, y = env._state.cell
+        env.step(env.MOVE_LEFT)
+        nx, ny = env._state.cell
+        if (nx, ny) != (x, y):
+            assert ny == y or nx != x  # never a vertical move from LEFT
+            assert nx in (x - 1, 14) and (nx != x - 1 or ny == y)
+
+
 def test_episode_length_is_predetermined():
     # The horizon depends only on the configured size, never the layout.
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
