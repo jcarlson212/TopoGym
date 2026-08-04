@@ -20,6 +20,7 @@ import numpy as np
 from topogym.core import constants as C
 from topogym.envs.topo2d import TopoGrid2DEnv
 from topogym.generation.config import TopoGenConfig2D
+from topogym.generation.generator import Layout
 from topogym.generation.scenarios import (
     SCENARIO_SIZES,
     SCENARIOS,
@@ -45,12 +46,12 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         kwargs.setdefault("config", TopoGenConfig2D(base="square", size=size))
         super().__init__(**kwargs)
 
-    def _generate(self, seed):
+    def _generate(self, seed: int) -> Layout:
         return build_scenario(self.scenario, seed, **self._scenario_knobs)
 
     # -- episode state -------------------------------------------------------
 
-    def _reset_runtime(self):
+    def _reset_runtime(self) -> None:
         super()._reset_runtime()
         self._fell = False
         self._decoy_cells = frozenset(
@@ -72,7 +73,7 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
 
     # -- mechanics -----------------------------------------------------------
 
-    def _post_move_hook(self):
+    def _post_move_hook(self) -> None:
         extras = self.layout.extras
         cell = self._state.cell
         wormholes = extras.get("wormholes", {})
@@ -88,7 +89,7 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         if self._clown_pos is not None:
             self._move_clown()
 
-    def _move_clown(self):
+    def _move_clown(self) -> None:
         clown = self.layout.extras["clown"]
         base = self.layout.base
         free = set(self.layout.free_cells)
@@ -100,11 +101,11 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         ] + [self._clown_pos]
         self._clown_pos = options[int(self.np_random.integers(len(options)))]
 
-    def _dist_to_clown(self, cell) -> int:
+    def _dist_to_clown(self, cell: tuple) -> int:
         return (abs(cell[0] - self._clown_pos[0])
                 + abs(cell[1] - self._clown_pos[1]))
 
-    def _step_outcome(self, agent_cell):
+    def _step_outcome(self, agent_cell: tuple) -> tuple:
         reward, terminated, truncated = super()._step_outcome(agent_cell)
         if self._fell:
             # The drop: fatal, rewardless, episode over.
@@ -125,7 +126,7 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
     _ADJ = (((-1, 0), C.TEX_BLOCK_LEFT), ((1, 0), C.TEX_BLOCK_RIGHT),
             ((0, -1), C.TEX_BLOCK_ABOVE), ((0, 1), C.TEX_BLOCK_BELOW))
 
-    def _texture_block(self, cell):
+    def _texture_block(self, cell: tuple) -> np.ndarray:
         vec = np.zeros(C.TEXTURE_DIM, dtype=np.float32)
         types = self.layout.cell_types
         w, h = self.layout.base.layout_size()
@@ -161,7 +162,7 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         (C.TEX_DIRT, "dirt"),
     )
 
-    def _tile_name(self, cell, code) -> str:
+    def _tile_name(self, cell: tuple, code: int) -> str:
         if code in (C.OBS_UNSEEN, C.OBS_OUT_OF_WORLD):
             return "unseen" if code == C.OBS_UNSEEN else "out"
         space = self.scenario == "space_warp"
@@ -188,10 +189,10 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
                 return name
         return "floor"
 
-    def _agent_tile(self):
+    def _agent_tile(self) -> str | None:
         return "boat" if self.layout.extras.get("boat") else None
 
-    def _render_overlay(self, img, tile: int) -> None:
+    def _render_overlay(self, img: np.ndarray, tile: int) -> None:
         if self._clown_pos is None or self._clown_pos == self._state.cell:
             return
         x, y = self.layout.base.layout_coords(self._clown_pos)

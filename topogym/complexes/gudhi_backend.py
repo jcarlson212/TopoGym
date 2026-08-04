@@ -20,10 +20,12 @@ Betti numbers are read off GUDHI's persistence over the field Z/pZ
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
+
 import gudhi
 
 
-def order_complex(top_cells, faces_of) -> gudhi.SimplexTree:
+def order_complex(top_cells: Iterable, faces_of: Callable) -> gudhi.SimplexTree:
     """SimplexTree of the order complex of a face poset.
 
     ``top_cells``: iterable of top-dimensional cell keys.
@@ -54,7 +56,9 @@ def order_complex(top_cells, faces_of) -> gudhi.SimplexTree:
     return st
 
 
-def betti_of_poset(top_cells, faces_of, dim: int, field: int = 2) -> tuple:
+def betti_of_poset(
+    top_cells: Iterable, faces_of: Callable, dim: int, field: int = 2
+) -> tuple:
     """Betti numbers ``(b_0, ..., b_dim)`` over Z/field of a face poset."""
     top_cells = list(top_cells)
     if not top_cells:
@@ -68,7 +72,9 @@ def betti_of_poset(top_cells, faces_of, dim: int, field: int = 2) -> tuple:
     return tuple(betti[: dim + 1])
 
 
-def filtered_order_complex(top_cells, faces_of, value_of) -> gudhi.SimplexTree:
+def filtered_order_complex(
+    top_cells: Iterable, faces_of: Callable, value_of: Callable
+) -> gudhi.SimplexTree:
     """Order complex with a lower-star filtration by top-cell values.
 
     ``value_of(top_cell)`` gives each top cell's filtration value (e.g. the
@@ -137,7 +143,9 @@ def filtered_order_complex(top_cells, faces_of, value_of) -> gudhi.SimplexTree:
     return st
 
 
-def persistence_of_poset(top_cells, faces_of, value_of, field: int = 2):
+def persistence_of_poset(
+    top_cells: Iterable, faces_of: Callable, value_of: Callable, field: int = 2
+) -> dict:
     """Persistence diagram of the lower-star filtration, per dimension.
 
     Returns ``{dim: [(birth, death), ...]}`` with ``death = inf`` for

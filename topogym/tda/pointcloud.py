@@ -11,10 +11,12 @@ did the agent's representation learn that the world is a torus?
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 import gudhi
 
 
-def rips_diagram(points, max_edge_length: float, max_dim: int = 2) -> dict:
+def rips_diagram(points: Iterable, max_edge_length: float, max_dim: int = 2) -> dict:
     """Vietoris–Rips persistence of a point cloud.
 
     ``points``: sequence of coordinate sequences (any dimension).
@@ -37,7 +39,7 @@ def rips_diagram(points, max_edge_length: float, max_dim: int = 2) -> dict:
     return out
 
 
-def betti_at_scale(points, epsilon: float, max_dim: int = 2) -> tuple:
+def betti_at_scale(points: Iterable, epsilon: float, max_dim: int = 2) -> tuple:
     """Betti numbers of the Rips complex at one scale ``epsilon``.
 
     The features counted are those alive at ``epsilon`` — born at or
@@ -51,7 +53,7 @@ def betti_at_scale(points, epsilon: float, max_dim: int = 2) -> tuple:
     )
 
 
-def bottleneck_distance(bars_a, bars_b) -> float:
+def bottleneck_distance(bars_a: Iterable, bars_b: Iterable) -> float:
     """Bottleneck distance between two diagrams' bars for one dimension.
 
     Pass the per-dimension bar lists (e.g. ``rips_diagram(...)[1]``);

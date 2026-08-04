@@ -16,6 +16,8 @@ expectation, including the deliberately disconnected b0 = 2).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 import numpy as np
 
 from topogym.core import constants as C
@@ -49,7 +51,7 @@ SCENARIO_SIZES = {
 }
 
 
-def _mark(textures: dict, cells, slot: int) -> None:
+def _mark(textures: dict, cells: Iterable, slot: int) -> None:
     for cell in cells:
         textures[cell] = tuple(sorted(set(textures.get(cell, ())) | {slot}))
 
@@ -58,7 +60,7 @@ def _door_cells(layout: Layout) -> list:
     return sorted(layout.doors)
 
 
-def _interiors(layout: Layout, kinds=("chamber",)) -> list:
+def _interiors(layout: Layout, kinds: tuple = ("chamber",)) -> list:
     return sorted(
         c for f in layout.features if f.kind in kinds for c in f.interior
     )

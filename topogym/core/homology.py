@@ -25,6 +25,7 @@ boundary circles, and genus (orientable) or demigenus / crosscap number
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from topogym.complexes.cell_complex import CellComplex2D, _UnionFind
@@ -52,7 +53,7 @@ class Surface2DSummary:
     demigenus: int | None  # crosscap number; requires connected + manifold
 
 
-def _regularize_2d(cycles):
+def _regularize_2d(cycles: list) -> list:
     """Split pinched vertices; return face cycles over regularized ids."""
     vert_faces = defaultdict(list)
     for fi, cyc in enumerate(cycles):
@@ -92,7 +93,7 @@ def _regularize_2d(cycles):
     ]
 
 
-def free_complex_2d(keyed_cycles) -> CellComplex2D:
+def free_complex_2d(keyed_cycles: Iterable) -> CellComplex2D:
     """The regularized cell complex of a 2D free space, with face keys.
 
     ``keyed_cycles``: iterable of ``(cell, face_cycle(cell))`` pairs. Face
@@ -106,7 +107,7 @@ def free_complex_2d(keyed_cycles) -> CellComplex2D:
     return CellComplex2D(zip(keys, reg))
 
 
-def analyze_2d(cycles) -> Surface2DSummary:
+def analyze_2d(cycles: Iterable) -> Surface2DSummary:
     """Certified invariants for a 2D free space.
 
     ``cycles``: one 4-tuple of canonical geometric vertex ids per free cell

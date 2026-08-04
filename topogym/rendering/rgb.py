@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from topogym.core import constants as C
 from topogym.rendering import tiles
+
+if TYPE_CHECKING:
+    from topogym.envs.core import TopoEnvCore
 
 #: observation code -> default tile name
 CODE_TILES = {
@@ -25,7 +30,7 @@ REVEAL_DECOY = (146, 63, 63)  # decoy walls, revealed for docs
 AGENT_COLOR = (231, 76, 60)
 
 
-def _reveal_tint(env, cell):
+def _reveal_tint(env: TopoEnvCore, cell: tuple) -> tuple | None:
     """The reveal-mode overlay color for a cell, or None."""
     if not env.reveal_hidden:
         return None
@@ -38,7 +43,7 @@ def _reveal_tint(env, cell):
     return None
 
 
-def render_rgb_2d(env, tile=14):
+def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
     base = env.layout.base
     w, h = base.layout_size()
     img = np.tile(tiles.tile("out", tile), (h, w, 1))

@@ -22,7 +22,7 @@ def _rng(key: str) -> np.random.Generator:
     return np.random.default_rng(zlib.crc32(key.encode()))
 
 
-def _flat(color) -> np.ndarray:
+def _flat(color: tuple) -> np.ndarray:
     return np.full((BASE, BASE, 3), color, dtype=np.float32)
 
 
@@ -33,14 +33,14 @@ def _chunky_noise(tile: np.ndarray, rng: np.random.Generator,
     tile += np.kron(small, np.ones((2, 2, 1)))
 
 
-def _speckle(tile: np.ndarray, rng: np.random.Generator, color,
+def _speckle(tile: np.ndarray, rng: np.random.Generator, color: tuple,
              n: int) -> None:
     for _ in range(n):
         x, y = int(rng.integers(BASE)), int(rng.integers(BASE))
         tile[y, x] = color
 
 
-def _stone(rng):
+def _stone(rng: np.random.Generator) -> np.ndarray:
     t = _flat((112, 112, 124))
     _chunky_noise(t, rng, 10)
     for row in (0, 8):  # brick courses
@@ -51,7 +51,7 @@ def _stone(rng):
     return t
 
 
-def _ice(rng):
+def _ice(rng: np.random.Generator) -> np.ndarray:
     t = _flat((168, 208, 236))
     _chunky_noise(t, rng, 8)
     xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
@@ -61,7 +61,7 @@ def _ice(rng):
     return t
 
 
-def _water(rng):
+def _water(rng: np.random.Generator) -> np.ndarray:
     t = _flat((44, 106, 190))
     _chunky_noise(t, rng, 7)
     for row in range(1, BASE, 4):  # wave crests
@@ -72,7 +72,7 @@ def _water(rng):
     return t
 
 
-def _wood(rng, horizontal=False):
+def _wood(rng: np.random.Generator, horizontal: bool = False) -> np.ndarray:
     t = _flat((152, 106, 56))
     _chunky_noise(t, rng, 8)
     for seam in range(0, BASE, 5):  # plank seams
@@ -89,7 +89,7 @@ def _wood(rng, horizontal=False):
     return t
 
 
-def _door(rng):
+def _door(rng: np.random.Generator) -> np.ndarray:
     t = _wood(rng)
     t[0, :] -= 34
     t[-1, :] -= 34
@@ -99,7 +99,7 @@ def _door(rng):
     return t
 
 
-def _dirt(rng):
+def _dirt(rng: np.random.Generator) -> np.ndarray:
     t = _flat((134, 96, 58))
     _chunky_noise(t, rng, 13)
     _speckle(t, rng, (92, 62, 34), 7)
@@ -107,13 +107,13 @@ def _dirt(rng):
     return t
 
 
-def _floor(rng):
+def _floor(rng: np.random.Generator) -> np.ndarray:
     t = _flat((228, 228, 234))
     _chunky_noise(t, rng, 4)
     return t
 
 
-def _slab(rng):  # platforms
+def _slab(rng: np.random.Generator) -> np.ndarray:  # platforms
     t = _flat((176, 176, 186))
     _chunky_noise(t, rng, 6)
     for row in (0, 8):
@@ -121,7 +121,7 @@ def _slab(rng):  # platforms
     return t
 
 
-def _hall(rng):  # hallway checker
+def _hall(rng: np.random.Generator) -> np.ndarray:  # hallway checker
     t = _flat((208, 204, 214))
     _chunky_noise(t, rng, 4)
     xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
@@ -129,7 +129,7 @@ def _hall(rng):  # hallway checker
     return t
 
 
-def _carpet(rng):  # room interiors
+def _carpet(rng: np.random.Generator) -> np.ndarray:  # room interiors
     t = _flat((128, 62, 62))
     _chunky_noise(t, rng, 7)
     t[0, :] -= 20
@@ -137,7 +137,7 @@ def _carpet(rng):  # room interiors
     return t
 
 
-def _ladder(rng):
+def _ladder(rng: np.random.Generator) -> np.ndarray:
     t = _floor(rng)
     for col in (4, 11):  # rails
         t[:, col] = (128, 88, 44)
@@ -146,11 +146,11 @@ def _ladder(rng):
     return t
 
 
-def _bridge(rng):
+def _bridge(rng: np.random.Generator) -> np.ndarray:
     return _wood(rng, horizontal=True)
 
 
-def _drop(rng):
+def _drop(rng: np.random.Generator) -> np.ndarray:
     t = _flat((22, 14, 14))
     _chunky_noise(t, rng, 5)
     xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
@@ -160,7 +160,7 @@ def _drop(rng):
     return t
 
 
-def _wormhole(rng):
+def _wormhole(rng: np.random.Generator) -> np.ndarray:
     t = _flat((32, 12, 48))
     xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
     d = np.sqrt((xs - 7.5) ** 2 + (ys - 7.5) ** 2)
@@ -172,13 +172,13 @@ def _wormhole(rng):
     return t
 
 
-def _hole(rng):
+def _hole(rng: np.random.Generator) -> np.ndarray:
     t = _flat((15, 15, 18))
     _chunky_noise(t, rng, 3)
     return t
 
 
-def _chest(rng):
+def _chest(rng: np.random.Generator) -> np.ndarray:
     t = _floor(rng)
     t[4:14, 2:14] = (140, 95, 45)  # the chest
     t[4, 2:14] = (96, 62, 26)
@@ -190,7 +190,7 @@ def _chest(rng):
     return t
 
 
-def _boat(rng):
+def _boat(rng: np.random.Generator) -> np.ndarray:
     t = _water(rng)
     t[11:14, 3:13] = (120, 78, 40)  # hull
     t[13, 3] = t[13, 12] = (44, 106, 190)  # tapered bow/stern
@@ -201,7 +201,7 @@ def _boat(rng):
     return t
 
 
-def _space(rng):
+def _space(rng: np.random.Generator) -> np.ndarray:
     t = _flat((10, 10, 22))
     _chunky_noise(t, rng, 3)
     for _ in range(4):  # stars
@@ -213,7 +213,7 @@ def _space(rng):
     return t
 
 
-def _hull(rng):
+def _hull(rng: np.random.Generator) -> np.ndarray:
     t = _flat((142, 150, 164))
     _chunky_noise(t, rng, 6)
     for line in (0, 8):  # panel seams
@@ -225,7 +225,7 @@ def _hull(rng):
     return t
 
 
-def _deck(rng):
+def _deck(rng: np.random.Generator) -> np.ndarray:
     t = _flat((92, 100, 118))
     _chunky_noise(t, rng, 5)
     xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
@@ -233,7 +233,7 @@ def _deck(rng):
     return t
 
 
-def _hatch(rng):
+def _hatch(rng: np.random.Generator) -> np.ndarray:
     t = _flat((70, 76, 90))
     xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
     d = np.maximum(np.abs(xs - 7.5), np.abs(ys - 7.5))
@@ -245,7 +245,7 @@ def _hatch(rng):
     return t
 
 
-def _tent(rng):
+def _tent(rng: np.random.Generator) -> np.ndarray:
     t = _flat((240, 236, 226))
     for col in range(BASE):  # candy stripes
         if (col // 2) % 2 == 0:
@@ -257,7 +257,7 @@ def _tent(rng):
     return t
 
 
-def _clown(rng):
+def _clown(rng: np.random.Generator) -> np.ndarray:
     t = _flat((248, 148, 24))  # the suit
     t[2:5, 3:13] = (220, 40, 40)  # wig
     t[6:8, 4:6] = (255, 255, 255)  # eyes
@@ -321,7 +321,7 @@ def tile(name: str, px: int, cell: tuple = (0, 0)) -> np.ndarray:
     return _scaled(name, variant, px)
 
 
-def tint(region: np.ndarray, color, strength: float = 0.45) -> None:
+def tint(region: np.ndarray, color: tuple, strength: float = 0.45) -> None:
     """Blend a flat color over a rendered region, in place."""
     region[:] = (
         region.astype(np.float32) * (1 - strength)

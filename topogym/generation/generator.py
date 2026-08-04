@@ -27,7 +27,7 @@ from typing import Callable
 
 import numpy as np
 
-from topogym.core.basemap import BaseMap2D, make_base_map_2d
+from topogym.core.basemap import AgentState, BaseMap2D, BaseMapInfo, make_base_map_2d
 from topogym.core.constants import DOOR, GOAL, HOLE, WALL
 from topogym.core.homology import analyze_2d
 from topogym.core.metadata import TopologyMetadata, homology_strings
@@ -92,7 +92,7 @@ class Layout:
 # Offset mapping by parallel transport
 # ---------------------------------------------------------------------------
 
-def _translate(base: BaseMap2D, state, steps: int):
+def _translate(base: BaseMap2D, state: AgentState, steps: int) -> AgentState | None:
     if steps < 0:
         state = base.turn_left(base.turn_left(state))
         state = _translate(base, state, -steps)
@@ -106,7 +106,7 @@ def _translate(base: BaseMap2D, state, steps: int):
     return state
 
 
-def map_offsets(base: BaseMap2D, anchor: tuple, offsets: set):
+def map_offsets(base: BaseMap2D, anchor: tuple, offsets: set) -> dict | None:
     """Map local (dx, dy) offsets onto the manifold by walking dx cells
     forward then dy cells to the right from the anchor. Returns
     ``{offset: cell}`` or None if the shape leaves the world or overlaps
@@ -133,7 +133,7 @@ def map_offsets(base: BaseMap2D, anchor: tuple, offsets: set):
 # Expected homology (cross-checked against the computed one)
 # ---------------------------------------------------------------------------
 
-def expected_betti_2d(base_info, n_components: int) -> tuple:
+def expected_betti_2d(base_info: BaseMapInfo, n_components: int) -> tuple:
     b2 = 1 if (base_info.closed and n_components == 0) else 0
     b1 = 1 + b2 - base_info.euler_characteristic + n_components
     return (1, b1, b2)
@@ -276,7 +276,7 @@ def _partition_components_2d(partition_plan: list) -> int:
 
 
 def _choose_gap_positions(rng: np.random.Generator, length: int, k: int,
-                          floating: bool, tries: int = 80):
+                          floating: bool, tries: int = 80) -> list | None:
     """K positions along the line, pairwise distance >= 2 (circular for
     floating lines), keeping end segments non-empty on attached lines."""
     candidates = list(range(length)) if floating else list(range(1, length - 1))
@@ -301,7 +301,7 @@ def _choose_gap_positions(rng: np.random.Generator, length: int, k: int,
 
 
 def _partition_line_2d(base: BaseMap2D, rng: np.random.Generator,
-                       spec: dict):
+                       spec: dict) -> list | None:
     """The ordered cells of a partition line, or None to retry."""
     axis = spec["axis"]
     other = 1 - axis
@@ -377,7 +377,7 @@ def _place_partition_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
     raise _RetryAttempt("could not place a partition")
 
 
-def _solve_target_2d(cfg: TopoGenConfig2D, base_info,
+def _solve_target_2d(cfg: TopoGenConfig2D, base_info: BaseMapInfo,
                      partition_k: int = 0) -> int:
     """Resolve n_holes from target_b1 if requested."""
     if cfg.target_b1 is None:

@@ -7,8 +7,10 @@ the interesting environments but has b1 = 0.
 
 from __future__ import annotations
 
+import numpy as np
 
-def maze_walls_2d(rng, width, height):
+
+def maze_walls_2d(rng: np.random.Generator, width: int, height: int) -> set:
     """Perfect maze (recursive backtracker): a tree, so b1 = 0.
 
     Rooms live on odd coordinates; returns the WALL cell set. Even-sized
@@ -49,7 +51,7 @@ def maze_walls_2d(rng, width, height):
     } - free
 
 
-def zigzag_walls_2d(width, height):
+def zigzag_walls_2d(width: int, height: int) -> set:
     """Serpentine corridor: horizontal bars alternately attached to the
     left/right border force one long winding path. Every bar merges with
     the boundary, so b1 = 0."""

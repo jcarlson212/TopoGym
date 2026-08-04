@@ -85,7 +85,7 @@ class BaseMap2D(ABC):
         """All cell ids (hashable), in a deterministic order."""
 
     @abstractmethod
-    def initial_state(self, cell) -> AgentState:
+    def initial_state(self, cell: tuple) -> AgentState:
         """A canonical agent state at ``cell``."""
 
     @abstractmethod
@@ -100,11 +100,11 @@ class BaseMap2D(ABC):
     def turn_right(self, state: AgentState) -> AgentState: ...
 
     @abstractmethod
-    def face_cycle(self, cell) -> tuple:
+    def face_cycle(self, cell: tuple) -> tuple:
         """The cell's 4 corner vertices as canonical ids, in cyclic order."""
 
     @abstractmethod
-    def layout_coords(self, cell) -> tuple:
+    def layout_coords(self, cell: tuple) -> tuple:
         """(col, row) drawing position; unique per cell."""
 
     @abstractmethod
@@ -123,7 +123,7 @@ class BaseMap2D(ABC):
         """
         return CellComplex2D((c, self.face_cycle(c)) for c in self.cells())
 
-    def neighbor_states(self, cell) -> list:
+    def neighbor_states(self, cell: tuple) -> list:
         """Agent states reachable in one step (4 directions), with frames."""
         out = []
         state = self.initial_state(cell)
@@ -134,7 +134,7 @@ class BaseMap2D(ABC):
             state = self.turn_left(state)
         return out
 
-    def neighbors(self, cell) -> list:
+    def neighbors(self, cell: tuple) -> list:
         return [s.cell for s in self.neighbor_states(cell)]
 
 
@@ -193,10 +193,10 @@ class RectGluing2D(BaseMap2D):
         self.rule_x, self.rule_y = rule_x, rule_y
         self.info = BaseMapInfo(dim=2, **_RECT_INFO[key])
 
-    def cells(self):
+    def cells(self) -> list:
         return [(x, y) for y in range(self.height) for x in range(self.width)]
 
-    def initial_state(self, cell) -> AgentState:
+    def initial_state(self, cell: tuple) -> AgentState:
         return AgentState(cell=cell, frame=(1, 0, 0, 1))  # facing +x, right = +y
 
     def turn_left(self, state: AgentState) -> AgentState:
@@ -228,7 +228,7 @@ class RectGluing2D(BaseMap2D):
 
     # -- canonical vertices ------------------------------------------------
 
-    def _vertex_images(self, v):
+    def _vertex_images(self, v: tuple) -> list:
         """Direct seam identifications of a vertex of the (W+1)x(H+1) grid."""
         x, y = v
         w, h = self.width, self.height
@@ -256,7 +256,7 @@ class RectGluing2D(BaseMap2D):
         return out
 
     @cache
-    def canonical_vertex(self, v):
+    def canonical_vertex(self, v: tuple) -> tuple:
         """Lexicographically-smallest member of the vertex's gluing orbit."""
         orbit = {v}
         stack = [v]
@@ -267,15 +267,15 @@ class RectGluing2D(BaseMap2D):
                     stack.append(img)
         return min(orbit)
 
-    def face_cycle(self, cell):
+    def face_cycle(self, cell: tuple) -> tuple:
         x, y = cell
         corners = ((x, y), (x + 1, y), (x + 1, y + 1), (x, y + 1))
         return tuple(self.canonical_vertex(c) for c in corners)
 
-    def layout_coords(self, cell):
+    def layout_coords(self, cell: tuple) -> tuple:
         return cell
 
-    def layout_size(self):
+    def layout_size(self) -> tuple:
         return (self.width, self.height)
 
 
@@ -295,7 +295,7 @@ _RECT_BY_NAME = {
 BASE_MAPS_2D = tuple(_RECT_BY_NAME)
 
 
-def make_base_map_2d(name: str, size) -> BaseMap2D:
+def make_base_map_2d(name: str, size: int | tuple) -> BaseMap2D:
     """Create a 2D base map by name.
 
     ``size`` is ``(width, height)`` or a single int.

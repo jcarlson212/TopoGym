@@ -19,7 +19,12 @@ Rows are plain dicts, ready for pandas::
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import gymnasium as gym
+
+if TYPE_CHECKING:
+    from topogym.envs.core import TopoEnvCore
 
 
 class StatsRecorder(gym.Wrapper):
@@ -35,10 +40,10 @@ class StatsRecorder(gym.Wrapper):
         self._goal_reached = False
 
     @property
-    def _core(self):
+    def _core(self) -> TopoEnvCore:
         return self.env.unwrapped
 
-    def reset(self, **kwargs):
+    def reset(self, **kwargs) -> tuple:
         self._flush()
         obs, info = self.env.reset(**kwargs)
         self._episode_index += 1
@@ -46,7 +51,7 @@ class StatsRecorder(gym.Wrapper):
         self._goal_reached = False
         return obs, info
 
-    def step(self, action):
+    def step(self, action: int) -> tuple:
         obs, reward, terminated, truncated, info = self.env.step(action)
         self._last_info = info
         core = self._core
@@ -66,7 +71,7 @@ class StatsRecorder(gym.Wrapper):
             self._flush()
         return obs, reward, terminated, truncated, info
 
-    def _flush(self):
+    def _flush(self) -> None:
         if not self._last_info or self._episode_index < 0:
             return
         info = self._last_info
