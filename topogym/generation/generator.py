@@ -17,17 +17,15 @@ decoy              chamber look-alike, completely filled: same homology,
                    nothing inside — punishes persistence
 partition          dividing line with K bridge gaps: K-1 obstacle
                    components attached, K floating (see below)
-=================  =========================================================
-"""
+=================  ========================================================="""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Callable
 
 import numpy as np
 
-from topogym.core.basemap import AgentState, BaseMap2D, BaseMapInfo, make_base_map_2d
+from topogym.core.basemap import BaseMap2D, BaseMapInfo, make_base_map_2d
 from topogym.core.constants import DOOR, GOAL, HOLE, WALL
 from topogym.core.homology import analyze_2d
 from topogym.core.metadata import TopologyMetadata, homology_strings
@@ -40,112 +38,23 @@ from topogym.generation.graph import (
     reachable_from,
 )
 
-
-class GenerationError(RuntimeError):
-    """Raised when no valid layout could be produced for (config, seed)."""
-
-
-class _RetryAttempt(Exception):
-    pass
-
-
-@dataclass(frozen=True)
-class DoorSpec:
-    """A hidden bump-door cell: observed as a wall until opened."""
-
-    cell: tuple
-    kind: str = "bump"
-    tries: int = 1  # bumps required to open
-
-
-@dataclass(frozen=True)
-class Feature:
-    kind: str
-    cells: tuple  # obstacle cells
-    interior: tuple  # enterable interior (empty for holes/decoys)
-    doors: tuple  # DoorSpecs
-    meta: dict | None = None  # feature-specific facts (e.g. gaps)
-
-
-@dataclass
-class Layout:
-    """A fully-generated environment layout with certified metadata."""
-
-    dim: int
-    base: BaseMap2D
-    cell_types: dict  # cell -> WALL/HOLE/DOOR/GOAL (EMPTY cells absent)
-    doors: dict  # cell -> DoorSpec
-    start: tuple
-    goal: tuple
-    features: list = field(default_factory=list)
-    free_cells: list = field(default_factory=list)
-    metadata: TopologyMetadata | None = None
-    #: Texture-variant payload: {"textures": {cell: {slot: value}},
-    #: "hazards": frozenset, "wormholes": {cell: partner}, "clown": {...}}
-    extras: dict = field(default_factory=dict)
-
-    def neighbors(self, cell: tuple) -> list:
-        return self.base.neighbors(cell)
-
-
-# ---------------------------------------------------------------------------
-# Offset mapping by parallel transport
-# ---------------------------------------------------------------------------
-
-def _translate(base: BaseMap2D, state: AgentState, steps: int) -> AgentState | None:
-    if steps < 0:
-        state = base.turn_left(base.turn_left(state))
-        state = _translate(base, state, -steps)
-        if state is None:
-            return None
-        return base.turn_left(base.turn_left(state))
-    for _ in range(steps):
-        state = base.forward(state)
-        if state is None:
-            return None
-    return state
-
-
-def map_offsets(base: BaseMap2D, anchor: tuple, offsets: set) -> dict | None:
-    """Map local (dx, dy) offsets onto the manifold by walking dx cells
-    forward then dy cells to the right from the anchor. Returns
-    ``{offset: cell}`` or None if the shape leaves the world or overlaps
-    itself (e.g. wrapped around a small handle)."""
-    s0 = base.initial_state(anchor)
-    mapping: dict = {}
-    used: set = set()
-    for off in sorted(offsets):
-        s = _translate(base, s0, off[0])
-        if s is None:
-            return None
-        s = base.turn_right(s)
-        s = _translate(base, s, off[1])
-        if s is None:
-            return None
-        if s.cell in used:
-            return None
-        used.add(s.cell)
-        mapping[off] = s.cell
-    return mapping
-
-
-# ---------------------------------------------------------------------------
-# Expected homology (cross-checked against the computed one)
-# ---------------------------------------------------------------------------
-
-def expected_betti_2d(base_info: BaseMapInfo, n_components: int) -> tuple:
-    b2 = 1 if (base_info.closed and n_components == 0) else 0
-    b1 = 1 + b2 - base_info.euler_characteristic + n_components
-    return (1, b1, b2)
-
-
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
-
-def _sample_tries(rng: np.random.Generator, bounds: tuple) -> int:
-    lo, hi = bounds
-    return int(rng.integers(lo, hi + 1))
+# Re-exported for compatibility: these historically lived here.
+from topogym.generation.layout import (  # noqa: F401
+    DoorSpec,
+    Feature,
+    GenerationError,
+    Layout,
+    _RetryAttempt,
+    _sample_tries,
+    _translate,
+    expected_betti_2d,
+    map_offsets,
+)
+from topogym.generation.partitions import (  # noqa: F401
+    _partition_components_2d,
+    _place_partition_2d,
+    _plan_partitions_2d,
+)
 
 
 def _pick_doors(rng: np.random.Generator, cands: list, n: int,
@@ -179,7 +88,6 @@ def _room_side(rng: np.random.Generator, cfg: TopoGenConfig2D,
     return _sample_tries(rng, cfg.chamber_size)
 
 
-#: Room kinds placed via the rooms module.
 _ROOM_KINDS_2D = ("chamber", "decoy")
 
 
@@ -213,170 +121,6 @@ def _check_packing_2d(cfg: TopoGenConfig2D, base: BaseMap2D) -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# Partitions (bridge-finding)
-# ---------------------------------------------------------------------------
-#
-# A partition is a dividing line across the world with K gap cells — the
-# bridges. A line whose ends attach to WALL boundaries merges with them, so
-# its K+1 segments contribute K-1 obstacle components (K=1 is a pure
-# dumbbell: no homology change, only a bottleneck). A *floating* line (a
-# ring around a wrap axis) has no boundary to attach to: its K arcs
-# contribute K components. Material "moat" uses HOLE cells: impassable but
-# transparent, so the far side is visible before it is reachable
-# (observed-region H0 events).
-
-def _partition_axes_2d(base: BaseMap2D) -> list:
-    """Allowed (axis, floating) choices for a partition line on ``base``.
-
-    The line runs along ``axis``; it may not run across a flip seam (the
-    line would not close onto itself).
-    """
-    from topogym.core.basemap import Boundary, RectGluing2D
-
-    assert isinstance(base, RectGluing2D)
-    out = []
-    for axis, rule in ((0, base.rule_x), (1, base.rule_y)):
-        if rule == Boundary.WRAP:
-            out.append((axis, True))
-        elif rule == Boundary.WALL:
-            out.append((axis, False))
-    return out
-
-
-def _plan_partitions_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
-                        rng: np.random.Generator) -> list:
-    """Pre-sample each partition's axis, gap count, and hidden-gap count so
-    that target-Betti solving can account for them exactly."""
-    if cfg.n_partitions == 0:
-        return []
-    axes = _partition_axes_2d(base)
-    if not axes:
-        raise GenerationError(
-            f"base {cfg.base!r} admits no partitions (every axis crosses a "
-            "flip seam)"
-        )
-    plan = []
-    for _ in range(cfg.n_partitions):
-        axis, floating = axes[int(rng.integers(len(axes)))]
-        k = _sample_tries(rng, cfg.partition_gaps)
-        if k < 1:
-            raise GenerationError("partitions need at least one gap")
-        n_hidden = min(k, _sample_tries(rng, cfg.partition_hidden_gaps))
-        plan.append({"axis": axis, "floating": floating, "n_gaps": k,
-                     "n_hidden": n_hidden})
-    return plan
-
-
-def _partition_components_2d(partition_plan: list) -> int:
-    return sum(
-        p["n_gaps"] if p["floating"] else p["n_gaps"] - 1
-        for p in partition_plan
-    )
-
-
-def _choose_gap_positions(rng: np.random.Generator, length: int, k: int,
-                          floating: bool, tries: int = 80) -> list | None:
-    """K positions along the line, pairwise distance >= 2 (circular for
-    floating lines), keeping end segments non-empty on attached lines."""
-    candidates = list(range(length)) if floating else list(range(1, length - 1))
-    for _ in range(tries):
-        perm = list(rng.permutation(len(candidates)))
-        picked: list = []
-        for idx in perm:
-            pos = candidates[idx]
-            ok = True
-            for q in picked:
-                d = abs(pos - q)
-                if floating:
-                    d = min(d, length - d)
-                if d < 2:
-                    ok = False
-                    break
-            if ok:
-                picked.append(pos)
-            if len(picked) == k:
-                return sorted(picked)
-    return None
-
-
-def _partition_line_2d(base: BaseMap2D, rng: np.random.Generator,
-                       spec: dict) -> list | None:
-    """The ordered cells of a partition line, or None to retry."""
-    axis = spec["axis"]
-    other = 1 - axis
-    length = (base.width, base.height)[axis]
-    span_other = (base.width, base.height)[other]
-    if span_other < 5:
-        return None
-    c = int(rng.integers(2, span_other - 2))
-    line = []
-    for i in range(length):
-        cell = [0, 0]
-        cell[axis] = i
-        cell[other] = c
-        line.append(tuple(cell))
-    return line
-
-
-def _ring_around_2d(base: BaseMap2D, cells_line: list) -> set:
-    """Chebyshev-1 neighborhood of the line (via the movement graph, so it
-    is correct across seams)."""
-    line = set(cells_line)
-    near: set = set()
-    for c in cells_line:
-        for n in base.neighbors(c):
-            near.add(n)
-            for m in base.neighbors(n):
-                near.add(m)
-    return near - line
-
-
-def _place_partition_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
-                        rng: np.random.Generator, spec: dict,
-                        cell_types: dict, doors: dict, features: list,
-                        reserved: set, n_tries: int = 120) -> None:
-    material = HOLE if cfg.partition_material == "moat" else WALL
-    for _ in range(n_tries):
-        line = _partition_line_2d(base, rng, spec)
-        if line is None:
-            continue
-        gaps = _choose_gap_positions(
-            rng, len(line), spec["n_gaps"], spec["floating"]
-        )
-        if gaps is None:
-            continue
-        footprint = set(line)
-        if footprint & reserved:
-            continue
-        hidden = set(
-            gaps[int(i)] for i in rng.permutation(len(gaps))[: spec["n_hidden"]]
-        )
-        wall_cells, door_specs, gap_cells = [], [], []
-        for i, cell in enumerate(line):
-            if i in hidden:
-                d = DoorSpec(cell, "bump", tries=_sample_tries(rng, cfg.door_tries))
-                cell_types[cell] = DOOR
-                doors[cell] = d
-                door_specs.append(d)
-                gap_cells.append(cell)
-            elif i in gaps:
-                gap_cells.append(cell)  # an open bridge: stays EMPTY
-            else:
-                cell_types[cell] = material
-                wall_cells.append(cell)
-        features.append(Feature(
-            kind="partition", cells=tuple(wall_cells), interior=(),
-            doors=tuple(door_specs),
-            meta={"n_gaps": spec["n_gaps"], "floating": spec["floating"],
-                  "gaps": tuple(gap_cells),
-                  "material": cfg.partition_material},
-        ))
-        reserved.update(footprint | _ring_around_2d(base, line))
-        return
-    raise _RetryAttempt("could not place a partition")
-
-
 def _solve_target_2d(cfg: TopoGenConfig2D, base_info: BaseMapInfo,
                      partition_k: int = 0) -> int:
     """Resolve n_holes from target_b1 if requested."""
@@ -402,10 +146,6 @@ def _solve_target_2d(cfg: TopoGenConfig2D, base_info: BaseMapInfo,
         )
     return n_holes
 
-
-# ---------------------------------------------------------------------------
-# 2D generation
-# ---------------------------------------------------------------------------
 
 _PRESETS_2D = {"annulus": "square", "x_holes": "square"}
 
@@ -614,10 +354,6 @@ def _place_feature_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
         return
     raise _RetryAttempt(f"could not place feature {kind!r}")
 
-
-# ---------------------------------------------------------------------------
-# Finalization: start/goal, validation, certified metadata
-# ---------------------------------------------------------------------------
 
 def _finalize_layout(cfg: TopoGenConfig2D, base: BaseMap2D, cells: list,
                      cell_types: dict, doors: dict, features: list,
