@@ -14,6 +14,9 @@ _PALETTE = {
     "wall": "#44444f",
     "hole": "#0f0f12",
     "door_hidden": "#9b59b6",  # bump doors (reveal mode)
+    "door_open": "#a17438",  # wood: a visible walk-through door
+    "hazard": "#781a1a",
+    "wormhole": "#9b59b6",
     "decoy": "#923f3f",  # decoy walls (reveal mode)
     "goal": "#27ae60",
     "start": "#3498db",
@@ -36,7 +39,13 @@ def _cell_fill(layout, cell, decoys, reveal):
     if t == C.GOAL:
         return _PALETTE["goal"]
     if t == C.DOOR:
+        if layout.doors[cell].kind == "open":
+            return _PALETTE["door_open"]
         return _PALETTE["door_hidden"] if reveal else _PALETTE["wall"]
+    if t == C.HAZARD:
+        return _PALETTE["hazard"]
+    if t == C.WORMHOLE:
+        return _PALETTE["wormhole"]
     if t == C.HOLE:
         return _PALETTE["hole"]
     if t == C.WALL:

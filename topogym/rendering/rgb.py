@@ -10,12 +10,14 @@ CODE_COLORS = {
     C.OBS_EMPTY: (240, 240, 244),
     C.OBS_WALL: (68, 68, 80),
     C.OBS_HOLE: (15, 15, 18),
-    C.OBS_DOOR_OPEN: (130, 205, 155),
+    C.OBS_DOOR_OPEN: (161, 116, 56),  # wood: a visible walk-through door
     C.OBS_GOAL: (39, 174, 96),
     C.OBS_OUT_OF_WORLD: (28, 28, 36),
     C.OBS_UNSEEN: (130, 130, 140),
+    C.OBS_HAZARD: (120, 26, 26),  # the drop: dark red pit
+    C.OBS_WORMHOLE: (155, 89, 182),  # all wormholes are purple
 }
-REVEAL_BUMP_DOOR = (155, 89, 182)  # hidden doors, revealed for docs
+REVEAL_BUMP_DOOR = (155, 89, 182)  # hidden bump-doors, revealed for docs
 REVEAL_DECOY = (146, 63, 63)  # decoy walls, revealed for docs
 AGENT_COLOR = (231, 76, 60)
 START_COLOR = (52, 152, 219)

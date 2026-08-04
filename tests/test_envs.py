@@ -260,6 +260,79 @@ def test_deceptive_reward_field_and_shaping():
 
 
 # ---------------------------------------------------------------------------
+# Screen directions, predetermined horizon, teleport resets
+# ---------------------------------------------------------------------------
+
+def test_fourway_actions_are_screen_directions():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_holes=0, n_chambers=0, n_decoys=0,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    deltas = {0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
+    base = env.layout.base
+    for action, (dx, dy) in deltas.items():
+        x0, y0 = base.layout_coords(env._state.cell)
+        env.step(action)
+        x1, y1 = base.layout_coords(env._state.cell)
+        if (x1, y1) != (x0, y0):  # the move happened
+            assert (x1 - x0, y1 - y0) == (dx, dy), action
+
+
+def test_episode_length_is_predetermined():
+    # The horizon depends only on the configured size, never the layout.
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    assert env._max_steps == 4 * 15 * 15
+    for other_seed in (4, 5):
+        env2 = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                        layout_seed=other_seed).unwrapped
+        env2.reset(seed=0)
+        assert env2._max_steps == env._max_steps
+
+
+def test_teleport_reset():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_holes=0, n_chambers=0, n_decoys=0, teleport=True,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    for a in (0, 3, 3, 1, 2):
+        env.step(a)
+    visited = set(env._visited)
+    target = max(visited, key=repr)
+    # Resetting archives the ended episode's visits; those cells are now
+    # legal teleport targets.
+    _, info = env.reset(seed=0, options={"teleport": target})
+    assert info["position"] == target
+    never = next(
+        c for c in env.layout.free_cells
+        if c not in visited and c != env.layout.start
+    )
+    with pytest.raises(ValueError):
+        env.reset(seed=0, options={"teleport": never})
+
+
+def test_teleport_disabled_by_default():
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    env.reset(seed=0)
+    with pytest.raises(ValueError):
+        env.reset(seed=0, options={"teleport": env.layout.start})
+
+
+def test_open_doors_are_visible_wood():
+    env = gym.make("TopoGym/Decoys0-50-v0", seed=1).unwrapped
+    env.reset(seed=0)
+    from topogym.core import constants as C
+    (door_cell, spec), = env.layout.doors.items()
+    assert spec.kind == "open"
+    assert env._obs_code(door_cell) == C.OBS_DOOR_OPEN  # visible doorway
+    outside = env.layout.base.neighbors(door_cell)[0]
+    assert env._try_enter(outside, door_cell)  # and walkable
+
+
+# ---------------------------------------------------------------------------
 # Observed-region tracking (H0 merges, loop closures)
 # ---------------------------------------------------------------------------
 

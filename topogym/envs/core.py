@@ -70,8 +70,8 @@ class TopoEnvCore(gym.Env):
     def __init__(self, config=None, *, layout=None, layout_seed=None,
                  seed=None, obs_mode=None, view_radius=None,
                  reward_mode="none", p_slip=0.0, complex="cubical",
-                 max_steps=None, render_mode=None, reveal_hidden=False,
-                 **overrides):
+                 max_steps=None, teleport=False, render_mode=None,
+                 reveal_hidden=False, **overrides):
         # The registry interface spells the layout seed simply "seed":
         # gym.make("TopoGym/Dilution-50-v0", seed=3).
         if layout_seed is None:
@@ -105,6 +105,11 @@ class TopoEnvCore(gym.Env):
             )
         self.complex_backend = complex
         self._max_steps_cfg = max_steps
+        self.teleport = teleport
+        # Cells visited in earlier episodes on the current layout — the
+        # only legal teleport-reset targets (archive methods restore to
+        # states they have reached before).
+        self._ever_visited: set = set()
         self.render_mode = render_mode
         self.reveal_hidden = reveal_hidden
 
@@ -141,13 +146,45 @@ class TopoEnvCore(gym.Env):
             return self._fixed_layout
         return self._generate(int(self.np_random.integers(2 ** 31 - 1)))
 
+    def _note_episode_end(self):
+        """Fold the finished episode's visits into the teleport archive
+        (called at reset, before the layout may change)."""
+        prev = getattr(self, "_visited", None)
+        if prev and self.layout is not None:
+            self._ever_visited |= prev
+
+    def _resolve_start(self, options) -> tuple:
+        """The episode's start cell: the layout's, or a teleport target
+        (``reset(options={"teleport": (x, y)})``, previously visited)."""
+        target = (options or {}).get("teleport")
+        if target is None:
+            return self.layout.start
+        if not self.teleport:
+            raise ValueError(
+                "teleport resets are disabled; construct the env with "
+                "teleport=True"
+            )
+        target = tuple(int(v) for v in target)
+        if target not in self._ever_visited:
+            raise ValueError(
+                f"teleport target {target} has not been visited in any "
+                "previous episode on this layout"
+            )
+        return target
+
     def _reset_runtime(self):
         self._bumps = {}
         self._open = set()
         self._visited = set()
         self._steps = 0
-        n_free = len(self.layout.free_cells)
-        self._max_steps = self._max_steps_cfg or max(64, 6 * n_free)
+        # The episode length is pre-determined by the configured grid
+        # size alone (never by the sampled layout): 4 cells' worth of
+        # steps per cell of the world unless max_steps overrides it.
+        if self._max_steps_cfg:
+            self._max_steps = self._max_steps_cfg
+        else:
+            w, h = self.layout.base.layout_size()
+            self._max_steps = 4 * w * h
         # Observed-region filtration (see module docstring).
         self._observed_free = set()
         self._known_uf = _UnionFind()
@@ -273,9 +310,9 @@ class TopoEnvCore(gym.Env):
         if t in (C.WALL, C.HOLE):
             return False
         if t == C.DOOR:
-            if target in self._open:
-                return True
             spec = self.layout.doors[target]
+            if spec.kind == "open" or target in self._open:
+                return True
             self._bumps[target] = self._bumps.get(target, 0) + 1
             if self._bumps[target] >= spec.tries:
                 self._open.add(target)
@@ -288,10 +325,14 @@ class TopoEnvCore(gym.Env):
     def _obs_code(self, cell) -> int:
         t = self.layout.cell_types.get(cell, C.EMPTY)
         if t == C.DOOR:
-            return C.OBS_DOOR_OPEN if cell in self._open else C.OBS_WALL
+            spec = self.layout.doors[cell]
+            if spec.kind == "open" or cell in self._open:
+                return C.OBS_DOOR_OPEN  # a visible walk-through doorway
+            return C.OBS_WALL  # bump doors hide until opened
         return {
             C.EMPTY: C.OBS_EMPTY, C.WALL: C.OBS_WALL, C.HOLE: C.OBS_HOLE,
-            C.GOAL: C.OBS_GOAL,
+            C.GOAL: C.OBS_GOAL, C.HAZARD: C.OBS_HAZARD,
+            C.WORMHOLE: C.OBS_WORMHOLE,
         }[t]
 
     @staticmethod

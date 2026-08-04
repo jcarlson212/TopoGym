@@ -86,17 +86,15 @@ def build_nested(cfg: TopoGenConfig2D, base: BaseMap2D,
         side_cells = _SIDE_CELLS[side](cx, cy, r)
         door = side_cells[int(rng.integers(len(side_cells)))]
 
-        door_specs = []
+        ring.discard(door)
         if cfg.door_kind == "open":
-            ring.discard(door)
-            door_specs.append(door_cls(door, "open", tries=0))
+            spec = door_cls(door, "open", tries=0)
         else:
             spec = door_cls(door, "bump",
                             tries=_sample_tries(rng, cfg.door_tries))
-            ring.discard(door)
-            cell_types[door] = DOOR
-            doors[door] = spec
-            door_specs.append(spec)
+        cell_types[door] = DOOR
+        doors[door] = spec
+        door_specs = [spec]
         for c in ring:
             cell_types[c] = WALL
         interior = tuple(
