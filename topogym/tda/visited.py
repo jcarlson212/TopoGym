@@ -321,7 +321,6 @@ class VisitedComplex:
                     keep: Callable) -> ChainComplex:
         """Assemble a simplicial complex from an edge adjacency and a
         ``keep(simplex)`` filter for dimensions >= 2."""
-        index = {v: i for i, v in enumerate(verts)}
         edges = sorted(
             {tuple(sorted((a, b), key=repr))
              for a, ns in adjacency.items() for b in ns},

@@ -1,0 +1,15 @@
+#!/bin/sh
+# TopoGym pre-commit: refuse to commit code that would fail CI lint.
+# Runs ruff and the version-sync check (the fast CI gates; tests stay
+# in CI). Bypass deliberately with: git commit --no-verify
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+PY=.venv/bin/python
+[ -x "$PY" ] || PY=python3
+
+echo "pre-commit: ruff check"
+"$PY" -m ruff check .
+
+echo "pre-commit: version sync"
+"$PY" scripts/sync_version.py --check
