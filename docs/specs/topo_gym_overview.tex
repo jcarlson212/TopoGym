@@ -384,18 +384,19 @@ scenario's semantic features, documented per environment below.
 Texture slice of TopoGym-v1:
 \begin{itemize}[leftmargin=2em, itemsep=3pt]
   \item \texttt{TopoGym/IceShip}. Arctic ship navigation (the agent
-        is the sailboat). Coastal ice sheets attach to the north and
-        south edges --- land masses, not floating obstacles ---
-        octagonal sealed bergs float in the open water as decoys, and
-        the treasure sits in a cavity deep inside the large eastern
-        sheet, reachable \emph{only} through a guaranteed narrow
-        width-1 channel threaded across the ice (the guarantee is
-        unit-tested: blocking the channel disconnects the goal).
+        is the sailboat, and \emph{hitting ice ends the episode} ---
+        collisions hurt the hull). Coastal ice sheets attach to the
+        north and south edges --- land masses, not floating obstacles
+        --- octagonal sealed bergs float in the open water as decoys,
+        and the treasure sits in a cavity deep inside the large
+        eastern landmass, reachable \emph{only} through a guaranteed
+        narrow width-1 channel threaded across the ice (the guarantee
+        is unit-tested: blocking the channel disconnects the goal).
         Ice-adjacent water cells carry the directional adjacency
-        flags (a doorway reads as ice on both sides); open-water
-        cells carry the water feature only. Texture makes berg
-        avoidance cheap on sight; whether the channel leads anywhere
-        remains invisible to any local feature.
+        flags --- the boat's collision-warning system --- and
+        open-water cells carry the water feature only. Texture makes
+        berg avoidance cheap on sight; whether the channel leads
+        anywhere remains invisible to any local feature.
   \item \texttt{TopoGym/Ladders}. Platforms, ladders, and bridges;
         a gem on the top platform is the target. Rooms (platforms),
         ladders, and bridges each carry their own semantic feature;
@@ -449,19 +450,21 @@ Texture slice of TopoGym-v1:
         within one cell); the clown's position is otherwise sensed
         only through the reward gradient --- which is exactly the
         signal that must be distrusted.
-  \item \texttt{TopoGym/EnvironmentalIceShip}. IceShip with seasons.
-        Each episode is drawn sunny (summer) or snowing (winter), with
-        matching texture palettes, and the water texture's value
-        encodes the season (1.0 sunny, 0.5 cold). In winter the ice
-        \emph{grows}: from step 40, the narrow channel freezes shut
-        one cell every 6 steps from its mouth toward the door ---
-        standing on a cell when it freezes, or being inside the
-        treasure cavity when the channel closes, ends the episode. In
-        summer the ice shrinks: the channel's flanking walls melt on
-        the same schedule, widening the passage. The certified
-        metadata describes the episode-start geometry; a
-        \texttt{season} make-kwarg forces either season for
-        controlled evaluation.
+  \item \texttt{TopoGym/EnvironmentalIceShip}. IceShip with seasons
+        and a structured landmass: three cavities --- one holding the
+        treasure, two empty --- each behind its own guaranteed
+        channel, plus two sealed water pockets (little enclosed
+        lakes, visible but unreachable: the certified $b_0 = 3$
+        counts them). Each episode is drawn sunny (summer) or snowing
+        (winter), with matching palettes; the water texture's value
+        encodes the season (1.0 sunny, 0.5 cold). Only the
+        \emph{floating bergs} respond to the season: in winter they
+        grow --- their water fringe freezes in waves at steps 60 and
+        120, and being on a cell when it freezes ends the episode ---
+        and in summer their rims melt away. Channels and the landmass
+        never change. The certified metadata describes the
+        episode-start geometry; a \texttt{season} make-kwarg forces
+        either season for controlled evaluation.
   \item \texttt{TopoGym/SearchRescue}. Search and rescue. A person is
         trapped in one large open chamber buried in a dense field of
         shrapnel (26 small transient obstacles, each a small

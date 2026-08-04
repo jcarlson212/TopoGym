@@ -41,7 +41,7 @@ def _step_onto(env, target):
     ("SpaceWarp", [2, 4, 0], [5, 4, 0]),
     ("ClownChase", [1, 4, 0], [2, 4, 0]),
     ("SearchRescue", [1, 27, 0], [2, 27, 0]),
-    ("EnvironmentalIceShip", [1, 4, 0], [2, 4, 0]),
+    ("EnvironmentalIceShip", [3, 4, 0], [6, 4, 0]),
 ])
 def test_scenarios_certify(name, betti, sealed):
     env, obs, info = _make(name)
@@ -49,7 +49,9 @@ def test_scenarios_certify(name, betti, sealed):
     assert info["topology"]["betti_z2_sealed"] == sealed
     assert obs.shape == (18,)
     for _ in range(20):
-        env.step(int(env.np_random.integers(4)))
+        _, _, term, _, _ = env.step(int(env.np_random.integers(4)))
+        if term:  # boat scenarios end on ice bumps
+            env.reset(seed=0)
 
 
 def test_scenarios_deterministic():
@@ -136,61 +138,84 @@ def _seasonal_env(season):
     return env
 
 
-def test_winter_freezes_the_channel_and_traps():
+def test_hitting_ice_ends_the_episode():
+    env, _, _ = _make("IceShip")
+    base = env.layout.base
+    free = set(env.layout.free_cells)
+    berg = next(f for f in env.layout.features if f.kind == "decoy")
+    wall, nbr = next(
+        (c, n) for c in berg.cells
+        for n in base.neighbors(c) if n in free
+    )
+    env._state = base.turn_left(base.initial_state(nbr))
+    delta = (wall[0] - nbr[0], wall[1] - nbr[1])
+    _, reward, terminated, _, _ = env.step(_ACTION[delta])
+    assert terminated and reward == 0.0
+
+
+def test_seasonal_world_structure():
+    """Three cavities (one treasure) behind channels, two sealed water
+    pockets: b0 = 3, unreachable pockets, reachable empty cavities."""
+    layout = build_scenario("environmental_ice_ship", 2)
+    chambers = [f for f in layout.features if f.kind == "chamber"]
+    pockets = [f for f in layout.features if f.kind == "pocket"]
+    assert len(chambers) == 3 and len(pockets) == 2
+    assert sum(f.meta["treasure"] for f in chambers) == 1
+    free = set(layout.free_cells)
+    adj = build_adjacency(free, layout.base.neighbors)
+    reached = reachable_from(adj, layout.start)
+    for f in chambers:  # every cavity is enterable via its channel
+        assert set(f.interior) <= reached
+    for p in pockets:  # the lakes are sealed
+        assert not (set(p.interior) & reached)
+
+
+def test_winter_grows_only_the_bergs():
     env = _seasonal_env("winter")
     seasonal = env.layout.extras["seasonal"]
     base = env.layout.base
-    # Idling inside the cavity: the ice closes the channel and the
-    # episode ends before the horizon.
-    env._state = base.turn_left(
-        base.initial_state(seasonal["inside"][0])
+    # Oscillate between two adjacent fringe cells so we are standing on
+    # one when the wave freezes it.
+    grow1 = set(seasonal["grow_layers"][0])
+    a, b = next(
+        (u, v) for u in sorted(grow1)
+        for v in base.neighbors(u) if v in grow1
     )
-    outcome = None
-    for _ in range(env._max_steps):
-        _, _, term, trunc, _ = env.step(0)
+    env._state = base.turn_left(base.initial_state(a))
+    here, there = a, b
+    died = None
+    for t in range(120):
+        delta = (there[0] - here[0], there[1] - here[1])
+        _, _, term, _, _ = env.step(_ACTION[delta])
+        here, there = env._state.cell, here
         if term:
-            outcome = "trapped"
+            died = t
             break
-        assert not trunc
-    assert outcome == "trapped"
-    # The channel is fully frozen, and the icescape froze beyond it.
-    assert set(seasonal["channel"]) <= env._frozen
-    assert len(env._frozen) > len(seasonal["channel"])
-    # Frozen cells act as ice: impassable, observed as wall.
-    frozen = next(iter(env._frozen))
-    assert not env._try_enter(None, frozen)
-    assert env._texture_block(seasonal["inside"][0]) is not None
-
-
-def test_winter_crushes_an_agent_in_the_channel():
-    env = _seasonal_env("winter")
-    seasonal = env.layout.extras["seasonal"]
-    base = env.layout.base
-    env._state = base.turn_left(
-        base.initial_state(seasonal["channel"][3])
+    assert died is not None and died <= 61  # crushed by the first wave
+    assert env._frozen  # bergs grew...
+    channels = {
+        c for f in env.layout.features if f.kind == "chamber"
+        for c in f.meta["channel"]
+    }
+    assert not (env._frozen & channels)  # ...but never the channels
+    assert env._frozen <= set(seasonal["grow_layers"][0]) | set(
+        seasonal["grow_layers"][1]
     )
-    crushed = False
-    for _ in range(env._max_steps):
-        _, _, term, _, _ = env.step(0)
-        if term:
-            crushed = True
-            break
-    assert crushed
 
 
-def test_summer_melts_the_flanks_and_is_safe():
+def test_summer_shrinks_the_bergs():
     env = _seasonal_env("summer")
-    seasonal = env.layout.extras["seasonal"]
-    base = env.layout.base
-    env._state = base.turn_left(
-        base.initial_state(seasonal["inside"][0])
-    )
-    for _ in range(env._max_steps - 1):
-        _, _, term, _, _ = env.step(0)
-        assert not term
-    assert env._melted  # the passage widened
-    melted = sorted(env._melted)[0]
-    assert env._try_enter(None, melted)
+    for _ in range(130):
+        env.step(0)
+    berg_cells = {c for b in env.layout.extras["bergs"] for c in b}
+    melted = env._melted & berg_cells
+    assert melted  # rims receded
+    assert env._try_enter(None, sorted(melted)[0])
+    channels = {
+        c for f in env.layout.features if f.kind == "chamber"
+        for c in f.meta["channel"]
+    }
+    assert not (env._melted & channels)
 
 
 def test_season_is_drawn_per_episode_and_sensed():

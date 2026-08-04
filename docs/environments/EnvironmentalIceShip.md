@@ -2,7 +2,7 @@
 
 <img src="../envs/EnvironmentalIceShip.gif" width="360"/>
 
-IceShip with seasons: sunny episodes are safe; in snowing winters the ice grows and the channel freezes shut — caught or trapped means the episode ends.
+IceShip with seasons: winters grow the floating bergs (their fringe freezes in waves), summers shrink them; three cavities (one treasure) and sealed water pockets structure the landmass.
 
 ## Action space
 
@@ -32,6 +32,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/EnvironmentalIceShip-v0` | `[1, 4, 0]` |
+| `TopoGym/EnvironmentalIceShip-v0` | `[3, 4, 0]` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

@@ -2,7 +2,7 @@
 
 <img src="../envs/IceShip.gif" width="360"/>
 
-Arctic sailing: open water, sealed ice decoys, and a treasure chamber reachable through a water passage.
+Arctic sailing: coastal land, berg decoys, and the treasure cavity behind a guaranteed narrow channel; hitting ice ends the episode.
 
 ## Action space
 

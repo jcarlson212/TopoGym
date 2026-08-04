@@ -147,8 +147,9 @@ FAMILY_DOCS = {
                 "flip; H1 carries torsion over Z.",
     "TopRP2": "Corner chambers on the real projective plane: both "
               "identifications flipped.",
-    "IceShip": "Arctic sailing: open water, sealed ice decoys, and a "
-               "treasure chamber reachable through a water passage.",
+    "IceShip": "Arctic sailing: coastal land, berg decoys, and the "
+               "treasure cavity behind a guaranteed narrow channel; "
+               "hitting ice ends the episode.",
     "Ladders": "Platforms joined by ladders (vertical) and bridges "
                "(horizontal); the gem sits on the top platform.",
     "BankRobber": "Nested rooms with the money in the center; door "
@@ -165,10 +166,11 @@ FAMILY_DOCS = {
                     "a dense shrapnel field: every shard is a small "
                     "transient hole, the chamber the only large "
                     "persistent one.",
-    "EnvironmentalIceShip": "IceShip with seasons: sunny episodes are "
-                            "safe; in snowing winters the ice grows and "
-                            "the channel freezes shut — caught or "
-                            "trapped means the episode ends.",
+    "EnvironmentalIceShip": "IceShip with seasons: winters grow the "
+                            "floating bergs (their fringe freezes in "
+                            "waves), summers shrink them; three "
+                            "cavities (one treasure) and sealed water "
+                            "pockets structure the landmass.",
 }
 
 _SPACES_BLURB = """\
