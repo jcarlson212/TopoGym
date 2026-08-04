@@ -1,10 +1,8 @@
-name: Release to PyPI
+name: Release
 
-# Publishes when a GitHub release is created (or manually via the Actions
-# tab). Uses PyPI Trusted Publishing - no API tokens to manage. One-time
-# setup on pypi.org: Account -> Publishing -> add a "pending publisher"
-# with project name "topogym", owner "jcarlson212", repo "TopoGym",
-# workflow "release.yml", environment "pypi".
+# Build and publish to PyPI when a GitHub release is published.
+# TopoGym is pure Python: one sdist + one universal wheel covers every
+# supported interpreter (3.9+). Uses PyPI trusted publishing (no tokens).
 
 on:
   release:
@@ -19,6 +17,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Verify version metadata is in sync
+        run: python scripts/sync_version.py --check
       - name: Build sdist and wheel
         run: |
           pip install build

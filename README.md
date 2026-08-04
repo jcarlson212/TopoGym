@@ -5,181 +5,181 @@
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](pyproject.toml)
 [![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/2Sn6cTYbbw)
 
-**Build reinforcement-learning environments from topology.**
+**Gridworld environments with certified topology, for exploration
+research.**
 
-Compose spaces — tori, Möbius bands, annuli, and their products — into
-[Gymnasium](https://gymnasium.farama.org) environments whose homology is
-**certified**: computed by [GUDHI](https://gudhi.inria.fr/) from the actual
-free-space complex and cross-checked against the analytic expectation.
-Then measure how much of that topology your agent actually discovered,
-from its own trajectory.
+TopoGym is a [Gymnasium](https://gymnasium.farama.org) environment
+library where the *shape* of every world — its chambers, decoys, loops,
+and identifications — is known exactly: computed from the free-space
+cell complex by [GUDHI](https://gudhi.inria.fr/) and cross-checked
+against the analytic expectation at generation time. Everything is
+**deterministic up to seeds**, end to end.
 
 <table>
 <tr>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/square-holes.svg" width="170"/><br><sub><b>square-holes</b></sub></td>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/annulus.svg" width="170"/><br><sub><b>annulus</b></sub></td>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/mobius-rooms.svg" width="170"/><br><sub><b>mobius-rooms</b></sub></td>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/torus-rooms.svg" width="170"/><br><sub><b>torus-rooms</b></sub></td>
+<td align="center"><img src="docs/envs/IceShip.gif" width="215"/><br><sub><b>IceShip</b></sub></td>
+<td align="center"><img src="docs/envs/ClownChase.gif" width="215"/><br><sub><b>ClownChase</b></sub></td>
+<td align="center"><img src="docs/envs/SpaceWarp.gif" width="215"/><br><sub><b>SpaceWarp</b></sub></td>
+<td align="center"><img src="docs/envs/DontFall.gif" width="215"/><br><sub><b>DontFall</b></sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/klein-rooms.svg" width="170"/><br><sub><b>klein-rooms</b></sub></td>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/sphere-rooms.svg" width="170"/><br><sub><b>sphere-rooms</b></sub></td>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/square-decoyfield.svg" width="170"/><br><sub><b>square-decoyfield</b></sub></td>
-<td align="center"><img src="docs/envs/2d_bench_grid_small/control-maze.svg" width="170"/><br><sub><b>control-maze</b></sub></td>
+<td align="center"><img src="docs/envs/Nested3-50.gif" width="215"/><br><sub><b>Nested3-50</b></sub></td>
+<td align="center"><img src="docs/envs/Decoys4-50.gif" width="215"/><br><sub><b>Decoys4-50</b></sub></td>
+<td align="center"><img src="docs/envs/Maze-50.gif" width="215"/><br><sub><b>Maze-50</b></sub></td>
+<td align="center"><img src="docs/envs/TopTorus-50.gif" width="215"/><br><sub><b>TopTorus-50</b></sub></td>
 </tr>
 </table>
 
-*Rendered in reveal mode: walls (gray), holes (black), hidden doors
-(purple), decoys (dark red), start (blue), goal (green). Full gallery,
-including 3D and directed suites: [`docs/envs/`](docs/envs/README.md).*
+*Full gallery and per-environment documentation:
+[`docs/envs/`](docs/envs/README.md) ·
+[`docs/environments/`](docs/environments/README.md).*
 
 ## Why
 
-Exploration methods increasingly claim to exploit the *shape* of an
-environment — loops that shouldn't be re-searched, enclosed regions that
-must be entered to be known, irreversible passages that deserve caution.
-Testing those claims needs environments whose topology is **known**
-(certified, not assumed), **varied** (a plain square through RP² and
-3-manifolds), and **controllable** (same spec + same seed = byte-identical
-world) — plus size-matched **control environments** that are hard to
-explore but topologically trivial, so "understands topology" has to beat
-"good at generic novelty-seeking".
+Exploration methods increasingly claim to exploit environment
+*structure*: enclosed regions that must be entered to be known, decoys
+that punish persistence, loops that shouldn't be re-searched, reward
+gradients that lie. Testing those claims needs environments whose
+structure is **certified** (computed, not assumed), **controllable**
+(same config + same seed = byte-identical world, across processes), and
+**varied** along clean axes — world size, chamber count, decoy count,
+shape, nesting, bottlenecks, texture, and global topology — with
+size-matched controls that are hard to explore but topologically
+trivial.
 
-## What TopoGym gives you
+## Environments
 
-- **Topology → environment.** Immutable, composable specs compile to
-  Gymnasium envs: `Torus(15).holes(3).compile()`.
-- **Products.** `Annulus(15) * Circle(8)` is a real 3D environment; its
-  homology is computed directly *and* cross-checked with the Künneth
-  formula. `Circle(m) * Circle(n)` *is* a torus spec.
-- **Certified metadata on every env.** Betti numbers (ℤ/2, with integral
-  homology and torsion where the math allows), Euler characteristic,
-  orientability, genus, directed-asymmetry and bottleneck descriptors —
-  in `info["topology"]`, ready to sweep.
-- **Geometry the agent feels.** One cell complex is the source of truth
-  for both movement and homology: crossing a Möbius seam mirrors the
-  agent's egocentric view because the complex says the gluing flips.
-- **Topology of experience.** `ExplorationTracker` turns a rollout into
-  persistence diagrams over discovery time: which loops were found, when,
-  and how long spurious ones were believed. Rips utilities do the same
-  for learned representations.
-- **Frozen benchmarks + controls.** Six suites (48 pinned envs) covering
-  holes, chambers, decoys, one-way doors, trapdoors, and bridges.
+One benchmark, **TopoGym-v1**, in three slices under a universal
+interface (`Discrete(4)` screen-direction actions; observation =
+`(x, y)` + a 16-slot texture block):
+
+| slice | families | axis |
+|---|---|---|
+| **GridWorld2D** | `Dilution`, `Chambers2`, `ChamberCount`, `Decoys`, `Shape{Sq,Ci,Tr,St}`, `Nested`, `GiveUp`, `Bottleneck`, `Maze` | world size, chamber/decoy count, shape, nesting depth, corridor length, braiding |
+| **Texture** | `IceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase` | semantic local signals — and exactly where they fail |
+| **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal |
+
+Highlights: sealed **decoys** indistinguishable from chambers from the
+outside; **DontFall**'s fatal drop where the most novel direction is
+the worst one; **SpaceWarp**'s doorless treasure chamber, enterable
+only through one wormhole in a field of thirty (noise for
+gradient-followers, tractable for anything modeling transitions);
+**ClownChase**'s wandering distractor paying a depleting trickle of
+reward away from the treasure; Möbius/Klein/RP² worlds that are locally
+flat everywhere — only globally aggregated signals can tell them apart.
+
+Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`.
+Details per family: [docs/environments/](docs/environments/README.md).
 
 ## Install
 
 ```bash
-pip install topogym            # deps: gymnasium, numpy, gudhi
+pip install topogym              # deps: gymnasium, numpy, gudhi
+pip install "topogym[play]"      # + pygame, for keyboard play
 ```
 
-Development: `git clone`, then `pip install -e ".[testing]"`.
+Development: `git clone`, then `pip install -e ".[testing,play,assets]"`.
 
 ## Quick start
 
 ```python
-from topogym.spec import Annulus, Circle, Torus
+import gymnasium as gym
+import topogym  # registers the TopoGym/* ids
 
-# A torus with 3 holes and a hidden chamber.
-env = Torus(15).holes(3).chambers(1).compile(seed=7)
+env = gym.make("TopoGym/Decoys4-50-v0", seed=3)
 obs, info = env.reset(seed=0)
-info["topology"]["betti_z2"]   # [1, 5, 0] — certified
-info["topology"]["homology"]   # {'H0': 'Z', 'H1': 'Z^5', 'H2': '0'}
-
-# A product space: annulus x circle, a solid torus with a tunnel.
-env = (Annulus(15) * Circle(8)).compile(seed=3)
-env.unwrapped.topology.betti_z2          # (1, 2, 1, 0)
-env.unwrapped.topology.product           # Künneth cross-check: passed
+info["topology"]["betti_z2"]         # [1, 5, 0] — certified
+info["topology"]["betti_z2_sealed"]  # [2, 5, 0] — doors count as walls
 ```
 
-Measure what an agent discovered — from its trajectory, not ground truth:
+Episodes truncate after a pre-determined `4 * max(W, H)` steps; the
+goal pays +1 terminal reward by default (`reward_mode="sparse"`) and
+sits inside a designated chamber. `reward_mode="none"` for pure
+exploration, `"coverage"`, `"deceptive"`; `goal=False` removes the goal;
+`p_slip=0.1` for sticky-action noise; `complex="rips"` swaps the
+homology backend to a Vietoris–Rips complex on the quotient metric.
+
+Compose custom worlds with the fluent spec API:
+
+```python
+from topogym.spec import Torus
+
+env = Torus(15).holes(3).chambers(1).compile(seed=7)
+```
+
+Measure what an agent actually discovered — from its own trajectory:
 
 ```python
 from topogym.tda import ExplorationTracker
+from topogym.stats import StatsRecorder
 
+env = StatsRecorder(gym.make("TopoGym/Nested3-50-v0", seed=1))
 tracker = ExplorationTracker(env)
 tracker.reset(seed=0)
 # ... run your policy ...
-tracker.summary()
-# {'coverage': 0.99, 'recovery': {'betti_z2': 311, ...},
-#  'essential_bars': {0: 1, 1: 1},   # the real loop, found at step 311
-#  'transient_bars': {1: 2}, ...}    # two fake "holes", later disproven
+tracker.summary()      # discovery-time persistence: real vs transient loops
+env.episodes           # per-episode rows: return, coverage, chamber entries
 ```
 
-Classic Gymnasium ids and the frozen benchmarks still work:
+Archive-style (Go-Explore) resets are built in:
 
 ```python
-import gymnasium as gym
-import topogym  # registers the TopoGym/* env ids
-
-env = gym.make("TopoGym/Grid2D-v0", base="torus", n_holes=3, layout_seed=7)
-
-import topogym.benchmarks as bench
-for entry in bench.get_benchmark("2d_bench_grid_small"):
-    env = entry.make()
+env = gym.make("TopoGym/Maze-100-v0", seed=1, teleport=True)
+env.reset(options={"teleport": (12, 40)})  # any previously visited cell
 ```
 
-More in [`examples/`](examples/) and the [reference](docs/reference.md).
+## Play any environment yourself
 
-## Environments
+```bash
+python scripts/play.py --list
+python scripts/play.py TopoGym/SpaceWarp-v0
+```
 
-**`TopoGym/Grid2D-v0`** — egocentric agent, `Discrete(3)` (turn/turn/
-forward), on any 2D base. The agent's frame is parallel-transported by the
-cell complex: Möbius/Klein/RP² seams mirror its view, cube-sphere corners
-have 90° holonomy. Observations: occluded egocentric patches (or
-`obs_mode="global"`). **`TopoGym/Grid3D-v0`** — free agent, `Discrete(6)`,
-in 3D bases and product spaces.
+Arrow keys move; `Tab` reveals hidden structure; `r` resets;
+`Backspace` regenerates the layout.
 
-| 2D base | gluing (x, y) | b(ℤ/2) | | 1D / 3D | b(ℤ/2) |
-|---|---|---|---|---|---|
-| `square` | wall, wall | (1, 0, 0) | | `interval` | (1, 0) |
-| `cylinder` | wrap, wall | (1, 1, 0) | | `circle` | (1, 1) |
-| `torus` | wrap, wrap | (1, 2, 1) | | `box` | (1, 0, 0, 0) |
-| `mobius` | flip, wall | (1, 1, 0) | | `solid_torus` | (1, 1, 0, 0) |
-| `klein` | flip, wrap | (1, 2, 1) † | | `torus3` | (1, 3, 3, 1) |
-| `rp2` | flip, flip | (1, 1, 1) † | | `shell` | (1, 0, 1, 0) |
-| `sphere` | cube surface | (1, 0, 1) | | | |
+## Determinism, certification, and stats
 
-† H₁ is (partly) torsion — ℤ/2 sees it, ℚ doesn't; TopoGym certifies both
-and reports torsion explicitly.
+- **Determinism up to seeds is a guarantee, not an accident**:
+  (config, seed) fixes the layout and its metadata byte-for-byte —
+  including everything computed through GUDHI — and (env, reset seed,
+  actions) fixes the episode, `p_slip` included. Iteration orders are
+  sorted so nothing depends on interpreter hash state; a cross-process
+  test enforces it.
+- **Certified metadata on every env** (`info["topology"]`): Betti
+  numbers in both door conventions, Euler characteristic,
+  orientability, genus, bottleneck descriptors, the full generator
+  configuration, and the canonical config string
+  (`TG-GridWorld2D-S50-C1-D4-...`) as the run-log key.
+  `topogym.registry.manifest()` emits the validity manifest.
+- **Stats built in**: `info` tracks within-episode coverage, lifetime
+  (cross-episode) coverage, chamber entries, and return;
+  `StatsRecorder` accumulates pandas-ready rows.
 
-Features to compose onto any base: **holes** (+1 loop each), **chambers**
-(hidden rooms behind bump-doors), **decoys**, **partitions** (bridge
-bottlenecks, wall or see-through moat), and directed mechanics — **trap
-rooms**, **airlocks**, **trapdoor rooms** — whose reversibility structure
-is certified in the `asymmetry` block. Details:
-[docs/reference.md](docs/reference.md).
+## Documentation
 
-## Benchmarks
+- **[`docs/specs/topo_gym_overview.pdf`](docs/specs/topo_gym_overview.pdf)**
+  — the detailed environment specification: world model, registry,
+  generator schema, modes, reward semantics, complex backends, and the
+  Texture/Top constructions. The authority on the benchmark.
+- [docs/environments/](docs/environments/README.md) — per-environment
+  pages (spaces, rewards, registered configurations).
+- [docs/reference.md](docs/reference.md) — library internals: the cell
+  complex, the generator, TDA.
 
-| collection | envs | contents |
-|---|---|---|
-| `2d_bench_grid_small` | 16 | all 7 bases, holes/chambers/decoys, 2 controls |
-| `3d_bench_grid_small` | 8 | rings (b₁), voids (b₂), rooms, 3-torus, shell, control |
-| `2d/3d_bench_grid_small_directed` | 12 | trap rooms, airlocks, trapdoor rooms |
-| `2d/3d_bench_grid_small_bridges` | 12 | dumbbells, moats, hidden bridges, torus meridian |
+## Contributing 🤝
 
-Each entry pins `(config, layout_seed)` and registers a Gymnasium id —
-everyone runs byte-identical environments. Suggested protocol (≥5 agent
-seeds, coverage + Betti-recovery curves, always include the controls):
-see [docs/reference.md](docs/reference.md) and [`examples/`](examples/).
-
-## Community & contributing
-
-- **Discord**: [join us](https://discord.gg/2Sn6cTYbbw) to discuss
-  benchmarks, results, and topology questions.
-- **Add an environment** (no code needed) with
+- **Discord**: [join us](https://discord.gg/2Sn6cTYbbw).
+- Add an environment without writing code:
   [`scripts/new_env.py`](scripts/new_env.py) — walkthrough in
   [docs/contributing_environments.md](docs/contributing_environments.md).
-- **Extend the framework**: new base manifolds, hole shapes, and door
-  mechanics have documented extension points; see
-  [CONTRIBUTING.md](CONTRIBUTING.md). All new topology must come with
+- Extend the framework (new families, shapes, mechanics):
+  [CONTRIBUTING.md](CONTRIBUTING.md). All new topology ships with
   certified tests — the homology engine is the referee.
 
-Roadmap: genus-g surfaces (polygon gluings), non-orientable 3D bases (3D
-frame transport, which also unlocks compiling Möbius × S¹), continuous
-compilation (cells as charts), larger benchmark tiers.
-
 ## Citation
+
+If you use TopoGym in your research, please cite:
 
 ```bibtex
 @software{carlson2026topogym,

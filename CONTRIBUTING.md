@@ -11,7 +11,7 @@ git clone https://github.com/<you>/TopoGym.git
 cd TopoGym
 pip install -e ".[testing]"
 pip install ruff            # linting
-pytest -q                   # ~130 tests, a few seconds
+pytest -q                   # ~220 tests, a few seconds
 ruff check .
 ```
 
@@ -19,9 +19,11 @@ ruff check .
 
 | you want to add | start here |
 |---|---|
-| a specific environment / benchmark entry | [docs/contributing_environments.md](docs/contributing_environments.md) — usually zero code |
-| a hole shape | `topogym/generation/shapes.py` (one function + registry entry) |
-| a door / traversal mechanic | `DoorSpec` handling in `topogym/generation/generator.py` + `topogym/envs/core.py`; extend the `asymmetry` block if it is directed |
+| a specific environment / registry entry | [docs/contributing_environments.md](docs/contributing_environments.md) — usually zero code |
+| a hole or room shape | `topogym/generation/shapes.py` / `topogym/generation/rooms.py` (one function + registry entry) |
+| a cell mechanic (hazard/wormhole-style) | constants + `TextureGrid2DEnv` hooks in `topogym/envs/texture2d.py` + a tile in `topogym/rendering/tiles.py` |
+| a Texture scenario | a builder in `topogym/generation/scenarios.py` + `registry.TEXTURE_SCENARIOS` |
+| a generation style | `topogym/generation/modes.py` (nested/corridor are the templates) |
 | a base manifold | subclass `BaseMap2D` in `topogym/core/basemap.py`; implement transport + `face_cycle` and the homology engine works unchanged |
 | an experiment / evaluation script | `examples/` |
 
@@ -93,7 +95,7 @@ it walks the same fork → generate → verify → PR flow with the env tooling.
 
 - [ ] `pytest -q` and `ruff check .` pass
 - [ ] new behavior has tests; new envs have certified-topology tests
-- [ ] SVG gallery regenerated if benchmarks changed
+- [ ] gallery/GIFs regenerated if registry entries changed
 - [ ] docs updated (README tables, gallery, or the environments guide)
 
 ## Releasing (maintainers)
@@ -102,11 +104,11 @@ Publishing to PyPI is automated via
 [`.github/workflows/release.yml`](.github/workflows/release.yml) using PyPI
 trusted publishing (no tokens). To cut a release:
 
-1. Bump the version in all three places (keep them identical):
-   - `pyproject.toml` → `version`
-   - `topogym/__init__.py` → `__version__`
-   - `CITATION.cff` → `version` (and `date-released`)
-2. Make sure `pytest -q` and `ruff check .` pass and the SVG gallery is
+1. Bump `version` in `pyproject.toml` and run
+   `python scripts/sync_version.py` (propagates to `CITATION.cff`,
+   `topogym.__version__`, and the README citation; CI enforces the
+   sync). Update `date-released` in `CITATION.cff`.
+2. Make sure `pytest -q` and `ruff check .` pass and the gallery is
    current (`python scripts/generate_assets.py`); commit and push.
 3. Create a GitHub release with a matching tag, e.g.:
 
