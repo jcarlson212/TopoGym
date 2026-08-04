@@ -121,6 +121,11 @@ space, where the loop can still tighten. `env.h1_representatives()`
 returns exactly what is drawn ({cycle, rim, pocket} per class), so
 archive methods consume the same loops the overlay shows.
 
+`OLLIVIER_HEATMAP=1` tints free cells by Ollivier–Ricci curvature
+(strongest red = most negative: doorways, corridors, bottlenecks) with
+a gradient-scale legend top-left showing the min/max of the scale.
+The field comes from `env.ollivier_ricci()`, cached per layout.
+
 ```bash
 TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 python scripts/play.py TopoGym/Decoys4-50-v0
 ```

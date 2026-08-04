@@ -806,8 +806,8 @@ documentation).
 \subsection{Debugging the topology live}
 \label{sec:overlay}
 
-Two environment variables turn the simulator into a topology
-debugger; both are off by default and cost nothing when unset.
+Three environment variables turn the simulator into a topology
+debugger; all are off by default and cost nothing when unset.
 
 \paragraph{The H1 overlay.} \texttt{TOPOGYM\_OVERLAY=1} (alias
 \texttt{OVERLAY\_ENABLED=1}) recomputes, on every rendered frame, the
@@ -841,6 +841,20 @@ overlay shows --- what you see is the interface.
 # watch loops be conjectured, confirmed, and refuted as you drive:
 TOPOGYM_OVERLAY=1 python scripts/play.py TopoGym/Decoys4-50-v0
 \end{lstlisting}
+
+\paragraph{The Ollivier--Ricci heatmap.}
+\texttt{OLLIVIER\_HEATMAP=1} tints every free cell by its
+Ollivier--Ricci curvature (the per-cell field of
+\texttt{env.ollivier\_ricci()}, computed once and cached per
+layout): the most negatively curved cells --- doorways, corridors,
+bottlenecks --- glow strongest red, fading to untinted at the
+layout's maximum curvature. A legend in the top-left corner shows the
+gradient bar with the scale's minimum and maximum values, so the
+colors read as numbers. Driving through a world with the heatmap on
+makes the geometric signature of its bottlenecks visible at a glance
+--- the red ridges are exactly the cells the curvature-coverage
+metric of Section~\ref{sec:code} tracks. It composes with the other
+two variables.
 
 \paragraph{The step stream.} \texttt{TOPOGYM\_DEBUG=1} streams
 everything the environment computes to the console: a reset line

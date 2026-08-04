@@ -136,6 +136,10 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
         overlay = getattr(env, "_render_overlay", None)
         if overlay is not None:
             overlay(img, tile)
+        if getattr(env, "_ricci_overlay", False):
+            from topogym.rendering.overlay import draw_ricci_heatmap
+
+            draw_ricci_heatmap(env, img, tile)
         if getattr(env, "_overlay", False):
             from topogym.rendering.overlay import draw_h1_overlay
 
@@ -153,6 +157,10 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
     overlay = getattr(env, "_render_overlay", None)
     if overlay is not None:
         overlay(img, tile)
+    if getattr(env, "_ricci_overlay", False):
+        from topogym.rendering.overlay import draw_ricci_heatmap
+
+        draw_ricci_heatmap(env, img, tile)
     if getattr(env, "_overlay", False):
         from topogym.rendering.overlay import draw_h1_overlay
 
