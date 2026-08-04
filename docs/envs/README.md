@@ -41,7 +41,7 @@ GIFs show a coverage explorer navigating. Regenerate with
 | **TopTorus** | `TopoGym/TopTorus-50-v0` | `[1, 5, 0]` | <img src="TopTorus.png" width="200"/> |
 | **TopKlein** | `TopoGym/TopKlein-50-v0` | `[1, 5, 0]` | <img src="TopKlein.png" width="200"/> |
 | **TopRP2** | `TopoGym/TopRP2-50-v0` | `[1, 4, 0]` | <img src="TopRP2.png" width="200"/> |
-| **IceShip** | `TopoGym/IceShip-v0` | `[1, 4, 0]` | <img src="IceShip.gif" width="200"/> |
+| **IceShip** | `TopoGym/IceShip-v0` | `[3, 4, 0]` | <img src="IceShip.png" width="200"/> |
 | **Ladders** | `TopoGym/Ladders-v0` | `[1, 0, 0]` | <img src="Ladders.gif" width="200"/> |
 | **BankRobber** | `TopoGym/BankRobber-v0` | `[1, 4, 0]` | <img src="BankRobber.gif" width="200"/> |
 | **DontFall** | `TopoGym/DontFall-v0` | `[1, 12, 0]` | <img src="DontFall.gif" width="200"/> |

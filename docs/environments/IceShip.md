@@ -1,6 +1,6 @@
 # IceShip
 
-<img src="../envs/IceShip.gif" width="360"/>
+<img src="../envs/IceShip.png" width="360"/>
 
 Arctic sailing: coastal land, berg decoys, and the treasure cavity behind a guaranteed narrow channel; hitting ice ends the episode.
 
@@ -24,7 +24,7 @@ occluded egocentric patches, `obs_mode="global"` the full symbolic grid.
 
 `reward_mode="sparse"` (default): +1 terminal on reaching the goal.
 Other modes: `none`, `coverage`, `deceptive`; `goal=False` removes the
-goal entirely. Episodes truncate after a pre-determined `4 * max(W, H)`
+goal entirely. Episodes truncate after a pre-determined `1.2 * max(W, H)`
 steps (`max_steps` overrides). Layouts, metadata, and rollouts are
 deterministic up to seeds.
 
@@ -32,6 +32,6 @@ deterministic up to seeds.
 
 | id | certified b(Z/2) |
 |---|---|
-| `TopoGym/IceShip-v0` | `[1, 4, 0]` |
+| `TopoGym/IceShip-v0` | `[3, 4, 0]` |
 
 Make with `gym.make(id, seed=n)`; the seed drives layout variation within the frozen configuration.

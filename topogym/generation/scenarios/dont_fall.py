@@ -166,7 +166,16 @@ def build_dont_fall(seed: int) -> Layout:
         _mark(textures, drop_adjacent, C.TEX_DROP_ADJ)
         _mark(textures, interiors & free_set, C.TEX_INTERIOR)
         _mark(textures, doors, C.TEX_DOOR)
+        # A forest rings the outermost perimeter: still free cells,
+        # rendered as trees over dark ground.
+        edge = 8
+        forest = frozenset(
+            c for c in free_set
+            if (min(c[0], c[1], size - 1 - c[0], size - 1 - c[1]) < edge)
+            and c not in interiors and c not in doors
+        )
         layout.extras = {"textures": textures,
-                        "hazards": frozenset(hazards)}
+                        "hazards": frozenset(hazards),
+                        "forest": forest}
         return layout
     raise GenerationError(f"could not build DontFall for seed {seed}")

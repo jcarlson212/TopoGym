@@ -80,21 +80,28 @@ def build_nested(cfg: TopoGenConfig2D, base: BaseMap2D,
             for y in range(cy - r, cy + r + 1)
             if max(abs(x - cx), abs(y - cy)) == r
         }
-        choices = [s for s in range(4) if s != prev_side]
-        side = choices[int(rng.integers(len(choices)))]
-        prev_side = side
-        side_cells = _SIDE_CELLS[side](cx, cy, r)
-        door = side_cells[int(rng.integers(len(side_cells)))]
-
-        ring.discard(door)
-        if cfg.door_kind == "open":
-            spec = door_cls(door, "open", tries=0)
+        n_doors = max(1, min(4, cfg.doors_per_chamber))
+        if n_doors == 1:
+            choices = [s for s in range(4) if s != prev_side]
+            sides = [choices[int(rng.integers(len(choices)))]]
         else:
-            spec = door_cls(door, "bump",
-                            tries=_sample_tries(rng, cfg.door_tries))
-        cell_types[door] = DOOR
-        doors[door] = spec
-        door_specs = [spec]
+            sides = [int(i) for i in rng.permutation(4)[:n_doors]]
+        prev_side = sides[0]
+        door_specs = []
+        door_cells = []
+        for side in sides:
+            side_cells = _SIDE_CELLS[side](cx, cy, r)
+            door = side_cells[int(rng.integers(len(side_cells)))]
+            ring.discard(door)
+            if cfg.door_kind == "open":
+                spec = door_cls(door, "open", tries=0)
+            else:
+                spec = door_cls(door, "bump",
+                                tries=_sample_tries(rng, cfg.door_tries))
+            cell_types[door] = DOOR
+            doors[door] = spec
+            door_specs.append(spec)
+            door_cells.append(door)
         for c in ring:
             cell_types[c] = WALL
         interior = tuple(
@@ -108,8 +115,9 @@ def build_nested(cfg: TopoGenConfig2D, base: BaseMap2D,
             cells=tuple(sorted(ring)),
             interior=interior,
             doors=tuple(door_specs),
-            meta={"components": 1, "level": level,
-                  "door_cells": (door,)},
+            # d door gaps split the ring into d wall arcs.
+            meta={"components": len(door_specs), "level": level,
+                  "door_cells": tuple(door_cells)},
         ))
 
 

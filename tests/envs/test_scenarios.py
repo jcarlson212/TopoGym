@@ -34,7 +34,7 @@ def _step_onto(env, target):
 
 
 @pytest.mark.parametrize("name,betti,sealed", [
-    ("IceShip", [1, 4, 0], [2, 4, 0]),
+    ("IceShip", [3, 4, 0], [6, 4, 0]),
     ("Ladders", [1, 0, 0], [1, 0, 0]),
     ("BankRobber", [1, 4, 0], [5, 4, 0]),
     ("DontFall", [1, 12, 0], [13, 12, 0]),
@@ -79,7 +79,8 @@ def test_blocker_adjacency_slots():
 def test_ice_ship_channel_is_the_only_way(seed):
     """Guaranteed: the narrow channel is the sole route to the goal."""
     layout = build_scenario("ice_ship", seed)
-    (chamber,) = [f for f in layout.features if f.kind == "chamber"]
+    chamber = next(f for f in layout.features
+                   if f.kind == "chamber" and f.meta["treasure"])
     channel = set(chamber.meta["channel"])
     assert len(channel) >= 12  # a genuine passage across the ice
     free = set(layout.free_cells)

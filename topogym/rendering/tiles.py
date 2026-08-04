@@ -107,6 +107,27 @@ def _dirt(rng: np.random.Generator) -> np.ndarray:
     return t
 
 
+def _dirt_dark(rng: np.random.Generator) -> np.ndarray:
+    t = _flat((96, 66, 40))
+    _chunky_noise(t, rng, 11)
+    _speckle(t, rng, (66, 44, 26), 6)
+    _speckle(t, rng, (122, 88, 54), 4)
+    return t
+
+
+def _tree(rng: np.random.Generator) -> np.ndarray:
+    t = _dirt_dark(rng)
+    t[10:14, 7:9] = (78, 52, 30)  # trunk
+    cx = 7 + int(rng.integers(0, 2))
+    xs, ys = np.meshgrid(np.arange(BASE), np.arange(BASE))
+    canopy = (xs - cx) ** 2 + (ys - 6) ** 2 <= 16
+    t[canopy] = (44, 110, 52)
+    shade = (xs - cx + 1) ** 2 + (ys - 5) ** 2 <= 6
+    t[canopy & shade] = (66, 146, 70)  # sunlit side
+    _speckle(t, rng, (30, 84, 40), 3)
+    return t
+
+
 def _floor(rng: np.random.Generator) -> np.ndarray:
     t = _flat((228, 228, 234))
     _chunky_noise(t, rng, 4)
@@ -381,6 +402,8 @@ BUILDERS = {
     "wood": _wood,
     "door": _door,
     "dirt": _dirt,
+    "dirt_dark": _dirt_dark,
+    "tree": _tree,
     "floor": _floor,
     "slab": _slab,
     "hall": _hall,
