@@ -116,7 +116,8 @@ def test_metrics_coverage_and_hole_milestones():
             break
     m = env.metrics()
     # Global observation sees the hole immediately.
-    assert m.steps_to_holes.get(1) == 1
+    assert m.steps_to_h1_holes.get(1) == 1
+    assert m.steps_to_h0_holes.get(1) == 1
     # A long random walk on a tiny grid crosses coverage milestones.
     assert 0.5 in m.steps_to_coverage
     fracs = sorted(m.steps_to_coverage)

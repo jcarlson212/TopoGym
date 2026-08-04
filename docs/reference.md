@@ -158,12 +158,21 @@ m.visitation_entropy               # bits; _normalized in [0, 1]
 m.mean_regret                      # steps-to-goal minus shortest path
 m.planning_efficiency              # optimality of replays after discovery
 m.steps_to_coverage                # {0.5: step, 0.6: ..., ..., 1.0: ...}
-m.steps_to_holes                   # {k: step the k-th loop was found}
+m.steps_to_h1_holes                # {k: step the k-th loop was found}
+m.steps_to_h0_holes                # same, for components
+m.curvature_coverage_below_zero    # track_curvature=True
 env.coverage_at(1000)              # lifetime coverage by global step
 m.to_dict()                        # everything, logging-ready
 ```
 
-`track_holes=True` timestamps loop discoveries by recomputing the
-observed region's b1 each step (opt-in; it runs GUDHI per step).
-`env.shortest_path()` supplies the optimal baseline for regret and
-planning efficiency.
+Expensive stats are opt-in toggles, off by default: `track_holes`
+timestamps hole discoveries by recomputing observed homology each step
+(GUDHI per step); `track_curvature` adds Ollivier–Ricci curvature
+coverage (exact W1, once per layout, cached) — and
+`recorder.curvature_coverage(x)` answers "percent of cells with
+curvature < x reached" for any threshold on demand, with
+`env.ollivier_ricci()` exposing the raw per-cell field.
+`env.homology_stats(which)` returns per-dimension hole counts
+(`HomologyStats`: h0, h1, h2/h3 optional) for observed/visited/
+certified regions. `env.shortest_path()` supplies the optimal baseline
+for regret and planning efficiency.

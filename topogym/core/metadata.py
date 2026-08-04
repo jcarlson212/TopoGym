@@ -51,6 +51,33 @@ class BettiNumbers:
         return f"b0={self.b0} b1={self.b1} b2={self.b2}"
 
 
+@dataclass(frozen=True)
+class HomologyStats:
+    """Per-dimension hole counts of a region, as a value object.
+
+    Gridworlds carry ``h0`` (components) and ``h1`` (loops); ``h2`` and
+    ``h3`` are ``None`` where the dimension does not apply (2D free
+    spaces with boundary have no enclosed voids).
+    """
+
+    h0: int
+    h1: int
+    h2: int | None = None
+    h3: int | None = None
+
+    def as_dict(self) -> dict:
+        return {"h0": self.h0, "h1": self.h1, "h2": self.h2,
+                "h3": self.h3}
+
+    def __str__(self) -> str:
+        parts = [f"h0={self.h0}", f"h1={self.h1}"]
+        if self.h2 is not None:
+            parts.append(f"h2={self.h2}")
+        if self.h3 is not None:
+            parts.append(f"h3={self.h3}")
+        return " ".join(parts)
+
+
 def homology_strings(betti_q: tuple | None, h1_torsion: tuple,
                      betti_z2: tuple) -> dict:
     """Human-readable homology groups, e.g. ``{"H1": "Z^2 + Z/2"}``."""

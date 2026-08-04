@@ -41,7 +41,7 @@ import numpy as np
 
 from topogym.core import constants as C
 from topogym.core.homology import _UnionFind, analyze_2d
-from topogym.core.metadata import TopologyMetadata
+from topogym.core.metadata import HomologyStats, TopologyMetadata
 from topogym.generation.config import TopoGenConfig2D
 from topogym.generation.generator import Layout, generate_2d
 
@@ -286,6 +286,45 @@ class TopoEnvCore(gym.Env):
         }
 
     # -- environment structure accessors -------------------------------------
+
+    def ollivier_ricci(self) -> dict:
+        """Per-cell Ollivier-Ricci curvature of the free-cell graph
+        (mean over incident edges; alpha = 0, exact W1). Expensive on
+        large worlds; computed once and cached per layout."""
+        cached = getattr(self, "_ricci_cache", None)
+        if cached is not None and cached[0] is self.layout:
+            return cached[1]
+        from topogym.curvature import ollivier_ricci
+
+        ricci = ollivier_ricci(set(self.layout.free_cells),
+                               self.layout.base.neighbors)
+        self._ricci_cache = (self.layout, ricci)
+        return ricci
+
+    def homology_stats(self, which: str = "observed") -> HomologyStats:
+        """Per-dimension hole counts as a :class:`HomologyStats`.
+
+        ``which``: "observed" (the region the agent has seen and
+        believes free — the live discovery state), "visited" (cells
+        physically stood on), "certified" (the layout's ground truth),
+        or "certified_sealed" (ground truth, doors count as walls).
+        """
+        if which == "certified":
+            betti = self.topology.betti_z2
+        elif which == "certified_sealed":
+            betti = self.topology.betti_z2_sealed
+        elif which == "observed":
+            betti = self.observed_betti()
+        elif which == "visited":
+            betti = self.visited_betti()
+        else:
+            raise ValueError(
+                'which must be "observed", "visited", "certified", or '
+                f'"certified_sealed", got {which!r}'
+            )
+        h2 = int(betti[2]) if len(betti) > 2 else None
+        return HomologyStats(h0=int(betti[0]), h1=int(betti[1]), h2=h2)
+
 
     def graph(self):
         """The free-cell graph as a :class:`networkx.Graph` (nodes are
