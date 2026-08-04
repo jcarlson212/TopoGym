@@ -64,7 +64,8 @@ COMPLEX_BACKENDS = ("cubical", "rips")
 #: Set TOPOGYM_DEBUG=1 to stream everything the env computes each step
 #: to the console (the "topogym" logger at DEBUG level).
 logger = logging.getLogger("topogym")
-if os.environ.get("TOPOGYM_DEBUG") and not logger.handlers:
+logger.addHandler(logging.NullHandler())
+if os.environ.get("TOPOGYM_DEBUG") and not logger.handlers[1:]:
     _handler = logging.StreamHandler()
     _handler.setFormatter(logging.Formatter("[topogym] %(message)s"))
     logger.addHandler(_handler)
