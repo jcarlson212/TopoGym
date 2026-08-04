@@ -1,0 +1,73 @@
+"""The Top variant: corner chambers on every identification topology."""
+
+import gymnasium as gym
+import pytest
+
+import topogym  # noqa: F401
+from topogym.complexes.rips import rips_betti
+from topogym.generation.top import build_top
+
+
+@pytest.mark.parametrize("name,betti", [
+    ("TopPlane", [1, 4, 0]),
+    ("TopCylinder", [1, 5, 0]),
+    ("TopMobius", [1, 5, 0]),
+    ("TopTorus", [1, 5, 0]),
+    ("TopKlein", [1, 5, 0]),
+    ("TopRP2", [1, 4, 0]),
+])
+def test_top_ambient_classes_certify(name, betti):
+    env = gym.make(f"TopoGym/{name}-50-v0", seed=1).unwrapped
+    _, info = env.reset(seed=0)
+    assert info["topology"]["betti_z2"] == betti
+    # Exactly one corner chamber holds the treasure.
+    treasures = [f for f in env.layout.features if f.meta["treasure"]]
+    assert len(treasures) == 1
+    assert env.layout.goal in treasures[0].interior
+
+
+def test_top_chambers_hug_the_corners():
+    layout = build_top("torus", seed=2)
+    size = layout.base.layout_size()[0]
+    for f in layout.features:
+        xs = [c[0] for c in f.cells]
+        ys = [c[1] for c in f.cells]
+        # Each chamber sits inside one corner quadrant of the
+        # fundamental square (meeting the others across the edges).
+        assert max(xs) - min(xs) < size // 2
+        assert all(x < size // 2 for x in xs) or all(
+            x >= size // 2 for x in xs
+        )
+        assert all(y < size // 2 for y in ys) or all(
+            y >= size // 2 for y in ys
+        )
+
+
+def test_top_start_is_central():
+    layout = build_top("klein", seed=3)
+    size = layout.base.layout_size()[0]
+    x, y = layout.start
+    assert abs(x - size // 2) + abs(y - size // 2) <= size // 4
+
+
+@pytest.mark.parametrize("topology", ["torus", "mobius", "rp2"])
+def test_top_rips_backend_agrees(topology):
+    layout = build_top(topology, seed=1)
+    assert (
+        rips_betti(layout.base, layout.free_cells)
+        == layout.metadata.betti_z2[:2]
+    )
+
+
+def test_top_wraparound_movement():
+    env = gym.make("TopoGym/TopTorus-50-v0", seed=1).unwrapped
+    env.reset(seed=0)
+    # Walking left across the seam wraps to the far column when free.
+    base = env.layout.base
+    free = set(env.layout.free_cells)
+    row = next(
+        y for y in range(50) if (0, y) in free and (49, y) in free
+    )
+    env._state = base.turn_left(base.initial_state((0, row)))
+    env.step(env.MOVE_LEFT)
+    assert env._state.cell == (49, row)
