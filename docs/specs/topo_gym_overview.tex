@@ -1283,10 +1283,16 @@ baseline; the exploration family --- ICM~\cite{pathak17},
 RND~\cite{burda19}, and an archive method in the Go-Explore
 line~\cite{ecoffet21} consuming \texttt{VisitedComplex} cycles
 (Section~\ref{sec:visited}); and GRPO~\cite{shao24} for
-group-relative training. Benchmark tooling is not part of the core
+group-relative training. Reported numbers follow the reliable-
+evaluation protocol of Agarwal et al.~\cite{agarwal21}
+(\texttt{rliable}): per-run scores come from the library's
+deterministic \texttt{metrics()} facade, and aggregates across runs,
+seeds, and environments are interquartile means with stratified
+bootstrap confidence intervals and performance profiles --- never
+bare point estimates. Benchmark tooling is not part of the core
 install: \texttt{pip install topogym[benchmarks]} pulls the extras
-(including Ray~\cite{moritz18} for distributed runs); the core
-library never depends on them.
+(Ray~\cite{moritz18} for distributed runs, \texttt{rliable} for the
+aggregate statistics); the core library never depends on them.
 
 \begin{thebibliography}{99}
 \itemsep0pt
@@ -1340,6 +1346,12 @@ Prediction.
 K.~O.~Stanley, and J.~Clune.
 \newblock First return, then explore.
 \newblock \emph{Nature}, 590:580--586, 2021.
+
+\bibitem{agarwal21} R.~Agarwal, M.~Schwarzer, P.~S.~Castro,
+A.~Courville, and M.~G.~Bellemare.
+\newblock Deep Reinforcement Learning at the Edge of the Statistical
+Precipice.
+\newblock \emph{NeurIPS 2021}, 2021.
 
 \bibitem{shao24} Z.~Shao et al.
 \newblock DeepSeekMath: Pushing the Limits of Mathematical Reasoning

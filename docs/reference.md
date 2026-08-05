@@ -234,4 +234,8 @@ curvature < x reached" for any threshold on demand, with
 `env.homology_stats(which)` returns per-dimension hole counts
 (`HomologyStats`: h0, h1, h2/h3 optional) for observed/visited/
 certified regions. `env.shortest_path()` supplies the optimal baseline
-for regret and planning efficiency.
+for regret and planning efficiency. `metrics()` is deliberately
+per-run: aggregation across runs/seeds/envs belongs to
+[rliable](https://github.com/google-research/rliable) (IQM, stratified
+bootstrap CIs — `pip install topogym[benchmarks]`), never to bare
+means inside the library.

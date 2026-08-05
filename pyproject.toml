@@ -31,7 +31,9 @@ dependencies = ["gymnasium>=0.29", "numpy>=1.21", "gudhi>=3.8"]
 testing = ["pytest>=7.0", "networkx>=3.0"]
 play = ["pygame>=2.1"]
 assets = ["imageio>=2.31"]  # GIF generation for the docs gallery
-benchmarks = ["ray>=2.9"]  # baseline/benchmark runs (never a core dep)
+benchmarks = ["ray>=2.9", "rliable>=1.2"]  # baseline/benchmark runs
+# (never core deps): Ray for distributed runs, rliable for aggregate
+# statistics (IQM, stratified bootstrap CIs, performance profiles)
 graph = ["networkx>=3.0"]  # env.graph() as a networkx.Graph
 
 [project.urls]
