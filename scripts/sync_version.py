@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Sync the package version from pyproject.toml (the single source of
-truth) into CITATION.cff, topogym/__init__.py, and the README citation.
+truth) into CITATION.cff, topogym/__init__.py, the README citation,
+and croissant.json (both its version field and the citeAs bibtex).
 
     python scripts/sync_version.py          # rewrite files in place
     python scripts/sync_version.py --check  # exit 1 if anything is stale
@@ -30,6 +31,9 @@ TARGETS = (
      '__version__ = "{v}"'),
     ("README.md", r'(?m)^(\s*version\s*=\s*)\{[^}]*\}(,?)$',
      r"\g<1>{{{v}}}\g<2>"),
+    ("croissant.json", r'(?m)^(\s*"version":\s*)"[^"]*"(,?)$',
+     r'\g<1>"{v}"\g<2>'),
+    ("croissant.json", r'version=\{{[^}}]*\}}', "version={{{v}}}"),
 )
 
 
