@@ -112,12 +112,24 @@ Publishing to PyPI is automated via
 [`.github/workflows/release.yml`](.github/workflows/release.yml) using PyPI
 trusted publishing (no tokens). To cut a release:
 
-1. Bump `version` in `pyproject.toml` and run
-   `python scripts/sync_version.py` (propagates to `CITATION.cff`,
-   `topogym.__version__`, and the README citation; CI enforces the
-   sync). Update `date-released` in `CITATION.cff`.
-2. Make sure `pytest -q` and `ruff check .` pass and the gallery is
-   current (`python scripts/generate_assets.py`); commit and push.
+1. Bump `version` in `pyproject.toml` — the **single source of
+   truth**; it is the only place you ever edit a version — then run
+   `python scripts/sync_version.py` to propagate it to
+   `topogym.__version__`, `CITATION.cff`, the README citation, and
+   `croissant.json` (its `version` field and `citeAs` bibtex). Update
+   `date-released` in `CITATION.cff` by hand. Three guardrails hold
+   the lockstep: the pre-commit hook, the `version-sync` CI workflow,
+   and `tests/test_version_sync.py` — a drifted version cannot be
+   committed, merged, or released.
+2. Regenerate whatever the release changed: the gallery and per-env
+   pages if registry entries moved
+   (`python scripts/generate_assets.py`), the Croissant metadata if
+   the registry or certified values changed
+   (`python scripts/generate_croissant.py` — refreshes the manifest
+   and its sha256), and the spec PDF if the tex changed
+   (`docs/specs/compile_overview.sh`). Make sure `pytest -q` and
+   `ruff check .` pass; commit and push (the pre-commit gates run the
+   fast checks for you).
 3. Create a GitHub release with a matching tag, e.g.:
 
    ```bash
