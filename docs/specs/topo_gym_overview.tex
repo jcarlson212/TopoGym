@@ -105,22 +105,27 @@ benchmark is the registry crossed with the published seed lists.
 \textbf{Family} & \textbf{Description} & \textbf{Sizes / variants} \\
 \midrule
 \texttt{Dilution-\{50,200\}} &
-  one chamber, no decoys & --- \\
+  one chamber, no decoys & kwarg: \texttt{chamber\_side} \\
 \texttt{Chambers2-\{50,100,200,400\}} &
   two chambers, fixed geometry; the world-scaling family & --- \\
 \texttt{ChamberCount\{1,2,4,8\}-200} &
-  $k$ separated chambers & kwarg: none \\
+  $k$ separated chambers & --- \\
 \texttt{Decoys\{0,1,2,4,8\}-50} &
   one chamber among $k_d$ sealed decoys & kwarg: \texttt{decoy\_side} \\
 \texttt{Shape\{Sq,Ci,Tr,St\}-50} &
-  area-matched chamber shapes & --- \\
+  area-matched chamber shapes, centered, bottom-left start &
+  kwarg: \texttt{chamber\_side} \\
 \texttt{Nested\{1,2,3\}-50} &
-  sequentially nested shells & --- \\
+  sequentially nested shells &
+  kwarg: \texttt{doors\_per\_chamber} \\
 \texttt{GiveUp\{1,2,4\}-50} &
-  door behind a dead-end corridor of the given length & --- \\
+  door behind a dead-end corridor of the given length, centered,
+  bottom-left start & kwarg: \texttt{door\_corridor\_len} \\
 \texttt{Bottleneck\{3,6\}-100} &
-  tree of rooms joined by width-1 corridors of the given length &
-  kwarg: \texttt{rooms} \\
+  centered tree of side-24 rooms joined by width-1 corridors of the
+  given length &
+  kwargs: \texttt{rooms}, \texttt{corridor\_len},
+  \texttt{chamber\_side} \\
 \texttt{Maze-\{50,100\}} &
   seeded perfect maze (uniform spanning tree over cells) &
   kwarg: \texttt{braid} \\
