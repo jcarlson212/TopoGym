@@ -1,0 +1,25 @@
+# Commit gates (https://pre-commit.com): enable once with
+#   pip install pre-commit && pre-commit install
+# All hooks run from the contributor's own environment (language:
+# system), so they exercise exactly the ruff/pytest that CI uses.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff check
+        entry: python3 -m ruff check .
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: version-sync
+        name: version sync
+        entry: python3 scripts/sync_version.py --check
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: test-gate
+        name: unit tests (>= 90% must pass)
+        entry: python3 scripts/test_gate.py --min-pass 0.9
+        language: system
+        pass_filenames: false
+        always_run: true
