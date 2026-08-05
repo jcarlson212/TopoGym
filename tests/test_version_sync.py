@@ -23,3 +23,8 @@ def test_versions_match():
     assert f'version = "{topogym.__version__}"' in pyproject
     citation = (ROOT / "CITATION.cff").read_text()
     assert f"version: {topogym.__version__}" in citation
+    croissant = (ROOT / "croissant.json").read_text()
+    assert f'"version": "{topogym.__version__}"' in croissant
+    assert f"version={{{topogym.__version__}}}" in croissant  # citeAs
+    readme = (ROOT / "README.md").read_text()
+    assert f"version = {{{topogym.__version__}}}" in readme
