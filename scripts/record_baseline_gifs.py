@@ -120,7 +120,12 @@ def main() -> int:
         row = candidates[min(args.seed_index, len(candidates) - 1)]
         for name in names:
             baseline = get_baseline(name)(BaselineConfig(seed=0))
-            path = out / f"{unit}-{name}.gif"
+            # One folder per algorithm: the same world under each
+            # algorithm keeps the same filename, so the recordings line
+            # up for comparison.
+            folder = out / name
+            folder.mkdir(parents=True, exist_ok=True)
+            path = folder / f"{unit}.gif"
             frames = record(row, baseline, path, args.episodes,
                             args.stride)
             logger.info("%s seed=%s %s -> %s (%d frames)", unit,

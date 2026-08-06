@@ -23,6 +23,27 @@ interquartile means come from
 | `random` | Texture | 24 | 0.0% | — |
 | `random` | Top | 18 | 0.0% | — |
 
+## How each baseline explores
+
+One hold-out instance per world, the same seed for every
+algorithm. An archive method's teleports show up as
+jumps -- that is the mechanism, not a rendering glitch.
+Recorded by `scripts/record_baseline_gifs.py`.
+
+| world | `go-explore` | `random` |
+|---|---|---|
+| `BankRobber` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/BankRobber.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/BankRobber.gif) |
+| `ClownChase` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/ClownChase.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/ClownChase.gif) |
+| `DontFall` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/DontFall.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/DontFall.gif) |
+| `EnvironmentalIceShip` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/EnvironmentalIceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/EnvironmentalIceShip.gif) |
+| `IceShip` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/IceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/IceShip.gif) |
+| `Ladders` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/Ladders.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/Ladders.gif) |
+| `SearchRescue` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/SearchRescue.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SearchRescue.gif) |
+| `SpaceWarp` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/SpaceWarp.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SpaceWarp.gif) |
+| `TopRP2-50` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/TopRP2-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopRP2-50.gif) |
+| `TopTorus-50` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/TopTorus-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopTorus-50.gif) |
+
+
 ## Discovery curves
 
 ### Space discovered over the evaluation budget
@@ -46,25 +67,6 @@ interquartile means come from
 | algorithm | iterations | why it stopped | best validation return | hyperparameters |
 |---|---|---|---|---|
 | `random` | 0 | budget exhausted | — | `—` (tuning inconclusive) |
-
-## How each baseline explores
-
-One hold-out instance per world, the same seed for every algorithm, so
-the behaviours are directly comparable. An archive method's teleports
-show up as jumps -- that is the mechanism, not a rendering glitch.
-
-| world | `random` | `go-explore` |
-|---|---|---|
-| `BankRobber` | ![random](benchmarks/gridworld2dv1/gifs/BankRobber-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/BankRobber-go-explore.gif) |
-| `ClownChase` | ![random](benchmarks/gridworld2dv1/gifs/ClownChase-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/ClownChase-go-explore.gif) |
-| `DontFall` | ![random](benchmarks/gridworld2dv1/gifs/DontFall-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/DontFall-go-explore.gif) |
-| `EnvironmentalIceShip` | ![random](benchmarks/gridworld2dv1/gifs/EnvironmentalIceShip-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/EnvironmentalIceShip-go-explore.gif) |
-| `IceShip` | ![random](benchmarks/gridworld2dv1/gifs/IceShip-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/IceShip-go-explore.gif) |
-| `Ladders` | ![random](benchmarks/gridworld2dv1/gifs/Ladders-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/Ladders-go-explore.gif) |
-| `SearchRescue` | ![random](benchmarks/gridworld2dv1/gifs/SearchRescue-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/SearchRescue-go-explore.gif) |
-| `SpaceWarp` | ![random](benchmarks/gridworld2dv1/gifs/SpaceWarp-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/SpaceWarp-go-explore.gif) |
-| `TopRP2-50` | ![random](benchmarks/gridworld2dv1/gifs/TopRP2-50-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/TopRP2-50-go-explore.gif) |
-| `TopTorus-50` | ![random](benchmarks/gridworld2dv1/gifs/TopTorus-50-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/TopTorus-50-go-explore.gif) |
 
 ## What is recorded
 

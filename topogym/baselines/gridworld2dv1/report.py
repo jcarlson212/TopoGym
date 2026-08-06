@@ -410,23 +410,30 @@ def write_benchmarks_md(
               "jumps -- that is the mechanism, not a rendering glitch.",
               "Recorded by `scripts/record_baseline_gifs.py`.", ""]
     gif_dir = pathlib.Path(plots_dir).parent / "gifs"
-    if (pathlib.Path(__file__).resolve().parents[3] / gif_dir).is_dir():
-        algorithms = sorted(results)
-        lines += ["| world | " + " | ".join(f"`{a}`" for a in algorithms)
-                  + " |",
-                  "|---" * (len(algorithms) + 1) + "|"]
+    root = pathlib.Path(__file__).resolve().parents[3]
+    if (root / gif_dir).is_dir():
+        # One folder per algorithm, so a world keeps one filename and
+        # the recordings line up row by row.
+        algorithms = sorted(
+            path.name for path in (root / gif_dir).iterdir()
+            if path.is_dir()
+        )
         worlds = sorted({
-            path.stem.rsplit(f"-{a}", 1)[0]
-            for a in algorithms
-            for path in (pathlib.Path(__file__).resolve().parents[3]
-                         / gif_dir).glob(f"*-{a}.gif")
+            path.stem
+            for algorithm in algorithms
+            for path in (root / gif_dir / algorithm).glob("*.gif")
         })
-        for world in worlds:
-            cells = " | ".join(
-                f"![{a}]({gif_dir}/{world}-{a}.gif)" for a in algorithms
-            )
-            lines.append(f"| `{world}` | {cells} |")
-        lines.append("")
+        if algorithms and worlds:
+            lines += ["| world | "
+                      + " | ".join(f"`{a}`" for a in algorithms) + " |",
+                      "|---" * (len(algorithms) + 1) + "|"]
+            for world in worlds:
+                cells = " | ".join(
+                    f"![{a}]({gif_dir}/{a}/{world}.gif)"
+                    for a in algorithms
+                )
+                lines.append(f"| `{world}` | {cells} |")
+            lines.append("")
 
     lines += ["", "## Discovery curves", ""]
     for key, label, title in FIGURES:
