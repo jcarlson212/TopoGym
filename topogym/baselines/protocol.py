@@ -34,6 +34,20 @@ SPLIT_USAGE = {
     "test": "final evaluation, once, after training has stopped",
 }
 
+#: Only ``test`` is constrained. How a method spends ``tune``,
+#: ``train`` and ``val`` is its own business: a gradient method takes
+#: updates on ``train`` and stops on ``val``, while an archive method
+#: may reasonably pool all three, since what it is fitting is a
+#: selection strategy rather than a policy. What is *not* negotiable is
+#: that every method faces the same hold-out under the same conditions
+#: -- the same instances, the same contiguous episode budget on each,
+#: and the same offer of an archive reset at every episode boundary.
+HOLD_OUT_RULE = (
+    "test is read once, after training has stopped; every method gets "
+    "the same instances, the same contiguous per-instance episode "
+    "budget, and the same episode-boundary reset probe"
+)
+
 
 @dataclass
 class BaselineConfig:
@@ -63,6 +77,10 @@ class BaselineConfig:
     #: Environments vectorised inside each runner; multiplies throughput
     #: without another process.
     num_envs_per_runner: int = 1
+    #: Consecutive training episodes on one instance. One suits
+    #: gradient methods; archive methods need a contiguous run for an
+    #: archive to accumulate on a given world.
+    train_episodes_per_instance: int = 1
     num_learners: int = 0
     #: CUDA devices per learner. Apple MPS is not a Ray GPU resource, so
     #: leave this at 0 on Apple silicon.
@@ -170,6 +188,18 @@ class Baseline(abc.ABC):
     def policy(self) -> Callable:
         """``policy(observation, env) -> action`` after fitting."""
 
+    def choose_reset(self, env, info: dict):
+        """Where the next episode should resume, or ``None`` to start
+        where the world says.
+
+        Called at every episode boundary, which is the only place the
+        environment allows the choice. Archive methods override this to
+        return a previously visited cell; everything else inherits the
+        default and never notices. Returning a cell costs no step --
+        the reset lands directly on it.
+        """
+        return None
+
     def close(self) -> None:
         """Release anything :meth:`fit` acquired."""
 
@@ -197,6 +227,7 @@ class Baseline(abc.ABC):
         instances = evaluate_split(
             splits["test"], self.policy(),
             episodes=self.config.eval_episodes, seed=self.config.seed,
+            choose_reset=self.choose_reset,
         )
         return BaselineResult(
             algorithm=self.name,

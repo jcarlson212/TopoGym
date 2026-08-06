@@ -183,6 +183,24 @@ def _group_by(instances: list, key: str) -> dict:
     return dict(sorted(grouped.items()))
 
 
+#: Points kept per published curve. Instances have different budgets,
+#: so the union of sampled steps runs to tens of thousands -- orders of
+#: magnitude more resolution than a figure can show, and megabytes in a
+#: committed file.
+CURVE_POINTS = 400
+
+
+def _downsample(points: list, limit: int = CURVE_POINTS) -> list:
+    """Thin a curve to at most ``limit`` points, keeping the last."""
+    if len(points) <= limit:
+        return points
+    stride = len(points) / limit
+    kept = [points[int(i * stride)] for i in range(limit)]
+    if kept[-1] is not points[-1]:
+        kept.append(points[-1])
+    return kept
+
+
 def mean_curves(instances: list) -> dict:
     """Average each discovery curve across instances, by step.
 
@@ -203,7 +221,7 @@ def mean_curves(instances: list) -> dict:
                               if values.size > 1 else 0.0)
             points.append([step, float(np.mean(values)),
                            standard_error, int(values.size)])
-        curves[name] = points
+        curves[name] = _downsample(points)
     return curves
 
 

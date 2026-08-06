@@ -52,7 +52,8 @@ def _negative_curvature_cells(core) -> set:
 
 def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                       trace: bool = True, seed: int = 0,
-                      track_topology: bool = False) -> dict:
+                      track_topology: bool = False,
+                      choose_reset: Callable | None = None) -> dict:
     """Run ``policy`` on one hold-out instance.
 
     ``policy(observation, env) -> action``. Returns the instance's
@@ -79,9 +80,19 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     steps_to_goal = []
     negative: set = set()
 
-    interactions, chambers_seen = 0, set()
+    interactions, chambers_seen, archive_resets = 0, set(), 0
+    info: dict = {}
     for episode in range(episodes):
-        obs, info = env.reset(seed=seed + episode)
+        # The episode-boundary probe: every method gets the same offer,
+        # and the same contiguous budget on this one world, whatever it
+        # chose to do during training.
+        target = choose_reset(core, info) if choose_reset and episode \
+            else None
+        options = None
+        if target is not None:
+            options = {"teleport": tuple(int(v) for v in target)}
+            archive_resets += 1
+        obs, info = env.reset(seed=seed + episode, options=options)
         if trace and episode == 0:  # the layout exists only after reset
             negative = _negative_curvature_cells(core)
         reached, step = None, 0
@@ -126,6 +137,7 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
         "horizon": int(row["horizon"]),
         "episodes": episodes,
         "interactions": interactions,
+        "archive_resets": archive_resets,
         "success_rate": len(solved) / episodes,
         "chambers_entered": len(chambers_seen),
         "median_steps_to_goal": (float(np.median(solved))
@@ -167,13 +179,14 @@ def _mean_curve(points: list) -> list:
 
 
 def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
-                   seed: int = 0, track_topology: bool = False) -> list:
+                   seed: int = 0, track_topology: bool = False,
+                   choose_reset: Callable | None = None) -> list:
     """Evaluate every hold-out instance, in manifest order."""
     records = []
     for i, row in enumerate(rows):
         records.append(evaluate_instance(
             row, policy, episodes=episodes, seed=seed,
-            track_topology=track_topology,
+            track_topology=track_topology, choose_reset=choose_reset,
         ))
         if (i + 1) % 25 == 0:
             logger.info("evaluated %d/%d instances", i + 1, len(rows))

@@ -32,6 +32,14 @@ class SplitEnv(gym.Env):
         #: sweeps over a split (early-stopping checks).
         self._cursor = 0
         self._sequential = bool(config.get("sequential", False))
+        #: Consecutive episodes on the same instance before moving on.
+        #: One gives PPO the i.i.d. batches it expects; an archive
+        #: method needs a run of episodes on one world for its archive
+        #: to accumulate and its selection over that archive to mean
+        #: anything.
+        self._episodes_per_instance = max(
+            1, int(config.get("episodes_per_instance", 1)))
+        self._episodes_on_row = 0
         probe = make_instance(self.rows[0])
         self.observation_space = probe.observation_space
         self.action_space = probe.action_space
@@ -40,6 +48,11 @@ class SplitEnv(gym.Env):
         self.row = None
 
     def _next_row(self) -> dict:
+        if self.row is not None:
+            self._episodes_on_row += 1
+            if self._episodes_on_row < self._episodes_per_instance:
+                return self.row  # stay put: the archive is building
+        self._episodes_on_row = 0
         if self._sequential:
             row = self.rows[self._cursor % len(self.rows)]
             self._cursor += 1
@@ -47,9 +60,14 @@ class SplitEnv(gym.Env):
         return self.rows[int(self._rng.integers(len(self.rows)))]
 
     def reset(self, *, seed=None, options=None):
+        row = self._next_row()
+        if self.env is not None and row is self.row:
+            # Same world: keep the instance so its archive, lifetime
+            # coverage, and visit counts survive the episode boundary.
+            return self.env.reset(seed=seed, options=options)
         if self.env is not None:
             self.env.close()
-        self.row = self._next_row()
+        self.row = row
         self.env = make_instance(self.row)
         return self.env.reset(seed=seed, options=options)
 

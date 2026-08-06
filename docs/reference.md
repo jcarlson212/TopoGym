@@ -233,6 +233,19 @@ pip install topogym[benchmarks]
 python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
 ```
 
+Only `test` is constrained. How a method spends `tune`, `train` and
+`val` is its own business — a gradient method takes updates on `train`
+and stops on `val`, while an archive method may pool all three, since
+what it fits is a selection strategy rather than a policy. What is not
+negotiable is that every method faces the same hold-out on the same
+terms: the same instances, the same *contiguous* episode budget on each
+(50 episodes on one world, with lifetime coverage and the archive
+carrying across them), and the same offer of an archive reset at every
+episode boundary via `Baseline.choose_reset()`. Methods that ignore the
+probe cannot tell it was offered. For training, `BaselineConfig`'s
+`train_episodes_per_instance` gives the same contiguity where a method
+needs its archive to accumulate.
+
 Evaluation is single-process by construction: Ray parallelises training
 rollouts, but every reported number is produced in the driver from one
 `StatsRecorder`, so there is nothing to reconcile across workers. Each
