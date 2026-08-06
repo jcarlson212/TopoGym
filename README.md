@@ -6,8 +6,7 @@
 research.**
 
 TopoGym is a [Gymnasium](https://gymnasium.farama.org) environment
-library where the shape of every world — its chambers (rooms), decoys (filled rooms), loops,
-and identifications — is known exactly: computed from the free-space
+library where the shape of every world — its chambers (sort of like rooms), decoys (filled rooms, large icebergs, or other blatant & large obstructions), and identifications (going in a circle or going in a circle while twisting in space) — is known exactly: computed from the free-space
 cell complex by [GUDHI](https://gudhi.inria.fr/) and cross-checked
 against the analytic expectation at generation time. Everything is
 **deterministic up to seeds**, end to end. We provide benchmarks for 
@@ -115,6 +114,34 @@ env.reset(options={"teleport": (12, 40)})  # any previously visited cell
 | benchmark | what it tests | manifest | splits | RND+PPO | ICM+PPO | Go-Explore | status |
 |---|---|---|---|---|---|---|---|
 | **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
+
+The random floor is measured: over all 189 hold-out instances (945
+episodes) a uniform-random policy reaches the goal **0%** of the time
+and covers 4.0% of the reachable space, so nothing in this benchmark
+falls out of undirected exploration.
+
+Baselines report **median steps to find the goal, with a 95% bootstrap
+confidence interval**, over the hold-out split. Full metrics, per-slice
+breakdowns, and the discovery-curve figures live in
+[BENCHMARKS.md](BENCHMARKS.md).
+
+Every baseline consumes the splits the same way — hyperparameters on
+`tune`, gradients on `train`, early stopping on `val`, and `test` read
+once at the end — enforced by `Baseline.run()` rather than left to each
+algorithm. The algorithms themselves are Ray RLlib's; TopoGym does not
+reimplement PPO. A variant such as RND or ICM subclasses `PPOBaseline`
+and overrides one hook, and an algorithm that never uses PPO (Go-Explore
+explores randomly by default) implements the same small interface.
+
+```bash
+pip install topogym[benchmarks]
+python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
+python scripts/run_baselines_gridworld_v1_benchmark.py --smoke   # pipeline check
+```
+
+Published artefacts land in [`benchmarks/`](benchmarks/README.md) and are
+committed; Ray logs, checkpoints, and per-step traces land in `runs/`
+and are not.
 
 **All three slices are in every split** — GridWorld2D, Texture, and
 Top — across 63 family-size units. The splits differ only in *which

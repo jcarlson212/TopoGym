@@ -216,6 +216,32 @@ the plain Euclidean metric; a custom `metric=` falls back to all-pairs
 and is quadratic. Query once per episode, not per step; `torsion(1)`
 runs a Smith normal form and is an offline diagnostic.
 
+## Baselines
+
+`topogym.baselines` holds the reference algorithms. The algorithms are
+Ray RLlib's — TopoGym does not reimplement PPO — so what lives here is
+the protocol they share. `Baseline.run()` enforces it: hyperparameters
+on `tune`, gradients on `train`, early stopping on `val`, `test` read
+once at the end. Subclasses supply `fit()` and `policy()`; everything
+else is inherited, which is why an intrinsic-reward variant is
+`PPOBaseline` plus one overridden hook (`algorithm_config`) and
+Go-Explore's random exploration phase is a `Baseline` that trains
+nothing.
+
+```bash
+pip install topogym[benchmarks]
+python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
+```
+
+Evaluation is single-process by construction: Ray parallelises training
+rollouts, but every reported number is produced in the driver from one
+`StatsRecorder`, so there is nothing to reconcile across workers. Each
+instance record carries the *complete* native metric set, not just what
+the figures plot; `--track-topology` additionally timestamps hole
+discoveries (GUDHI every step, so it is opt-in). Aggregation is
+rliable's, and published artefacts land in `benchmarks/` (committed)
+while logs and checkpoints land in `runs/` (not).
+
 ## Performance
 
 The step path does no topology (homology runs at generation and in
