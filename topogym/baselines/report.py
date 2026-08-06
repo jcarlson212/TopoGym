@@ -56,13 +56,16 @@ FIGURE_STYLE = {
 }
 
 #: Figures published per metric: (curve key, axis label, title).
+#: Curves are cumulative over the whole evaluation budget, so the
+#: captions say so: a per-episode reading would answer a different and
+#: much less interesting question.
 FIGURES = (
     ("unique_states", "unique states visited",
-     "States discovered over an episode"),
+     "States discovered over the evaluation budget"),
     ("chambers_entered", "chambers entered",
-     "Chambers entered over an episode"),
+     "Chambers entered over the evaluation budget"),
     ("curvature_reached", "fraction of negatively curved cells reached",
-     "Bottleneck structure reached over an episode"),
+     "Bottleneck structure reached over the budget"),
 )
 
 
@@ -283,7 +286,7 @@ def plot_curves(results: dict, directory: pathlib.Path,
             if not drew:
                 plt.close(figure)
                 continue
-            axis.set_xlabel("environment steps")
+            axis.set_xlabel("cumulative interactions")
             axis.set_ylabel(label)
             axis.set_title(title)
             axis.margins(x=0)
@@ -379,18 +382,32 @@ def write_benchmarks_md(results: dict, path: pathlib.Path,
                   f"![{label}]({plots_dir}/{key}.png)", ""]
 
     lines += ["## Training", "",
-              "| algorithm | iterations | stopped early | "
+              "| algorithm | iterations | why it stopped | "
               "best validation return | hyperparameters |",
               "|---|---|---|---|---|"]
     for name, payload in sorted(results.items()):
         training = payload.get("training", {})
         chosen = payload.get("hyperparameters", {}).get("values", {})
+        groups = training.get("groups") or {}
+        tuned = (payload.get("hyperparameters", {}).get("groups") or {})
+        if groups:  # trained per group; report the first
+            training = next(iter(groups.values()))
+            chosen = next(iter(tuned.values()), {}).get("values", {})
         best = training.get("best_val_return")
+        # A run whose objective never moved has not converged. Saying
+        # "no learning signal" is the honest report -- expected, in
+        # fact, for a method with no exploration machinery against a
+        # sparse reward.
+        reason = training.get("stopped_because", "—")
+        inconclusive = tuned and all(
+            entry.get("tuning_score") is None for entry in tuned.values()
+        )
         lines.append(
             f"| `{name}` | {training.get('iterations', 0)} "
-            f"| {'yes' if training.get('stopped_early') else 'no'} "
+            f"| {reason} "
             f"| {'—' if best is None else f'{best:.3f}'} "
-            f"| `{chosen or '—'}` |"
+            f"| `{chosen or '—'}`"
+            f"{' (tuning inconclusive)' if inconclusive else ''} |"
         )
 
     lines += [

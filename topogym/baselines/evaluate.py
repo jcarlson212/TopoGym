@@ -20,9 +20,14 @@ from topogym.stats import StatsRecorder
 
 logger = logging.getLogger("topogym")
 
-#: Curves traced during evaluation, sampled every ``CURVE_STRIDE``.
+#: Curves traced during evaluation, sampled every ``CURVE_STRIDE``
+#: interactions. They are *cumulative across the whole evaluation
+#: budget*, not per-episode: with a 50-episode budget the question is
+#: how much of a world an explorer uncovers given that budget, which a
+#: per-episode average would flatten into "how much does one episode
+#: see".
 CURVE_METRICS = ("unique_states", "chambers_entered", "curvature_reached")
-CURVE_STRIDE = 5
+CURVE_STRIDE = 25
 
 
 #: Worlds larger than this skip the curvature trace: the field is
@@ -74,6 +79,7 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     steps_to_goal = []
     negative: set = set()
 
+    interactions, chambers_seen = 0, set()
     for episode in range(episodes):
         obs, info = env.reset(seed=seed + episode)
         if trace and episode == 0:  # the layout exists only after reset
@@ -84,20 +90,24 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                 policy(obs, core)
             )
             step += 1
+            interactions += 1
             if reached is None and info.get("goal_reached"):
                 reached = step
-            if trace and step % CURVE_STRIDE == 0:
-                visited = core._visited
-                curves["unique_states"].append((step, len(visited)))
+            if trace and interactions % CURVE_STRIDE == 0:
+                lifetime = core._ever_visited | core._visited
+                chambers_seen |= set(core.chamber_entry_steps)
+                curves["unique_states"].append(
+                    (interactions, len(lifetime)))
                 curves["chambers_entered"].append(
-                    (step, info["chambers_entered"]))
+                    (interactions, len(chambers_seen)))
                 curves["curvature_reached"].append((
-                    step,
-                    len(visited & negative) / len(negative)
+                    interactions,
+                    len(lifetime & negative) / len(negative)
                     if negative else 0.0,
                 ))
             if terminated or truncated:
                 break
+        chambers_seen |= set(core.chamber_entry_steps)
         steps_to_goal.append(reached)
 
     import dataclasses
@@ -115,7 +125,9 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                             if row["optimal_actions"] else None),
         "horizon": int(row["horizon"]),
         "episodes": episodes,
+        "interactions": interactions,
         "success_rate": len(solved) / episodes,
+        "chambers_entered": len(chambers_seen),
         "median_steps_to_goal": (float(np.median(solved))
                                  if solved else None),
         "mean_episode_coverage": metrics.mean_episode_coverage,
