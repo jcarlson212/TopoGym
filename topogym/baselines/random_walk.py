@@ -26,7 +26,24 @@ class RandomBaseline(Baseline):
         return TrainingReport(iterations=0, stopped_early=False)
 
     def policy(self) -> Callable:
-        rng = np.random.default_rng(self.config.seed)
+        return RandomPolicyFactory(self.config.seed)()
+
+    def policy_factory(self) -> Callable:
+        return RandomPolicyFactory(self.config.seed)
+
+
+class RandomPolicyFactory:
+    """Builds a random policy inside a worker process.
+
+    A module-level class with plain attributes, because a closure over
+    an RNG does not pickle and a process pool needs it to.
+    """
+
+    def __init__(self, seed: int = 0):
+        self.seed = seed
+
+    def __call__(self, seed: int | None = None):
+        rng = np.random.default_rng(self.seed if seed is None else seed)
 
         def act(_observation, env):
             return int(rng.integers(env.action_space.n))
