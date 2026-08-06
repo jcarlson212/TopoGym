@@ -124,3 +124,21 @@ def test_croissant_publishes_every_split():
     for path in sorted(SPLITS.glob("*.csv")):
         assert f"splits/{path.stem}.csv" in files
         assert f"split/{path.stem}" in record_sets
+
+
+def test_collapsed_units_are_recoverable_through_aliases():
+    """Identical configurations are carried once, but the labels that
+    collapsed into them stay discoverable -- otherwise grouping by
+    family silently loses ShapeSq's square control at sizes where it
+    coincides with Dilution."""
+    rows = _rows("train")
+    labels = {r["unit"] for r in rows}
+    aliased = {a for r in rows for a in r["aliases"].split() if a}
+    assert aliased, "expected at least one collapsed label"
+    assert "ShapeSq-50" in aliased      # it is Dilution-50 exactly
+    assert "ShapeSq-50" not in labels   # carried once, not twice
+    # Every Shape variant is reachable by label or alias at both sizes.
+    for shape in ("Sq", "Ci", "Tr", "St"):
+        for size in (50, 100):
+            name = f"Shape{shape}-{size}"
+            assert name in labels or name in aliased, name

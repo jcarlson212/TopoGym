@@ -83,13 +83,32 @@ Details per family: [docs/environments/](docs/environments/README.md).
 |---|---|---|---|---|---|---|---|
 | **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
 
-Splits are drawn over (family, size, seed) with size-scaled placement
-jitter, from disjoint seed bands — tune 1000+, train 2000+, val 3000+,
-test 4000+, with the canonical seed 0 in none of them. Every row
-carries its canonical config, certified topology, turn-aware optimal
-route, and horizon, so a split's difficulty distribution is auditable
-rather than asserted. Every split, and the extrapolation views, are
-published in `croissant.json` as their own Croissant record sets.
+**All three slices are in every split** — GridWorld2D, Texture, and
+Top — across 63 family-size units. The splits differ only in *which
+seeds* they draw, never in which environments they contain: every unit
+appears in all four, so tune, train, val, and test are samples of the
+same task rather than different ones.
+
+| | units | instances per split |
+|---|---|---|
+| GridWorld2D | 49 | 294 train · 147 each eval |
+| Texture | 8 | 48 train · 24 each eval |
+| Top | 6 | 36 train · 18 each eval |
+
+Seeds come from disjoint bands — tune 1000+, train 2000+, val 3000+,
+test 4000+, with the canonical seed 0 in none of them — and each
+instance carries size-scaled placement jitter, so no two are the same
+world. Every row records its canonical config, certified topology,
+turn-aware optimal route, and horizon, making a split's difficulty
+distribution auditable rather than asserted. Every split, and the
+extrapolation views, are published in `croissant.json` as their own
+Croissant record sets.
+
+GridWorld2D dominates by unit count, so report **per slice** rather
+than pooling: a single mean over all instances is mostly a GridWorld2D
+score. Scenario mechanics stay live at benchmark defaults — including
+ClownChase's depleting reward trickle toward the wrong target, which
+is deception the benchmark is meant to contain.
 
 ```python
 import csv, gymnasium as gym, topogym

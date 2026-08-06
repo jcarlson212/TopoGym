@@ -103,6 +103,11 @@ def _field(name: str, dtype: str, description: str,
 SPLIT_FIELDS = {
     "split": ("sc:Text", "tune, train, val, or test."),
     "unit": ("sc:Text", "Family-size unit, e.g. Decoys4-100."),
+    "aliases": ("sc:Text",
+                "Space-separated registry labels naming this exact "
+                "world. Identical configurations are carried once so "
+                "no world is weighted twice; the aliases keep the "
+                "collapsed labels discoverable."),
     "template_id": ("sc:Text",
                     "Registry id the instance is built from."),
     "slice": ("sc:Text", "GridWorld2D, Top, or Texture."),

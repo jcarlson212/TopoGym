@@ -34,8 +34,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "splits"
 
 FIELDS = (
-    "split", "unit", "template_id", "slice", "family", "size", "seed",
-    "placement_jitter", "canonical_config", "horizon",
+    "split", "unit", "aliases", "template_id", "slice", "family",
+    "size", "seed", "placement_jitter", "canonical_config", "horizon",
     "optimal_actions", "n_free_cells", "betti_z2", "betti_z2_sealed",
 )
 
@@ -78,21 +78,24 @@ def _units() -> list:
 
     # Distinct registry ids can name the same configuration -- ShapeSq
     # is Dilution with the square shape spelled out -- and a split that
-    # carried both would weight that world twice. Collapse them.
-    unique, configs = [], set()
+    # carried both would weight that world twice. Collapse them, but
+    # keep the dropped labels as aliases: without them, grouping by
+    # family would silently lose ShapeSq's square control at the sizes
+    # where it coincides with Dilution.
+    by_key: dict = {}
     for unit in sorted(units, key=lambda u: u[0]):
         cfg = unit[5]
         key = (registry.canonical_string(cfg, 0) if cfg is not None
                else unit[1])
-        if key in configs:
-            continue
-        configs.add(key)
-        unique.append(unit)
-    return unique
+        by_key.setdefault(key, []).append(unit)
+    return [
+        (*group[0], tuple(u[0] for u in group[1:]))
+        for group in by_key.values()
+    ]
 
 
 def _row(split: str, unit: tuple, seed: int) -> dict:
-    label, env_id, family, slice_name, size, cfg = unit
+    label, env_id, family, slice_name, size, cfg, aliases = unit
     kwargs = {"seed": seed}
     if cfg is not None:
         jitter = benchmarks.jitter_for(size)
@@ -111,6 +114,9 @@ def _row(split: str, unit: tuple, seed: int) -> dict:
     row = {
         "split": split,
         "unit": label,
+        # Other registry labels naming this exact world, so grouping by
+        # family can find a control that collapsed into another unit.
+        "aliases": " ".join(aliases),
         "template_id": env_id,
         "slice": slice_name,
         "family": family,

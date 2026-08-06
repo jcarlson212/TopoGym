@@ -50,7 +50,7 @@
       "description": "Benchmark split: The withheld families: concept transfer, reported separately. 36 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/family-holdout-test.csv",
       "encodingFormat": "text/csv",
-      "sha256": "d273a95edb53421dd5a94fa09298aba1943083cd6e58023389c37bc03e25e58c"
+      "sha256": "614da7a101b61c15461a0ca016b4004d8ef2421874ee100f385390fe4d0e9151"
     },
     {
       "@type": "cr:FileObject",
@@ -59,7 +59,7 @@
       "description": "Benchmark split: Train with whole families withheld. 306 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/family-holdout-train.csv",
       "encodingFormat": "text/csv",
-      "sha256": "41402a20bbca86267866c992421a46233c9cb9b75da1d8f4350af0016c00fce1"
+      "sha256": "231d09c310b31cadd8cca381c3314e5e0a9d49fc39e5c55faf914c261bf53456"
     },
     {
       "@type": "cr:FileObject",
@@ -68,7 +68,7 @@
       "description": "Benchmark split: Test large (size > 100): size extrapolation, reported separately. 27 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/size-extrapolation-test.csv",
       "encodingFormat": "text/csv",
-      "sha256": "31829b8289de5135d50dd7018e217b9d368c34a0edde5f562c4addb603fdc588"
+      "sha256": "e2a665ba8888fcc6ea76e51658aa860990bce281e64d04e91644eef13de0c83c"
     },
     {
       "@type": "cr:FileObject",
@@ -77,7 +77,7 @@
       "description": "Benchmark split: Train small (size <= 100). 324 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/size-extrapolation-train.csv",
       "encodingFormat": "text/csv",
-      "sha256": "542bfd992d13f4223b3b65688cd7a0a8976cd3c21c30eb1971730e93283ff9d2"
+      "sha256": "42ccf3b27ede3c3a2678f69114cfb7af45c87b4f41a3f78e276b8cce4c5749fa"
     },
     {
       "@type": "cr:FileObject",
@@ -86,7 +86,7 @@
       "description": "Benchmark split: Hold-out; reported once. 189 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/test.csv",
       "encodingFormat": "text/csv",
-      "sha256": "28884166ef0a73db26daa8354fa9b8b573b798c943beaf59418a41a7cafbf8e5"
+      "sha256": "93ff43b80512dc80959e4e8fc01a3413f90f05c73876180b174e5d9d14f3d823"
     },
     {
       "@type": "cr:FileObject",
@@ -95,7 +95,7 @@
       "description": "Benchmark split: Training instances. 378 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/train.csv",
       "encodingFormat": "text/csv",
-      "sha256": "80e1651c87556ecaf12172db8bbf655c5bb96d5993c5bc1704f2ce704b316f2f"
+      "sha256": "8ee97851d1e1a2aca38a2068d6b982f88c59312a6fc1fdf1085e4caa5be10c44"
     },
     {
       "@type": "cr:FileObject",
@@ -104,7 +104,7 @@
       "description": "Benchmark split: Hyperparameter selection only; never eval or hold-out. 189 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/tune.csv",
       "encodingFormat": "text/csv",
-      "sha256": "22028d97c6aa6c24baf93de3b5db644e390a9bf5c1caffcd898cf3c94b4b1e74"
+      "sha256": "c7205cf4447e6c82ca2e60997c4b8f28a49b2140f053d13818fc6b780c7efef0"
     },
     {
       "@type": "cr:FileObject",
@@ -113,7 +113,7 @@
       "description": "Benchmark split: Model selection during development. 189 instances.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/val.csv",
       "encodingFormat": "text/csv",
-      "sha256": "8e71a8b362723b24227d95c7e4ab1d86fbce1f4b70134c3580a0c0c87aa7d815"
+      "sha256": "4e24071b2b84a626aaf07d8a87251ba03969833a2b6ff4350e3e6c861c91e354"
     },
     {
       "@type": "cr:FileObject",
@@ -367,6 +367,21 @@
         },
         {
           "@type": "cr:Field",
+          "@id": "split/family-holdout-test/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "aliases"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
           "@id": "split/family-holdout-test/template_id",
           "name": "template_id",
           "description": "Registry id the instance is built from.",
@@ -580,6 +595,21 @@
             },
             "extract": {
               "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "aliases"
             }
           }
         },
@@ -803,6 +833,21 @@
         },
         {
           "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "aliases"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
           "@id": "split/size-extrapolation-test/template_id",
           "name": "template_id",
           "description": "Registry id the instance is built from.",
@@ -1016,6 +1061,21 @@
             },
             "extract": {
               "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "aliases"
             }
           }
         },
@@ -1239,6 +1299,21 @@
         },
         {
           "@type": "cr:Field",
+          "@id": "split/test/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "aliases"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
           "@id": "split/test/template_id",
           "name": "template_id",
           "description": "Registry id the instance is built from.",
@@ -1452,6 +1527,21 @@
             },
             "extract": {
               "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "aliases"
             }
           }
         },
@@ -1675,6 +1765,21 @@
         },
         {
           "@type": "cr:Field",
+          "@id": "split/tune/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "aliases"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
           "@id": "split/tune/template_id",
           "name": "template_id",
           "description": "Registry id the instance is built from.",
@@ -1888,6 +1993,21 @@
             },
             "extract": {
               "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/aliases",
+          "name": "aliases",
+          "description": "Space-separated registry labels naming this exact world. Identical configurations are carried once so no world is weighted twice; the aliases keep the collapsed labels discoverable.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "aliases"
             }
           }
         },
