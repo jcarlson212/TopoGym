@@ -1,4 +1,11 @@
-"""Go-Explore, with cell selection per Appendix A.5 of the paper.
+"""Go-Explore **phase 1** -- explore and archive, per Appendix A.5.
+
+This is the exploration half of the algorithm: build an archive of
+cells, return to a promising one, explore onward. It deliberately
+stops there. Phase 2 -- robustifying the best trajectories into a
+policy -- needs an archive that also stores the *path* to each cell,
+and will arrive as ``goexplore_phase1_and_phase2_ppo``, which is why
+the name says which half this is.
 
 Reference:
     A. Ecoffet, J. Huizinga, J. Lehman, K. O. Stanley and J. Clune.
@@ -182,10 +189,14 @@ class GoExploreResetFactory:
                               self.seed if seed is None else seed)
 
 
-class GoExploreBaseline(Baseline):
-    """Random exploration from archive cells, per the paper."""
+class GoExplorePhase1Baseline(Baseline):
+    """Phase 1 only: random exploration from archived cells.
 
-    name = "go-explore"
+    The archive stores cells and their counts, not trajectories, so
+    there is nothing here to robustify -- that is phase 2's job.
+    """
+
+    name = "go-explore-phase1"
 
     #: Go-Explore fits a selection strategy rather than a policy, so
     #: it treats every non-hold-out split as one tuning pool. Only
