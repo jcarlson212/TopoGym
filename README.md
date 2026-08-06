@@ -33,19 +33,6 @@ complex environment shapes.
 [`docs/envs/`](docs/envs/README.md) ·
 [`docs/environments/`](docs/environments/README.md).*
 
-## Why
-
-Exploration methods increasingly claim to exploit environment
-structure: enclosed regions that must be entered to be known, decoys
-that punish persistence, loops that shouldn't be re-searched, reward
-gradients that lie. Testing those claims needs environments whose
-structure is **certified** (computed, not assumed), **controllable**
-(same config + same seed = byte-identical world, across processes), and
-**varied** along clean axes — world size, chamber count, decoy count,
-shape, nesting, bottlenecks, texture, and global topology — with
-size-matched controls that are hard to explore but topologically
-trivial.
-
 ## Environments
 
 One benchmark, **TopoGym-v1**, in three slices under a universal
