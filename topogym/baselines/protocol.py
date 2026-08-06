@@ -46,9 +46,16 @@ class BaselineConfig:
     #: Consecutive validation checks without improvement before stopping.
     patience: int = 5
     val_every: int = 5
-    val_episodes: int = 10
-    #: Episodes per hold-out instance at final evaluation.
-    eval_episodes: int = 5
+    #: Episodes per validation check, swept across the split rather
+    #: than run per instance: this runs every ``val_every`` iterations,
+    #: so a per-instance sweep would cost far more than the training it
+    #: is supposed to supervise.
+    val_episodes: int = 50
+    #: Episodes per hold-out instance at final evaluation. The hold-out
+    #: is read once, so it can afford the thorough version -- and a real
+    #: budget per world is what makes "how well does it explore"
+    #: answerable at all.
+    eval_episodes: int = 50
     #: Rollout parallelism. Environment stepping is the bottleneck for
     #: these worlds -- the policy is a small MLP over a 49-dim vector --
     #: so cores matter and accelerators mostly do not.
@@ -91,6 +98,11 @@ class TrainingReport:
 
     iterations: int = 0
     stopped_early: bool = False
+    #: Why training ended, in words -- "budget exhausted", "validation
+    #: plateaued", or "no learning signal". A run that never moved its
+    #: objective has not converged, and must not be reported as if it
+    #: had.
+    stopped_because: str = "budget exhausted"
     best_val_return: float | None = None
     best_checkpoint: str | None = None
     history: list = field(default_factory=list)

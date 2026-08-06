@@ -142,33 +142,50 @@ class PPOBaseline(Baseline):
         validator = SplitEnv({"rows": val_rows, "seed": self.config.seed,
                               "sequential": True})
         report = TrainingReport()
-        best, stale = -float("inf"), 0
+        best, stale, baseline_value, moved = -float("inf"), 0, None, False
         try:
             for iteration in range(1, self.config.max_iterations + 1):
                 entry = {"iteration": iteration,
                          "train_return":
                              mean_return(self._algorithm.train())}
                 if iteration % self.config.val_every == 0:
-                    entry["val_return"] = self._validate(validator)
-                    if entry["val_return"] > best:
-                        best, stale = entry["val_return"], 0
+                    score = self._validate(validator)
+                    entry["val_return"] = score
+                    if baseline_value is None:
+                        baseline_value = score
+                    elif score != baseline_value:
+                        # The objective has moved at least once, so a
+                        # plateau from here is a real plateau.
+                        moved = True
+                    if score > best:
+                        best, stale = score, 0
                         report.best_checkpoint = self._checkpoint()
-                    else:
+                    elif moved:
                         stale += 1
                     logger.info(
-                        "[%s] iter %d train %.3f val %.3f (stale %d/%d)",
+                        "[%s] iter %d train %.3f val %.3f "
+                        "(stale %d/%d%s)",
                         self.name, iteration, entry["train_return"],
-                        entry["val_return"], stale, self.config.patience,
+                        score, stale, self.config.patience,
+                        "" if moved else ", signal flat",
                     )
                 report.history.append(entry)
                 report.iterations = iteration
-                if stale >= self.config.patience:
+                if moved and stale >= self.config.patience:
                     report.stopped_early = True
+                    report.stopped_because = "validation plateaued"
                     logger.info("[%s] early stop at iteration %d",
                                 self.name, iteration)
                     break
         finally:
             validator.close()
+        if not report.stopped_early:
+            # A never-moving objective is the expected outcome for a
+            # method with no exploration machinery against a sparse
+            # reward. Spend the whole budget and say so, rather than
+            # halting on a plateau that was never a plateau.
+            report.stopped_because = ("budget exhausted" if moved
+                                      else "no learning signal")
         report.best_val_return = best if np.isfinite(best) else None
         return report
 

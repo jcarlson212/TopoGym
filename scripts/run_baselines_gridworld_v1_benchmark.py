@@ -69,17 +69,19 @@ def main() -> int:
                              "the pipeline runs, not a result")
     parser.add_argument("--limit", type=int, default=None,
                         help="cap instances per split")
-    parser.add_argument("--episodes", type=int, default=5,
+    parser.add_argument("--episodes", type=int, default=50,
                         help="evaluation episodes per hold-out instance")
     parser.add_argument("--max-iterations", type=int, default=200)
     parser.add_argument("--track-topology", action="store_true",
                         help="also timestamp hole discoveries (runs "
                              "GUDHI every step; slow)")
-    parser.add_argument("--group", default="family", choices=GROUPINGS,
-                        help="what one policy is trained on: 'all' asks "
-                             "for a single general explorer, 'unit' is "
-                             "the Procgen-style per-world setting "
-                             "(default: family)")
+    parser.add_argument("--group", default="all", choices=GROUPINGS,
+                        help="what one policy is trained on: 'all' "
+                             "(default) asks for a single general "
+                             "explorer, which is what the benchmark "
+                             "claims to measure; 'family' and 'unit' "
+                             "are diagnostics for when a method scores "
+                             "zero everywhere")
     parser.add_argument("--num-env-runners", type=int, default=None,
                         help="rollout workers (default: cores - 2)")
     parser.add_argument("--envs-per-runner", type=int, default=4,
@@ -181,6 +183,11 @@ def main() -> int:
 
         merged.aggregates = aggregate(merged.instances, seed=args.seed)
         merged.curves = mean_curves(merged.instances)
+        # The averaged curves are what the figures need. Keeping every
+        # instance's own point cloud would put roughly half a million
+        # numbers in a committed file.
+        for record in merged.instances:
+            record.pop("curves", None)
         write_result(merged, results_dir)
         headline = merged.aggregates
         logger.info(
