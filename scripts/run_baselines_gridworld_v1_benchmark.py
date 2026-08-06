@@ -99,13 +99,21 @@ def main() -> int:
     )
     logger.setLevel(logging.INFO)
 
-    results_dir = PUBLISHED / "results"
-    plots_dir = PUBLISHED / "plots"
+    # A smoke run proves the pipeline moves; it is not a result. It
+    # must never land in the published directory, where it would
+    # overwrite a real evaluation and be indistinguishable from one.
+    destination = (RUNS / "smoke") if args.smoke else PUBLISHED
+    results_dir = destination / "results"
+    plots_dir = destination / "plots"
+    if args.smoke:
+        logger.info("smoke run: writing to %s, not %s",
+                    destination, PUBLISHED)
 
     if args.plots_only:
         published = load_results(results_dir)
         written = plot_curves(published, plots_dir)
-        write_benchmarks_md(published, ROOT / "BENCHMARKS.md")
+        write_benchmarks_md(published, destination / "BENCHMARKS.md"
+                            if args.smoke else ROOT / "BENCHMARKS.md")
         print(f"redrew {len(written)} figure files")
         return 0
 
@@ -184,9 +192,9 @@ def main() -> int:
 
     published = load_results(results_dir)
     written = plot_curves(published, plots_dir)
-    write_benchmarks_md(published, ROOT / "BENCHMARKS.md")
-    print(f"published {len(written)} figure files to {plots_dir} "
-          f"and BENCHMARKS.md")
+    write_benchmarks_md(published, destination / "BENCHMARKS.md"
+                        if args.smoke else ROOT / "BENCHMARKS.md")
+    print(f"published {len(written)} figure files to {plots_dir}")
     return 0
 
 

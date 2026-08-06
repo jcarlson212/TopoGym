@@ -115,10 +115,10 @@ env.reset(options={"teleport": (12, 40)})  # any previously visited cell
 |---|---|---|---|---|---|---|---|
 | **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
 
-The random floor is measured: over all 189 hold-out instances (945
-episodes) a uniform-random policy reaches the goal **0%** of the time
-and covers 4.0% of the reachable space, so nothing in this benchmark
-falls out of undirected exploration.
+No baseline numbers are published yet. A preliminary sweep of the
+random floor found 0% success across the hold-out split — nothing here
+falls out of undirected exploration — but that run predates the
+evaluation protocol below and will be reported once rerun.
 
 Baselines report **median steps to find the goal, with a 95% bootstrap
 confidence interval**, over the hold-out split. Full metrics, per-slice
