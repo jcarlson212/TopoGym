@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Generate Croissant metadata for the TopoGym-v1 benchmark.
 
-    python scripts/generate_croissant.py
+    python scripts/generate_croissant.py          # rewrite both files
+    python scripts/generate_croissant.py --check  # exit 1 if stale
 
 Writes ``docs/manifest.csv`` (one record per pinned environment id, with
 its canonical configuration and certified topology at the reference
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
 import json
 import pathlib
 import sys
@@ -96,13 +98,18 @@ def _field(name: str, dtype: str, description: str) -> dict:
 
 
 def main() -> int:
+    check = "--check" in sys.argv[1:]
     manifest = ROOT / "docs" / "manifest.csv"
     rows = _rows()
-    with open(manifest, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(rows)
-    sha = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=FIELDS,
+                            lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    manifest_text = buffer.getvalue()
+    if not check:
+        manifest.write_text(manifest_text)
+    sha = hashlib.sha256(manifest_text.encode()).hexdigest()
 
     croissant = {
         "@context": {
@@ -215,9 +222,27 @@ def main() -> int:
             }
         ],
     }
-    (ROOT / "croissant.json").write_text(
-        json.dumps(croissant, indent=2) + "\n"
-    )
+    croissant_text = json.dumps(croissant, indent=2) + "\n"
+    croissant_path = ROOT / "croissant.json"
+    if check:
+        stale = [
+            name for name, current, fresh in (
+                ("docs/manifest.csv",
+                 manifest.read_text() if manifest.exists() else "",
+                 manifest_text),
+                ("croissant.json",
+                 croissant_path.read_text() if croissant_path.exists()
+                 else "", croissant_text),
+            ) if current != fresh
+        ]
+        if stale:
+            print("croissant metadata is stale: " + ", ".join(stale)
+                  + " -- run python scripts/generate_croissant.py")
+            return 1
+        print(f"croissant metadata is current "
+              f"({len(rows)} environments, sha256 {sha[:12]}...)")
+        return 0
+    croissant_path.write_text(croissant_text)
     print(f"wrote docs/manifest.csv ({len(rows)} environments) "
           f"and croissant.json (sha256 {sha[:12]}...)")
     return 0

@@ -1390,8 +1390,54 @@ sheet, labelling each panel with its seed, $d^{\star}$, and horizon;
 
 \begin{lstlisting}[language=bash]
 python scripts/browse.py TopoGym/Decoys4-50-v0 --split train -n 12
-python scripts/browse.py --all --split test -n 4
+python scripts/browse.py --all --split test -n 4 --chunk 8
 \end{lstlisting}
+
+\noindent Figures~\ref{fig:test-split-1}--\ref{fig:test-split-6}
+are that command's output for the hold-out split: every family at
+four test seeds, which is what the splits actually look like.
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.86\textheight]{../splits/test-split-1.png}
+  \caption{The hold-out (\textbf{test}) split, part 1 of 6: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values across a row show the difficulty distribution a split is drawn from.}
+  \label{fig:test-split-1}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.86\textheight]{../splits/test-split-2.png}
+  \caption{The hold-out (\textbf{test}) split, part 2 of 6: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values across a row show the difficulty distribution a split is drawn from.}
+  \label{fig:test-split-2}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.86\textheight]{../splits/test-split-3.png}
+  \caption{The hold-out (\textbf{test}) split, part 3 of 6: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values across a row show the difficulty distribution a split is drawn from.}
+  \label{fig:test-split-3}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.86\textheight]{../splits/test-split-4.png}
+  \caption{The hold-out (\textbf{test}) split, part 4 of 6: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values across a row show the difficulty distribution a split is drawn from.}
+  \label{fig:test-split-4}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.86\textheight]{../splits/test-split-5.png}
+  \caption{The hold-out (\textbf{test}) split, part 5 of 6: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values across a row show the difficulty distribution a split is drawn from.}
+  \label{fig:test-split-5}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[height=0.86\textheight]{../splits/test-split-6.png}
+  \caption{The hold-out (\textbf{test}) split, part 6 of 6: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values across a row show the difficulty distribution a split is drawn from.}
+  \label{fig:test-split-6}
+\end{figure}
 
 \subsection{Skill ladders \textnormal{(in development)}}
 

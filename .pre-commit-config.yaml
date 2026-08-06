@@ -23,3 +23,13 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      # Croissant metadata is generated from the registry, so it can
+      # drift silently whenever generation or certification changes.
+      # Scoped to the files that can actually change it -- it makes
+      # 43 environments and plans each one, so it is not free.
+      - id: croissant
+        name: croissant metadata is current
+        entry: python3 scripts/generate_croissant.py --check
+        language: system
+        pass_filenames: false
+        files: ^(topogym/|scripts/generate_croissant\.py)

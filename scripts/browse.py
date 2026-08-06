@@ -44,7 +44,12 @@ def _fit(frame: np.ndarray, px: int) -> np.ndarray:
 def _tile_for(w: int, h: int, px: int) -> int:
     """Cell size that never forces a downsample. Nearest-neighbor
     shrinking drops whole rows, which erases one-cell walls -- a
-    chamber ring on a 200-grid comes out as two disconnected sides."""
+    chamber ring comes out as two disconnected sides.
+
+    One cell per pixel is the floor, so a world with more cells than
+    the requested panel renders *larger* than it; the sheet grows to
+    the widest panel rather than squeezing anyone down.
+    """
     return max(1, px // max(w, h))
 
 
@@ -80,20 +85,25 @@ def _make(env_id: str, seed: int, split: str | None):
     return env
 
 
-def _panel(env_id: str, seed: int, split: str | None) -> np.ndarray:
+def _panel(env_id: str, seed: int, split: str | None) -> tuple:
+    """``(world_frame, label)`` at the world's natural render size."""
     env = _make(env_id, seed, split)
     w, h = env.layout.base.layout_size()
-    tile = _tile_for(w, h, CELL_PX)
-    frame = _fit(render_rgb_2d(env, tile=tile), CELL_PX)
+    frame = render_rgb_2d(env, tile=_tile_for(w, h, CELL_PX))
     optimal, horizon = env.optimal_actions(), env._max_steps
     label = f"{seed}"
     if optimal:
         label += f"  {optimal}/{horizon}"
-    panel = np.zeros((CELL_PX + HEADER_PX, CELL_PX, 3), dtype=frame.dtype)
+    env.close()
+    return frame, label
+
+
+def _compose(frame: np.ndarray, label: str, px: int) -> np.ndarray:
+    """Scale a world up to ``px`` (never down) under its label strip."""
+    panel = np.zeros((px + HEADER_PX, px, 3), dtype=frame.dtype)
     panel[:HEADER_PX, :] = (24, 24, 30)
     _draw_text(panel, 3, 2, label, (235, 235, 240))
-    panel[HEADER_PX:, :] = frame
-    env.close()
+    panel[HEADER_PX:, :] = _fit(frame, px)
     return panel
 
 
@@ -101,12 +111,17 @@ def contact_sheet(env_ids: list, seeds: list, split: str | None,
                   out: pathlib.Path) -> None:
     import imageio.v3 as iio
 
-    rows = []
+    raw = []
     for env_id in env_ids:
-        panels = [_panel(env_id, s, split) for s in seeds]
-        rows.append(np.concatenate(panels, axis=1))
+        raw.append([_panel(env_id, s, split) for s in seeds])
         print(f"  {env_id}: seeds {seeds[0]}..{seeds[-1]}")
-    sheet = np.concatenate(rows, axis=0)
+    # Every panel scales *up* to the widest world in the sheet, so no
+    # world is ever downsampled into losing its one-cell walls.
+    px = max(CELL_PX, max(f.shape[0] for row in raw for f, _ in row))
+    sheet = np.concatenate([
+        np.concatenate([_compose(f, label, px) for f, label in row], axis=1)
+        for row in raw
+    ], axis=0)
     iio.imwrite(out, sheet)
     print(f"wrote {out} ({sheet.shape[1]}x{sheet.shape[0]})")
 
@@ -126,15 +141,18 @@ def play(env_id: str, split: str | None) -> None:
         env = _make(ids[index], seed, cur_split)
         w, h = env.layout.base.layout_size()
         tile = _tile_for(w, h, 700)
-        frame = _fit(render_rgb_2d(env, tile=tile), 700)
+        rendered = render_rgb_2d(env, tile=tile)
+        frame = _fit(rendered, max(700, rendered.shape[0]))
         pygame.display.set_caption(
             f"{ids[index]}  seed={seed}"
             f"  split={cur_split or 'canonical'}"
             f"  optimal={env.optimal_actions()}/{env._max_steps}"
         )
         screen.fill((18, 18, 22))
-        screen.blit(pygame.surfarray.make_surface(
-            frame.transpose(1, 0, 2)), (10, 10))
+        surface = pygame.surfarray.make_surface(frame.transpose(1, 0, 2))
+        if surface.get_width() > 700:  # a world wider than the window
+            surface = pygame.transform.smoothscale(surface, (700, 700))
+        screen.blit(surface, (10, 10))
         pygame.display.flip()
         env.close()
         moved = False
@@ -176,13 +194,25 @@ def main() -> int:
     ap.add_argument("--play", action="store_true", help="interactive")
     ap.add_argument("--out", type=pathlib.Path,
                     default=pathlib.Path("seeds.png"))
+    ap.add_argument("--chunk", type=int, default=0,
+                    help="rows per sheet; writes out-1.png, out-2.png, "
+                         "... (a 43-family sheet is far too tall to "
+                         "read in one piece)")
     args = ap.parse_args()
 
     if args.play:
         play(args.env_id, args.split)
         return 0
     env_ids = list(registry.registry_ids()) if args.all else [args.env_id]
-    contact_sheet(env_ids, _seed_list(args), args.split, args.out)
+    seeds = _seed_list(args)
+    if args.chunk:
+        stem, suffix = args.out.with_suffix(""), args.out.suffix or ".png"
+        for i in range(0, len(env_ids), args.chunk):
+            part = i // args.chunk + 1
+            contact_sheet(env_ids[i:i + args.chunk], seeds, args.split,
+                          pathlib.Path(f"{stem}-{part}{suffix}"))
+        return 0
+    contact_sheet(env_ids, seeds, args.split, args.out)
     return 0
 
 
