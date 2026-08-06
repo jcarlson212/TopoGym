@@ -19,6 +19,20 @@ Or compose spaces directly (see :mod:`topogym.spec`)::
 from gymnasium.envs.registration import register
 
 from topogym import complexes, registry, spec, stats, tda
+from topogym.core.constants import (
+    EGOCENTRIC_ACTION_NAMES,
+    FORWARD,
+    FOURWAY_ACTION_NAMES,
+    MOVE_DOWN,
+    MOVE_LEFT,
+    MOVE_RIGHT,
+    MOVE_UP,
+    TURN_LEFT,
+    TURN_RIGHT,
+    ActionMode,
+    EgocentricAction,
+    FourwayAction,
+)
 from topogym.core.metadata import (
     BettiNumbers,
     HomologyStats,
@@ -28,10 +42,22 @@ from topogym.generation import TopoGenConfig2D
 
 __version__ = "0.1.0"
 __all__ = [
+    "ActionMode",
     "BettiNumbers",
+    "EGOCENTRIC_ACTION_NAMES",
+    "EgocentricAction",
+    "FourwayAction",
+    "FORWARD",
+    "FOURWAY_ACTION_NAMES",
     "HomologyStats",
-    "TopologyMetadata",
+    "MOVE_DOWN",
+    "MOVE_LEFT",
+    "MOVE_RIGHT",
+    "MOVE_UP",
+    "TURN_LEFT",
+    "TURN_RIGHT",
     "TopoGenConfig2D",
+    "TopologyMetadata",
     "complexes",
     "registry",
     "spec",

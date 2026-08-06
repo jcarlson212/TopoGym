@@ -1,4 +1,68 @@
-"""Cell-type and observation codes shared across TopoGym."""
+"""Cell-type, action, and observation codes shared across TopoGym."""
+
+from enum import Enum, IntEnum
+
+# Actions. Both spaces are part of the public interface, so name them
+# once here rather than leaving callers to pass bare integers:
+# env.step(EgocentricAction.FORWARD) says what env.step(2) only
+# implies, and a type checker can tell the two spaces apart.
+
+
+class ActionMode(str, Enum):
+    """Which action space an environment exposes.
+
+    A ``str`` enum, so it compares and passes through as the plain
+    string the environment already accepts -- existing
+    ``actions="fourway"`` keeps working.
+    """
+
+    EGOCENTRIC = "egocentric"
+    FOURWAY = "fourway"
+
+    @property
+    def actions(self) -> type:
+        """The action enum belonging to this mode."""
+        return (EgocentricAction if self is ActionMode.EGOCENTRIC
+                else FourwayAction)
+
+
+class EgocentricAction(IntEnum):
+    """The default ``Discrete(3)`` space: the agent turns and advances.
+
+    An ``IntEnum``, so members are the action integers and can be
+    handed straight to ``env.step``.
+    """
+
+    TURN_LEFT = 0
+    TURN_RIGHT = 1
+    FORWARD = 2
+
+
+class FourwayAction(IntEnum):
+    """``Discrete(4)`` in *screen* directions (``actions="fourway"``):
+    up decreases y whatever the agent is facing."""
+
+    UP = 0
+    DOWN = 1
+    LEFT = 2
+    RIGHT = 3
+
+
+# Bare aliases, for callers who prefer names to enum members. Defined
+# from the enums so there is one source of truth.
+TURN_LEFT = int(EgocentricAction.TURN_LEFT)
+TURN_RIGHT = int(EgocentricAction.TURN_RIGHT)
+FORWARD = int(EgocentricAction.FORWARD)
+MOVE_UP = int(FourwayAction.UP)
+MOVE_DOWN = int(FourwayAction.DOWN)
+MOVE_LEFT = int(FourwayAction.LEFT)
+MOVE_RIGHT = int(FourwayAction.RIGHT)
+
+#: Action index -> name, per space; handy for logs and debugging.
+EGOCENTRIC_ACTION_NAMES = {
+    int(a): a.name.lower() for a in EgocentricAction
+}
+FOURWAY_ACTION_NAMES = {int(a): a.name.lower() for a in FourwayAction}
 
 # Layout cell types (what a cell *is*).
 EMPTY = 0

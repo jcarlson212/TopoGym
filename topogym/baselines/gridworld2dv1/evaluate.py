@@ -16,18 +16,26 @@ from collections.abc import Callable
 
 import numpy as np
 
-from topogym.baselines.instances import instance_key, make_instance
+from topogym.baselines.gridworld2dv1.instances import instance_key, make_instance
 from topogym.stats import StatsRecorder
 
 logger = logging.getLogger("topogym")
 
 #: Curves traced during evaluation, sampled every ``CURVE_STRIDE``
-#: interactions. They are *cumulative across the whole evaluation
-#: budget*, not per-episode: with a 50-episode budget the question is
-#: how much of a world an explorer uncovers given that budget, which a
-#: per-episode average would flatten into "how much does one episode
-#: see".
-CURVE_METRICS = ("unique_states", "chambers_entered", "curvature_reached")
+#: interactions. Two properties matter.
+#:
+#: They are *cumulative across the whole evaluation budget*, not
+#: per-episode: with a 50-episode budget the question is how much of a
+#: world an explorer uncovers given that budget, which a per-episode
+#: average would flatten into "how much does one episode see".
+#:
+#: They are *fractions*, not counts. Hold-out instances range from
+#: ~1,000 to ~160,000 free cells, so averaging raw counts across them
+#: would report little more than which worlds are large. Every curve
+#: is in [0, 1] and therefore comparable across sizes and averageable
+#: across instances.
+CURVE_METRICS = ("coverage", "chambers_entered", "curvature_reached",
+                 "cumulative_return")
 CURVE_STRIDE = 25
 
 
@@ -54,7 +62,8 @@ def _negative_curvature_cells(core) -> set:
 def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                       trace: bool = True, seed: int = 0,
                       track_topology: bool = False,
-                      choose_reset: Callable | None = None) -> dict:
+                      choose_reset: Callable | None = None,
+                      env_options: dict | None = None) -> dict:
     """Run ``policy`` on one hold-out instance.
 
     ``policy(observation, env) -> action``. Returns the instance's
@@ -73,7 +82,7 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     the driver, from one ``StatsRecorder``. There is nothing to
     aggregate across workers.
     """
-    env = StatsRecorder(make_instance(row),
+    env = StatsRecorder(make_instance(row, **(env_options or {})),
                         track_holes=track_topology,
                         track_curvature=track_topology)
     core = env.unwrapped
@@ -82,6 +91,9 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     negative: set = set()
 
     interactions, chambers_seen, archive_resets = 0, set(), 0
+    total_return = 0.0
+    n_free = max(1, len(core.layout.free_cells) if core.layout else 1)
+    n_chambers = 0
     info: dict = {}
     for episode in range(episodes):
         # The episode-boundary probe: every method gets the same offer,
@@ -96,6 +108,9 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
         obs, info = env.reset(seed=seed + episode, options=options)
         if trace and episode == 0:  # the layout exists only after reset
             negative = _negative_curvature_cells(core)
+            n_free = max(1, len(core.layout.free_cells))
+            n_chambers = sum(1 for f in core.layout.features
+                             if f.kind == "chamber")
         reached, step = None, 0
         while True:
             obs, reward, terminated, truncated, info = env.step(
@@ -103,20 +118,28 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
             )
             step += 1
             interactions += 1
+            total_return += float(reward)
             if reached is None and info.get("goal_reached"):
                 reached = step
             if trace and interactions % CURVE_STRIDE == 0:
                 lifetime = core._ever_visited | core._visited
                 chambers_seen |= set(core.chamber_entry_steps)
-                curves["unique_states"].append(
-                    (interactions, len(lifetime)))
-                curves["chambers_entered"].append(
-                    (interactions, len(chambers_seen)))
+                curves["coverage"].append(
+                    (interactions, len(lifetime) / n_free))
+                curves["chambers_entered"].append((
+                    interactions,
+                    len(chambers_seen) / n_chambers if n_chambers else 0.0,
+                ))
                 curves["curvature_reached"].append((
                     interactions,
                     len(lifetime & negative) / len(negative)
                     if negative else 0.0,
                 ))
+                # Unnormalised on purpose: reward does not scale with
+                # world size, so the raw total is already comparable --
+                # under the sparse default it counts goals reached.
+                curves["cumulative_return"].append(
+                    (interactions, total_return))
             if terminated or truncated:
                 break
         chambers_seen |= set(core.chamber_entry_steps)
@@ -139,6 +162,7 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
         "episodes": episodes,
         "interactions": interactions,
         "archive_resets": archive_resets,
+        "cumulative_return": total_return,
         "success_rate": len(solved) / episodes,
         "chambers_entered": len(chambers_seen),
         "median_steps_to_goal": (float(np.median(solved))
@@ -208,12 +232,14 @@ class InstanceTask:
 
     def __init__(self, policy_factory: Callable, episodes: int,
                  seed: int, track_topology: bool = False,
-                 choose_reset_factory: Callable | None = None):
+                 choose_reset_factory: Callable | None = None,
+                 env_options: dict | None = None):
         self.policy_factory = policy_factory
         self.episodes = episodes
         self.seed = seed
         self.track_topology = track_topology
         self.choose_reset_factory = choose_reset_factory
+        self.env_options = env_options or {}
 
     def __call__(self, row: dict) -> dict:
         # Rebuilt per instance, seeded from the instance: see
@@ -226,7 +252,7 @@ class InstanceTask:
         return evaluate_instance(
             row, policy, episodes=self.episodes, seed=self.seed,
             track_topology=self.track_topology,
-            choose_reset=choose_reset,
+            choose_reset=choose_reset, env_options=self.env_options,
         )
 
 
@@ -243,7 +269,8 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                    choose_reset: Callable | None = None,
                    choose_reset_factory: Callable | None = None,
                    policy_factory: Callable | None = None,
-                   workers: int = 1) -> list:
+                   workers: int = 1,
+                   env_options: dict | None = None) -> list:
     """Evaluate every hold-out instance, in manifest order.
 
     Instances are independent and separately seeded, so the loop
@@ -254,10 +281,11 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
     """
     if policy_factory is not None:
         # Same code path serial or parallel, so the two cannot drift.
-        from topogym.baselines.parallel import map_instances
+        from topogym.baselines.gridworld2dv1.parallel import map_instances
 
         task = InstanceTask(policy_factory, episodes, seed,
-                            track_topology, choose_reset_factory)
+                            track_topology, choose_reset_factory,
+                            env_options)
         return map_instances(task, rows, workers=workers)
 
     records = []
@@ -265,6 +293,7 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
         records.append(evaluate_instance(
             row, policy, episodes=episodes, seed=seed,
             track_topology=track_topology, choose_reset=choose_reset,
+            env_options=env_options,
         ))
         if (i + 1) % 25 == 0:
             logger.info("evaluated %d/%d instances", i + 1, len(rows))

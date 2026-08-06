@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from topogym.baselines.protocol import Baseline, TrainingReport
+from topogym.baselines.gridworld2dv1.protocol import Baseline, TrainingReport
 
 
 class RandomBaseline(Baseline):

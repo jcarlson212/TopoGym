@@ -14,7 +14,7 @@ from __future__ import annotations
 import gymnasium as gym
 import numpy as np
 
-from topogym.baselines.instances import make_instance
+from topogym.baselines.gridworld2dv1.instances import make_instance
 
 
 class SplitEnv(gym.Env):
@@ -40,7 +40,10 @@ class SplitEnv(gym.Env):
         self._episodes_per_instance = max(
             1, int(config.get("episodes_per_instance", 1)))
         self._episodes_on_row = 0
-        probe = make_instance(self.rows[0])
+        #: Applied to every instance, so training and evaluation agree
+        #: on the action and observation spaces.
+        self.env_options = dict(config.get("env_options") or {})
+        probe = make_instance(self.rows[0], **self.env_options)
         self.observation_space = probe.observation_space
         self.action_space = probe.action_space
         probe.close()
@@ -68,7 +71,7 @@ class SplitEnv(gym.Env):
         if self.env is not None:
             self.env.close()
         self.row = row
-        self.env = make_instance(self.row)
+        self.env = make_instance(self.row, **self.env_options)
         return self.env.reset(seed=seed, options=options)
 
     def step(self, action):

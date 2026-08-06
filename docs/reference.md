@@ -218,7 +218,29 @@ runs a Smith normal form and is an offline diagnostic.
 
 ## Baselines
 
-`topogym.baselines` holds the reference algorithms. The algorithms are
+`topogym.baselines.gridworld2dv1` holds the reference algorithms for
+the `gridworld2d-v1` benchmark. Baselines live under the benchmark
+version they were run against, and their artefacts are filed the same
+way (`benchmarks/gridworld2dv1/{results,plots}`, `runs/gridworld2dv1/`),
+so a later benchmark can change its splits, protocol, or observation
+shape without disturbing published results;
+`topogym.baselines.baselines_for(version)` resolves the right package.
+
+Actions are named constants rather than bare integers, so a policy can
+say what it means — `env.step(FORWARD)` rather than `env.step(2)`:
+
+```python
+from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
+from topogym import MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT  # fourway
+```
+
+Every published curve is a **fraction**, never a raw count: hold-out
+worlds span ~1,000 to ~160,000 free cells, so a mean of counts would
+mostly report which worlds are large. Coverage is the fraction of
+reachable space visited, chambers the fraction of chambers entered,
+curvature the fraction of negatively curved cells reached. The band is
+one standard error across instances; the headline aggregates in
+`BENCHMARKS.md` use bootstrap confidence intervals. The algorithms are
 Ray RLlib's — TopoGym does not reimplement PPO — so what lives here is
 the protocol they share. `Baseline.run()` enforces it: hyperparameters
 on `tune`, gradients on `train`, early stopping on `val`, `test` read
@@ -231,6 +253,15 @@ nothing.
 ```bash
 pip install topogym[benchmarks]
 python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
+```
+
+Actions are named constants rather than bare integers, so a policy can
+say what it means:
+
+```python
+from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
+from topogym import MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT  # fourway
+env.step(FORWARD)
 ```
 
 Only `test` is constrained. How a method spends `tune`, `train` and

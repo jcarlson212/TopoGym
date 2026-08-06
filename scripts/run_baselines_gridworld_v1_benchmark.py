@@ -5,7 +5,7 @@
     python scripts/run_baselines_gridworld_v1_benchmark.py \
         --baselines random,ppo
 
-Every baseline follows the same protocol (topogym.baselines.protocol):
+Every baseline follows the same protocol (topogym.baselines.gridworld2dv1.protocol):
 hyperparameters chosen on ``tune``, gradients taken on ``train``,
 stopping decided on ``val``, and ``test`` read once at the end. The
 published artefacts -- result JSON, figures, BENCHMARKS.md -- land in
@@ -25,16 +25,16 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from topogym.baselines import (
+from topogym.baselines.gridworld2dv1 import (
     BASELINES,
     BaselineConfig,
     BaselineResult,
     get_baseline,
 )
-from topogym.baselines.instances import load_split
-from topogym.baselines.parallel import default_workers
-from topogym.baselines.protocol import GROUPINGS, group_rows
-from topogym.baselines.report import (
+from topogym.baselines.gridworld2dv1.instances import load_split
+from topogym.baselines.gridworld2dv1.parallel import default_workers
+from topogym.baselines.gridworld2dv1.protocol import GROUPINGS, group_rows
+from topogym.baselines.gridworld2dv1.report import (
     aggregate,
     load_results,
     mean_curves,
@@ -47,6 +47,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 PUBLISHED = ROOT / "benchmarks"
 RUNS = ROOT / "runs"
 SPLITS = ("tune", "train", "val", "test")
+
+#: Artefacts are filed under the benchmark version that produced them,
+#: mirroring topogym/baselines/<version>/: results from different
+#: benchmark versions are different things and must not share a
+#: directory, however similar their filenames.
+BENCHMARK = "gridworld2dv1"
 
 logger = logging.getLogger("topogym")
 
@@ -96,6 +102,9 @@ def main() -> int:
     parser.add_argument("--gpus-per-learner", type=int, default=0,
                         help="CUDA devices per learner; Apple MPS is not "
                              "a Ray GPU resource, so leave at 0 there")
+    parser.add_argument("--benchmark", default=BENCHMARK,
+                        help="benchmark version; artefacts are filed "
+                             "under it, mirroring the baselines package")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--plots-only", action="store_true",
                         help="redraw figures from published JSON")
@@ -110,7 +119,8 @@ def main() -> int:
     # A smoke run proves the pipeline moves; it is not a result. It
     # must never land in the published directory, where it would
     # overwrite a real evaluation and be indistinguishable from one.
-    destination = (RUNS / "smoke") if args.smoke else PUBLISHED
+    destination = ((RUNS / "smoke" / args.benchmark) if args.smoke
+                   else PUBLISHED / args.benchmark)
     results_dir = destination / "results"
     plots_dir = destination / "plots"
     if args.smoke:
@@ -120,8 +130,12 @@ def main() -> int:
     if args.plots_only:
         published = load_results(results_dir)
         written = plot_curves(published, plots_dir)
-        write_benchmarks_md(published, destination / "BENCHMARKS.md"
-                            if args.smoke else ROOT / "BENCHMARKS.md")
+        write_benchmarks_md(
+            published,
+            destination / "BENCHMARKS.md" if args.smoke
+            else ROOT / "BENCHMARKS.md",
+            plots_dir=str(plots_dir.relative_to(ROOT)),
+        )
         print(f"redrew {len(written)} figure files")
         return 0
 
@@ -179,7 +193,7 @@ def main() -> int:
                                else default_workers())),
                 num_learners=args.num_learners,
                 gpus_per_learner=args.gpus_per_learner,
-                run_dir=RUNS / name / key,
+                run_dir=RUNS / args.benchmark / name / key,
             )
             baseline = get_baseline(name)(config)
             baseline.group = key
@@ -212,8 +226,12 @@ def main() -> int:
 
     published = load_results(results_dir)
     written = plot_curves(published, plots_dir)
-    write_benchmarks_md(published, destination / "BENCHMARKS.md"
-                        if args.smoke else ROOT / "BENCHMARKS.md")
+    write_benchmarks_md(
+        published,
+        destination / "BENCHMARKS.md" if args.smoke
+        else ROOT / "BENCHMARKS.md",
+        plots_dir=str(plots_dir.relative_to(ROOT)),
+    )
     print(f"published {len(written)} figure files to {plots_dir}")
     return 0
 

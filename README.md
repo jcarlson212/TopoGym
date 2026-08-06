@@ -246,6 +246,22 @@ archive-restorable states, so an agent can treat them as places to
 return to, frontiers to push, or features to encode. The certified
 metadata stays the answer key for scoring; this is the signal.
 
+Actions are named constants — `env.step(FORWARD)` says what
+`env.step(2)` only implies:
+
+```python
+from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
+from topogym import MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT  # fourway
+```
+
+Actions are named constants — `env.step(FORWARD)` says what
+`env.step(2)` only implies:
+
+```python
+from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
+from topogym import MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT  # fourway
+```
+
 ```python
 from topogym.tda import VisitedComplex
 

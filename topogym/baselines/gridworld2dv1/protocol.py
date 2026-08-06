@@ -22,6 +22,8 @@ import pathlib
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
+from topogym.core.constants import ActionMode
+
 logger = logging.getLogger("topogym")
 
 #: How every baseline must consume the splits. The hold-out rule is not
@@ -173,6 +175,25 @@ class Baseline(abc.ABC):
     #: than all of it; recorded with the results.
     group: str | None = None
 
+    #: The action space this baseline drives, declared rather than
+    #: assumed. "egocentric" (turn left / turn right / forward) is the
+    #: default; "fourway" is screen directions. Whatever a baseline
+    #: declares is used identically in training and evaluation, so a
+    #: policy never meets a space it was not trained on -- and it is
+    #: recorded with the results, because an agent that pays for turns
+    #: and one that does not are not directly comparable.
+    actions: ActionMode = ActionMode.EGOCENTRIC
+
+    #: Observation mode, or None to follow the action mode. Baselines
+    #: that want the universal (x, y) + texture vector set "vector".
+    obs_mode: str | None = None
+
+    #: Reward mode, or None for the environment default (``sparse``:
+    #: +1 on reaching the goal). Declared here so a method that wants a
+    #: denser signal has to say so, and the choice is recorded with the
+    #: results rather than inferred from the numbers.
+    reward_mode: str | None = None
+
     def __init__(self, config: BaselineConfig | None = None):
         self.config = config or BaselineConfig()
 
@@ -190,6 +211,23 @@ class Baseline(abc.ABC):
     @abc.abstractmethod
     def policy(self) -> Callable:
         """``policy(observation, env) -> action`` after fitting."""
+
+    def env_options(self) -> dict:
+        """Keyword arguments applied to every instance this baseline
+        sees, in training and in evaluation alike.
+
+        Override to ask for something other than the defaults -- a
+        different action space, the universal vector observation, a
+        wider view radius. Anything declared here is recorded with the
+        results, so a run states the terms it was measured on instead
+        of leaving them to be inferred.
+        """
+        options = {"actions": ActionMode(self.actions).value}
+        if self.obs_mode is not None:
+            options["obs_mode"] = self.obs_mode
+        if self.reward_mode is not None:
+            options["reward_mode"] = self.reward_mode
+        return options
 
     def choose_reset(self, env, info: dict):
         """Where the next episode should resume, or ``None`` to start
@@ -237,7 +275,7 @@ class Baseline(abc.ABC):
         ``test`` is read once, here, after training has finished. No
         subclass gets to change that.
         """
-        from topogym.baselines.evaluate import evaluate_split
+        from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
 
         logger.info("[%s] selecting hyperparameters on tune (%d rows)",
                     self.name, len(splits["tune"]))
@@ -257,10 +295,12 @@ class Baseline(abc.ABC):
             choose_reset_factory=self.choose_reset_factory(),
             policy_factory=self.policy_factory(),
             workers=self.config.eval_workers,
+            env_options=self.env_options(),
         )
         return BaselineResult(
             algorithm=self.name,
-            config=self.config.to_dict(),
+            config={**self.config.to_dict(),
+                    "env_options": self.env_options()},
             hyperparameters=hyperparameters.to_dict(),
             training=report.to_dict(),
             instances=instances,

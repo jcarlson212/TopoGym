@@ -160,3 +160,20 @@ def test_standardized_run_log(tmp_path, caplog):
     again.reset(seed=0)
     assert json.loads(again.save(tmp_path / "run2.json").read_text()) \
         == payload
+
+
+def test_regret_baseline_follows_the_action_space():
+    """Regret compares an agent against the best *it* could have done.
+    Egocentric agents pay for turns, fourway agents do not; mixing the
+    two produces negative regret."""
+    ego = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=0))
+    ego.reset(seed=0)
+    core = ego.unwrapped
+    cell_path = len(core.shortest_path()) - 1
+    assert ego._optimal == core.optimal_actions()
+    assert ego._optimal >= cell_path  # turns cost actions
+
+    four = StatsRecorder(gym.make("TopoGym/Dilution-50-v0", seed=0,
+                                  actions="fourway"))
+    four.reset(seed=0)
+    assert four._optimal == cell_path

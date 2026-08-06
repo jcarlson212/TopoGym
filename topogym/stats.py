@@ -144,8 +144,16 @@ class StatsRecorder(gym.Wrapper):
         core = self._core
         if core.goal_exists:
             try:
-                path = core.shortest_path()
-                self._optimal = len(path) - 1 if path else None
+                # The best a *this* agent could have done, so the
+                # baseline follows the action space in use: fourway
+                # pays only for cells, egocentric also pays for turns.
+                # Mixing them yields negative regret, which is how this
+                # was caught.
+                if getattr(core, "actions", "egocentric") == "fourway":
+                    path = core.shortest_path()
+                    self._optimal = len(path) - 1 if path else None
+                else:
+                    self._optimal = core.optimal_actions()
             except ValueError:
                 self._optimal = None
         else:
