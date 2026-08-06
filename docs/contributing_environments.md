@@ -74,9 +74,22 @@ python scripts/generate_assets.py
 pytest -q
 ```
 
-Add a test to `tests/test_registry.py` pinning anything worth
+Add a test to `tests/registry/test_registry.py` pinning anything worth
 asserting beyond the automatic checks (a specific genus, torsion, a
 bottleneck property).
+
+A registry entry is **not** thereby part of a benchmark. Membership is
+declared separately in
+[`topogym/benchmarks.json`](../topogym/benchmarks.json), and a family
+listed under no version is in no benchmark — your environment is
+generated, certified, pictured and importable, but no split carries it.
+That is deliberate: it means adding environments can never change
+already-published results. Adding a *size or knob* to an existing family
+needs nothing further; a genuinely new family joins a benchmark only
+when a new version declares it. See
+[CONTRIBUTING.md](../CONTRIBUTING.md#benchmark-metadata-and-terminology)
+for the roster, the terminology (family / slice / unit / version), and
+the regeneration steps.
 
 ## 3. Open the PR
 
