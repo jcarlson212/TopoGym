@@ -24,7 +24,7 @@
   "@type": "sc:Dataset",
   "conformsTo": "http://mlcommons.org/croissant/1.0",
   "name": "TopoGym-v1",
-  "description": "The pinned environment registry of TopoGym: gridworld reinforcement-learning environments with certified topology for exploration research. One record per stable environment id, with its canonical generator configuration and the certified Betti numbers (in both door conventions) at the reference seed. Environments are deterministic up to seeds, end to end.",
+  "description": "The pinned environment registry and benchmark splits of TopoGym: gridworld reinforcement-learning environments with certified topology for exploration research. One record per stable environment id, with its canonical generator configuration and the certified Betti numbers (in both door conventions) at the reference seed. Environments are deterministic up to seeds, end to end.",
   "url": "https://github.com/jcarlson212/TopoGym",
   "version": "0.1.0",
   "license": "https://spdx.org/licenses/MIT.html",
@@ -41,7 +41,79 @@
       "description": "One record per pinned environment id.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/manifest.csv",
       "encodingFormat": "text/csv",
-      "sha256": "655fc6f8795edc356b30687d9f8abe641539eebcbe84de65b9189ca69327f289"
+      "sha256": "4a264632e92ac1cba703dee14f8d50b2dac679f19c4842189001c74dc63ca106"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/family-holdout-test.csv",
+      "name": "family-holdout-test.csv",
+      "description": "Benchmark split: The withheld families: concept transfer, reported separately. 36 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/family-holdout-test.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "d273a95edb53421dd5a94fa09298aba1943083cd6e58023389c37bc03e25e58c"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/family-holdout-train.csv",
+      "name": "family-holdout-train.csv",
+      "description": "Benchmark split: Train with whole families withheld. 306 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/family-holdout-train.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "41402a20bbca86267866c992421a46233c9cb9b75da1d8f4350af0016c00fce1"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/size-extrapolation-test.csv",
+      "name": "size-extrapolation-test.csv",
+      "description": "Benchmark split: Test large (size > 100): size extrapolation, reported separately. 27 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/size-extrapolation-test.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "31829b8289de5135d50dd7018e217b9d368c34a0edde5f562c4addb603fdc588"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/size-extrapolation-train.csv",
+      "name": "size-extrapolation-train.csv",
+      "description": "Benchmark split: Train small (size <= 100). 324 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/size-extrapolation-train.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "542bfd992d13f4223b3b65688cd7a0a8976cd3c21c30eb1971730e93283ff9d2"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/test.csv",
+      "name": "test.csv",
+      "description": "Benchmark split: Hold-out; reported once. 189 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/test.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "28884166ef0a73db26daa8354fa9b8b573b798c943beaf59418a41a7cafbf8e5"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/train.csv",
+      "name": "train.csv",
+      "description": "Benchmark split: Training instances. 378 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/train.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "80e1651c87556ecaf12172db8bbf655c5bb96d5993c5bc1704f2ce704b316f2f"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/tune.csv",
+      "name": "tune.csv",
+      "description": "Benchmark split: Hyperparameter selection only; never eval or hold-out. 189 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/tune.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "22028d97c6aa6c24baf93de3b5db644e390a9bf5c1caffcd898cf3c94b4b1e74"
+    },
+    {
+      "@type": "cr:FileObject",
+      "@id": "splits/val.csv",
+      "name": "val.csv",
+      "description": "Benchmark split: Model selection during development. 189 instances.",
+      "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/splits/val.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "8e71a8b362723b24227d95c7e4ab1d86fbce1f4b70134c3580a0c0c87aa7d815"
     },
     {
       "@type": "cr:FileObject",
@@ -252,6 +324,1750 @@
             },
             "extract": {
               "column": "homology"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/family-holdout-test",
+      "name": "split/family-holdout-test",
+      "description": "The withheld families: concept transfer, reported separately. One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-test/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-test.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/family-holdout-train",
+      "name": "split/family-holdout-train",
+      "description": "Train with whole families withheld. One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/family-holdout-train/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/family-holdout-train.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/size-extrapolation-test",
+      "name": "split/size-extrapolation-test",
+      "description": "Test large (size > 100): size extrapolation, reported separately. One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-test/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-test.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/size-extrapolation-train",
+      "name": "split/size-extrapolation-train",
+      "description": "Train small (size <= 100). One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/size-extrapolation-train/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/size-extrapolation-train.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/test",
+      "name": "split/test",
+      "description": "Hold-out; reported once. One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/test/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/test.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/train",
+      "name": "split/train",
+      "description": "Training instances. One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/train/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/train.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/tune",
+      "name": "split/tune",
+      "description": "Hyperparameter selection only; never eval or hold-out. One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/tune/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/tune.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "@type": "cr:RecordSet",
+      "@id": "split/val",
+      "name": "split/val",
+      "description": "Model selection during development. One record per instance; seeds come from the split's disjoint band and canonical_config reproduces the instance exactly.",
+      "field": [
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/split",
+          "name": "split",
+          "description": "tune, train, val, or test.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "split"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/unit",
+          "name": "unit",
+          "description": "Family-size unit, e.g. Decoys4-100.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "unit"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/template_id",
+          "name": "template_id",
+          "description": "Registry id the instance is built from.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "template_id"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/slice",
+          "name": "slice",
+          "description": "GridWorld2D, Top, or Texture.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "slice"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/family",
+          "name": "family",
+          "description": "Environment family.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "family"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/size",
+          "name": "size",
+          "description": "Grid side length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "size"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/seed",
+          "name": "seed",
+          "description": "Layout seed, drawn from this split's disjoint band.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "seed"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/placement_jitter",
+          "name": "placement_jitter",
+          "description": "Cells of placement perturbation; keeps the family's arrangement while making every instance distinct.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "placement_jitter"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/canonical_config",
+          "name": "canonical_config",
+          "description": "Canonical configuration string: the reproduction key for this instance.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "canonical_config"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/horizon",
+          "name": "horizon",
+          "description": "Pre-determined episode length.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; makes the split's difficulty distribution auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/n_free_cells",
+          "name": "n_free_cells",
+          "description": "Traversable cells.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "n_free_cells"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/betti_z2",
+          "name": "betti_z2",
+          "description": "Certified Betti numbers (doors walkable).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "betti_z2"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "split/val/betti_z2_sealed",
+          "name": "betti_z2_sealed",
+          "description": "Certified Betti numbers (doors as walls).",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "splits/val.csv"
+            },
+            "extract": {
+              "column": "betti_z2_sealed"
             }
           }
         }

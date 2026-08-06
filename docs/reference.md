@@ -189,19 +189,32 @@ boundary decision by construction.
 ## VisitedComplex cost
 
 Lazy and cached, but **not incremental**: `add` records points and
-invalidates; the next query rebuilds. Cubical backend over a dense
-region — build/rims are linear, betti near-linear, representatives
-superlinear, torsion (Smith normal form) offline-only:
+invalidates; the next query rebuilds. Measured over F₂ on a dense
+square archive, in call order (`add` → build → `betti` →
+`representatives` → `rims`), each timed with the previous cached.
+
+`vr` (ε=1.5), the general-purpose choice:
+
+| cells | build | betti | representatives |
+|---|---|---|---|
+| 1k | 0.02s | 0.01s | 0.07s |
+| 10k | 0.20s | 0.45s | 2.7s |
+| 50k | 1.13s | 3.09s | 47s |
+
+`cubical`, for grid environments:
 
 | cells | build | betti | representatives | rims |
 |---|---|---|---|---|
 | 1k | 0.02s | 0.01s | 0.02s | ~0 |
-| 10k | 0.26s | 0.24s | 0.73s | ~0 |
-| 50k | 1.40s | 1.57s | 12.7s | ~0 |
-| 100k | 3.04s | 5.55s | 43.6s | 0.01s |
+| 10k | 0.26s | 0.23s | 0.81s | ~0 |
+| 50k | 1.48s | 1.53s | 12.5s | ~0 |
+| 100k | 3.00s | 5.30s | 44.1s | 0.01s |
 
-Query once per episode rather than once per step; `torsion(1)` takes
-minutes past ~20k cells and is a diagnostic, not an online signal.
+Builds and rims are linear, `betti` near-linear, `representatives`
+superlinear (comfortable to ~20k cells). VR uses a spatial hash under
+the plain Euclidean metric; a custom `metric=` falls back to all-pairs
+and is quadratic. Query once per episode, not per step; `torsion(1)`
+runs a Smith normal form and is an offline diagnostic.
 
 ## Performance
 

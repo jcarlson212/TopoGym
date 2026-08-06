@@ -55,11 +55,11 @@ agent is a MiniGrid-style arrow, so its heading is always visible;
 `actions="fourway"` opts into `Discrete(4)` screen-direction actions
 with the universal `(x, y)` + 16-slot texture vector):
 
-| slice | families | axis |
-|---|---|---|
-| **GridWorld2D** | `Dilution`, `Chambers2`, `ChamberCount`, `Decoys`, `Shape{Sq,Ci,Tr,St}`, `Nested`, `GiveUp`, `Bottleneck`, `Maze` | world size, chamber/decoy count, shape, nesting depth, corridor length, braiding |
-| **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail |
-| **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal |
+| slice | families | axis | status |
+|---|---|---|---|
+| **GridWorld2D** | `Dilution`, `Chambers2`, `ChamberCount`, `Decoys`, `Shape{Sq,Ci,Tr,St}`, `Nested`, `GiveUp`, `Bottleneck`, `Maze` | world size, chamber/decoy count, shape, nesting depth, corridor length, braiding | 🟠 in development |
+| **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail | 🟠 in development |
+| **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal | 🟠 in development |
 
 Highlights: sealed decoys indistinguishable from chambers from the
 outside; DontFall's fatal drop where the most novel direction is
@@ -76,6 +76,35 @@ edges are drawn with fundamental-polygon arrows) can tell them apart.
 
 Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`.
 Details per family: [docs/environments/](docs/environments/README.md).
+
+## Benchmarks
+
+| benchmark | what it tests | manifest | splits | RND+PPO | ICM+PPO | Go-Explore | status |
+|---|---|---|---|---|---|---|---|
+| **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
+
+Splits are drawn over (family, size, seed) with size-scaled placement
+jitter, from disjoint seed bands — tune 1000+, train 2000+, val 3000+,
+test 4000+, with the canonical seed 0 in none of them. Every row
+carries its canonical config, certified topology, turn-aware optimal
+route, and horizon, so a split's difficulty distribution is auditable
+rather than asserted. Every split, and the extrapolation views, are
+published in `croissant.json` as their own Croissant record sets.
+
+```python
+import csv, gymnasium as gym, topogym
+
+with open("docs/splits/train.csv") as f:
+    for row in csv.DictReader(f):
+        env = gym.make(row["template_id"], seed=int(row["seed"]),
+                       placement_jitter=int(row["placement_jitter"]),
+                       size=int(row["size"]))
+        obs, info = env.reset(seed=0)
+        # ... train; row["optimal_actions"] is the turn-aware optimum
+```
+
+Regenerate with `python scripts/generate_splits.py`; browse any split
+visually with `python scripts/browse.py --all --split test -n 4`.
 
 ## Install
 
@@ -197,21 +226,39 @@ Backends: `cubical` (movement-consistent on the env's own grid), `vr`
 vectors), and `witness` (de Silva–Carlsson landmarks, with the
 admit/evict policy yours to override). Coefficients: any prime or `Z`.
 
-Cost, cubical backend over a dense archive — lazy and cached, but not
-incremental, so query once an episode rather than once a step:
+Cost — lazy and cached but **not incremental**, so query once an
+episode rather than once a step. Measured over F₂ on a dense square
+archive, calling in this order and timing each with the previous
+already cached: `add` fills the archive, then the build (triggered by
+the first query), then `betti()`, then `representatives()`, then
+`rims()`. `add` is negligible throughout (0.03s at 100k).
+
+**`vr`, ε = 1.5** — the general-purpose choice, and the one to assume
+for non-voxel spaces:
+
+| cells | build | betti | representatives |
+|---|---|---|---|
+| 1k | 0.02s | 0.01s | 0.07s |
+| 10k | 0.20s | 0.45s | 2.7s |
+| 50k | 1.13s | 3.09s | 47s |
+
+**`cubical`** — for grid environments, where it matches movement:
 
 | cells | build | betti | representatives | rims |
 |---|---|---|---|---|
 | 1k | 0.02s | 0.01s | 0.02s | ~0 |
-| 10k | 0.26s | 0.24s | 0.73s | ~0 |
-| 50k | 1.40s | 1.57s | 12.7s | ~0 |
-| 100k | 3.04s | 5.55s | 43.6s | 0.01s |
+| 10k | 0.26s | 0.23s | 0.81s | ~0 |
+| 50k | 1.48s | 1.53s | 12.5s | ~0 |
+| 100k | 3.00s | 5.30s | 44.1s | 0.01s |
 
-Build and rims are linear, `betti` near-linear, `representatives`
-superlinear — comfortable to ~20k cells. Costs are sequential, so
-cycles from a 100k-cell archive take the build plus the extraction
-(~47s); a 50-grid archive is ~2.5k cells, where it is 0.02s.
-`torsion()` runs a Smith normal form and is an offline diagnostic.
+Builds and rims are linear and `betti` near-linear in both backends;
+`representatives` is the superlinear one — comfortable to ~20k cells,
+expensive past 50k. Costs are sequential, so cycles from a 100k-cell
+cubical archive cost the build plus the extraction (~47s), while a
+50-grid archive is ~2.5k cells, where it is hundredths of a second.
+Use `witness` to hold a large point cloud at a fixed landmark budget.
+`torsion()` runs an integer Smith normal form and is an offline
+diagnostic, not an online signal.
 
 ## Documentation
 

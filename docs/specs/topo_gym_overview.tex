@@ -1202,34 +1202,53 @@ belongs, as the answer key for scoring rather than an input.
 
 \paragraph{Cost.} Computation is lazy and cached but \emph{not}
 incremental: \texttt{add} records points and invalidates, and the
-next query rebuilds. Measured on the cubical backend over a dense
-visited region:
+next query rebuilds. Measured over $\F_2$ on a dense square archive,
+called in this order with each timed while the previous results stay
+cached --- \texttt{add} fills the archive, the build is triggered by
+the first query, then \texttt{betti}, then \texttt{representatives},
+then \texttt{rims}. \texttt{add} is negligible throughout
+($0.03$\,s at 100{,}000 cells).
 
 \begin{center}
 \small
 \begin{tabular}{@{}rrrrr@{}}
 \toprule
+\multicolumn{5}{@{}l}{\textbf{\texttt{vr}}, $\epsilon = 1.5$ ---
+the general-purpose choice} \\
 \textbf{cells} & \textbf{build} & \textbf{betti} &
 \textbf{representatives} & \textbf{rims} \\
 \midrule
-1{,}000   & 0.02\,s & 0.01\,s & 0.02\,s  & $\sim$0 \\
-10{,}000  & 0.26\,s & 0.24\,s & 0.73\,s  & $\sim$0 \\
-50{,}000  & 1.40\,s & 1.57\,s & 12.7\,s  & $\sim$0 \\
-100{,}000 & 3.04\,s & 5.55\,s & 43.6\,s  & 0.01\,s \\
+1{,}000   & 0.02\,s & 0.01\,s & 0.07\,s & --- \\
+10{,}000  & 0.20\,s & 0.45\,s & 2.7\,s  & --- \\
+50{,}000  & 1.13\,s & 3.09\,s & 47\,s   & --- \\
+\addlinespace
+\multicolumn{5}{@{}l}{\textbf{\texttt{cubical}} --- for grid
+environments, where it matches movement} \\
+\textbf{cells} & \textbf{build} & \textbf{betti} &
+\textbf{representatives} & \textbf{rims} \\
+\midrule
+1{,}000   & 0.02\,s & 0.01\,s & 0.02\,s & $\sim$0 \\
+10{,}000  & 0.26\,s & 0.23\,s & 0.81\,s & $\sim$0 \\
+50{,}000  & 1.48\,s & 1.53\,s & 12.5\,s & $\sim$0 \\
+100{,}000 & 3.00\,s & 5.30\,s & 44.1\,s & 0.01\,s \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\noindent The build and rims are linear in the archive, \texttt{betti}
-near-linear, and \texttt{representatives} superlinear --- comfortable
-to roughly 20{,}000 cells and expensive past 50{,}000. The costs are
-sequential, so extracting cycles from a 100{,}000-cell archive is the
-build plus the extraction, about 47\,s in total. For scale, only
-\texttt{Chambers2-400} has more free cells than that; a 50-grid
-archive is around 2{,}500 cells, where the same call takes
-$0.02$\,s. Query once an episode rather than once a step, and treat
-\texttt{torsion} --- an integer Smith normal form, minutes at
-20{,}000 cells --- as an offline diagnostic.
+\noindent Builds and rims are linear in the archive and
+\texttt{betti} near-linear in both backends; \texttt{representatives}
+is the superlinear one --- comfortable to roughly 20{,}000 cells and
+expensive past 50{,}000. The costs are sequential, so extracting
+cycles from a 100{,}000-cell cubical archive is the build plus the
+extraction, about 47\,s. For scale, only \texttt{Chambers2-400} has
+more free cells than that; a 50-grid archive is around 2{,}500 cells,
+where the same call takes hundredths of a second. The Vietoris--Rips
+build uses a spatial hash under the plain Euclidean metric; a custom
+\texttt{metric=} falls back to all-pairs comparison and is quadratic,
+and \texttt{witness} is the way to hold a large point cloud at a
+fixed landmark budget. Query once an episode rather than once a step,
+and treat \texttt{torsion} --- an integer Smith normal form, minutes
+at 20{,}000 cells --- as an offline diagnostic.
 
 \paragraph{Design.} All three backends reduce to one
 \texttt{ChainComplex} (cells per dimension, integer boundary maps),
@@ -1425,18 +1444,34 @@ destroy by widening the difficulty distribution instead of sampling
 from it.
 
 Each split ships as a pinned manifest in the format of
-\texttt{docs/manifest.csv}, one row per instance with its canonical
+\texttt{docs/manifest.csv} --- \texttt{docs/splits/\{tune, train,
+val, test\}.csv}, one row per instance with its canonical
 configuration, certified topology, turn-aware optimal $d^{\star}$,
-and horizon. Recording $d^{\star}$ is what makes the splits
-\emph{checkable}: anyone can confirm that train, val, and test have
-comparable difficulty distributions rather than taking it on faith.
+and horizon, emitted by \texttt{scripts/generate\_splits.py}.
+Recording $d^{\star}$ is what makes the splits \emph{checkable}:
+anyone can confirm that train, val, and test have comparable
+difficulty distributions rather than taking it on faith, and the
+library's tests assert exactly that, along with band disjointness, no
+instance shared between splits, and every family present at more than
+one size. Distinct registry ids can name the same configuration ---
+\texttt{ShapeSq} is \texttt{Dilution} with the square shape spelled
+out --- so units are collapsed by canonical string before sampling,
+and no world is weighted twice.
+
+Every split is published in \texttt{croissant.json} as its own
+Croissant record set with a \texttt{sha256}-pinned file object, so
+the splits are discoverable from the dataset metadata rather than
+only from the repository tree.
 
 Two further splits answer different questions and are reported
 separately, never blended into the headline score: \textbf{size
-extrapolation} (train at the smaller sizes, test at 200 and 400 ---
-the \texttt{Chambers2} family exists for precisely this) and
-\textbf{family hold-out}, where whole families are withheld to
-measure concept transfer.
+extrapolation} (\texttt{size-extrapolation-\{train,test\}.csv} ---
+train at sizes $\le 100$, test above, which the multi-scale families
+exist for) and \textbf{family hold-out}
+(\texttt{family-holdout-\{train,test\}.csv}), where whole families
+are withheld to measure concept transfer. Both are views over the
+same instances rather than fresh draws, so they cost no extra
+generation and stay consistent with the main splits.
 
 \paragraph{Inspecting a split.} \texttt{scripts/browse.py} renders
 any environment across a seed range or a whole split as a contact

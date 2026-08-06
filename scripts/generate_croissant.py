@@ -83,18 +83,77 @@ def _rows() -> list:
     return rows
 
 
-def _field(name: str, dtype: str, description: str) -> dict:
+def _field(name: str, dtype: str, description: str,
+           record_set: str = "environments",
+           file_id: str = "manifest.csv") -> dict:
     return {
         "@type": "cr:Field",
-        "@id": f"environments/{name}",
+        "@id": f"{record_set}/{name}",
         "name": name,
         "description": description,
         "dataType": dtype,
         "source": {
-            "fileObject": {"@id": "manifest.csv"},
+            "fileObject": {"@id": file_id},
             "extract": {"column": name},
         },
     }
+
+
+#: Column -> (type, description) for the benchmark split manifests.
+SPLIT_FIELDS = {
+    "split": ("sc:Text", "tune, train, val, or test."),
+    "unit": ("sc:Text", "Family-size unit, e.g. Decoys4-100."),
+    "template_id": ("sc:Text",
+                    "Registry id the instance is built from."),
+    "slice": ("sc:Text", "GridWorld2D, Top, or Texture."),
+    "family": ("sc:Text", "Environment family."),
+    "size": ("sc:Integer", "Grid side length."),
+    "seed": ("sc:Integer",
+             "Layout seed, drawn from this split's disjoint band."),
+    "placement_jitter": ("sc:Integer",
+                         "Cells of placement perturbation; keeps the "
+                         "family's arrangement while making every "
+                         "instance distinct."),
+    "canonical_config": ("sc:Text",
+                         "Canonical configuration string: the "
+                         "reproduction key for this instance."),
+    "horizon": ("sc:Integer", "Pre-determined episode length."),
+    "optimal_actions": ("sc:Integer",
+                        "Fewest actions from start to goal counting "
+                        "turns; makes the split's difficulty "
+                        "distribution auditable."),
+    "n_free_cells": ("sc:Integer", "Traversable cells."),
+    "betti_z2": ("sc:Text", "Certified Betti numbers (doors walkable)."),
+    "betti_z2_sealed": ("sc:Text",
+                        "Certified Betti numbers (doors as walls)."),
+}
+
+#: What each split file is for, keyed by stem.
+SPLIT_DESCRIPTIONS = {
+    "tune": "Hyperparameter selection only; never eval or hold-out.",
+    "train": "Training instances.",
+    "val": "Model selection during development.",
+    "test": "Hold-out; reported once.",
+    "size-extrapolation-train": "Train small (size <= 100).",
+    "size-extrapolation-test": "Test large (size > 100): size "
+                               "extrapolation, reported separately.",
+    "family-holdout-train": "Train with whole families withheld.",
+    "family-holdout-test": "The withheld families: concept transfer, "
+                           "reported separately.",
+}
+
+
+def _split_files() -> list:
+    """``(stem, path, sha256, n_rows)`` per split manifest on disk."""
+    out = []
+    for path in sorted((ROOT / "docs" / "splits").glob("*.csv")):
+        text = path.read_text()
+        out.append((
+            path.stem, path,
+            hashlib.sha256(text.encode()).hexdigest(),
+            max(0, len(text.splitlines()) - 1),
+        ))
+    return out
 
 
 def main() -> int:
@@ -132,7 +191,8 @@ def main() -> int:
         "conformsTo": "http://mlcommons.org/croissant/1.0",
         "name": "TopoGym-v1",
         "description": (
-            "The pinned environment registry of TopoGym: gridworld "
+            "The pinned environment registry and benchmark splits of "
+            "TopoGym: gridworld "
             "reinforcement-learning environments with certified "
             "topology for exploration research. One record per stable "
             "environment id, with its canonical generator "
@@ -164,6 +224,24 @@ def main() -> int:
                 "encodingFormat": "text/csv",
                 "sha256": sha,
             },
+            *[
+                {
+                    "@type": "cr:FileObject",
+                    "@id": f"splits/{stem}.csv",
+                    "name": f"{stem}.csv",
+                    "description": (
+                        f"Benchmark split: {SPLIT_DESCRIPTIONS.get(stem, '')}"
+                        f" {rows} instances."
+                    ),
+                    "contentUrl": (
+                        "https://raw.githubusercontent.com/jcarlson212/"
+                        f"TopoGym/main/docs/splits/{stem}.csv"
+                    ),
+                    "encodingFormat": "text/csv",
+                    "sha256": sha,
+                }
+                for stem, _path, sha, rows in _split_files()
+            ],
             {
                 "@type": "cr:FileObject",
                 "@id": "repository",
@@ -219,7 +297,28 @@ def main() -> int:
                     _field("homology", "sc:Text",
                            "Integral homology groups H0/H1/H2."),
                 ],
-            }
+            },
+            *[
+                {
+                    "@type": "cr:RecordSet",
+                    "@id": f"split/{stem}",
+                    "name": f"split/{stem}",
+                    "description": (
+                        f"{SPLIT_DESCRIPTIONS.get(stem, 'Benchmark split.')}"
+                        " One record per instance; seeds come from the "
+                        "split's disjoint band and canonical_config "
+                        "reproduces the instance exactly."
+                    ),
+                    "field": [
+                        _field(name, dtype, description,
+                               record_set=f"split/{stem}",
+                               file_id=f"splits/{stem}.csv")
+                        for name, (dtype, description)
+                        in SPLIT_FIELDS.items()
+                    ],
+                }
+                for stem, _path, _sha, _rows in _split_files()
+            ],
         ],
     }
     croissant_text = json.dumps(croissant, indent=2) + "\n"
