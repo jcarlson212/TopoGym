@@ -18,8 +18,10 @@ pip install pre-commit && pre-commit install   # commit gates (once)
 
 The last line installs the repo's [pre-commit](https://pre-commit.com)
 hooks: every `git commit` runs `ruff check`, the version-sync check,
-and the unit-test gate (at least 90% of the suite must pass) and
-refuses the commit otherwise — so failures surface locally, not on
+the unit-test gate (at least 90% of the suite must pass), and — when
+the change touches `topogym/` or the generator — a check that the
+Croissant metadata still matches the registry, refusing the commit
+otherwise — so failures surface locally, not on
 CI. Bypass deliberately with `git commit --no-verify`; CI still
 requires 100% green to merge.
 
