@@ -393,15 +393,47 @@ class VisitedComplex:
             boundaries.append(cols)
         return ChainComplex(cells=layers, boundaries=boundaries)
 
+    def _neighbor_pairs(self, verts: list) -> list:
+        """Pairs within ``epsilon``.
+
+        Under the plain Euclidean metric a spatial hash bounds the
+        search to adjacent buckets, which keeps the build near-linear;
+        all-pairs comparison is quadratic and caps the backend at a few
+        thousand points. Quotient metrics wrap, so coordinate buckets
+        do not bound distance there -- those fall back to all pairs.
+        """
+        dist = self._metric
+        eps = self.epsilon
+        if self._metric is not _euclidean:
+            return [(a, b) for i, a in enumerate(verts)
+                    for b in verts[i + 1:] if dist(a, b) <= eps]
+        buckets: dict = {}
+        for v in verts:
+            key = tuple(int(math.floor(c / eps)) for c in v)
+            buckets.setdefault(key, []).append(v)
+        offsets = [()]
+        for _ in range(len(verts[0]) if verts else 0):
+            offsets = [o + (d,) for o in offsets for d in (-1, 0, 1)]
+        pairs = []
+        for key, here in buckets.items():
+            for offset in offsets:
+                other = buckets.get(
+                    tuple(k + d for k, d in zip(key, offset))
+                )
+                if not other:
+                    continue
+                for a in here:
+                    for b in other:
+                        if repr(a) < repr(b) and dist(a, b) <= eps:
+                            pairs.append((a, b))
+        return pairs
+
     def _build_vr(self) -> ChainComplex:
         verts = sorted(self._points, key=repr)
-        dist = self._metric
         adjacency: dict = {v: set() for v in verts}
-        for i, a in enumerate(verts):
-            for b in verts[i + 1:]:
-                if dist(a, b) <= self.epsilon:
-                    adjacency[a].add(b)
-                    adjacency[b].add(a)
+        for a, b in self._neighbor_pairs(verts):
+            adjacency[a].add(b)
+            adjacency[b].add(a)
         return self._simplicial(verts, adjacency, lambda s: True)
 
     def _build_witness(self) -> ChainComplex:

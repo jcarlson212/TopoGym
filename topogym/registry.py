@@ -176,6 +176,30 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
     mode = "open" if cfg.style == "rooms" else cfg.style
     cs = cfg.chamber_side if cfg.chamber_side is not None else 0
     ds = cfg.decoy_side if cfg.decoy_side is not None else cs
+    # Structural fields that define a family but are not implied by the
+    # counts above. Omitted at their defaults, so plain configurations
+    # keep the short form -- but present whenever they distinguish two
+    # environments, because this string is the reproduction key.
+    extras = ""
+    if cfg.base != "square":
+        extras += f"-b{cfg.base}"
+    if cfg.n_holes:
+        extras += f"-h{cfg.n_holes}"
+    if cfg.base == "x_holes":
+        extras += f"-bh{cfg.n_base_holes}"
+    if cfg.doors_per_chamber > 1:
+        extras += f"-dc{cfg.doors_per_chamber}"
+    if cfg.door_corridor_len:
+        extras += f"-cor{cfg.door_corridor_len}"
+    if cfg.style == "nested":
+        extras += f"-nd{cfg.nested_depth}"
+        if cfg.shell_spacing != 2:
+            extras += f"-ss{cfg.shell_spacing}"
+    if cfg.style == "corridor":
+        extras += f"-cl{cfg.corridor_len}-rm{cfg.rooms}"
+    if cfg.style == "maze" and getattr(cfg, "braid", 0):
+        extras += f"-br{cfg.braid}"
+
     placement = ""
     placement += {"center": "-ctr", "perimeter": "-per"}.get(
         cfg.chamber_placement, "")
@@ -185,7 +209,8 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
     placement += f"-j{cfg.placement_jitter}" if cfg.placement_jitter else ""
     return (
         f"TG-GridWorld2D-S{size}-C{cfg.n_chambers}-D{cfg.n_decoys}"
-        f"-cs{cs}-ds{ds}-sep{cfg.min_sep}-shp{shp}{placement}-{mode}"
+        f"-cs{cs}-ds{ds}-sep{cfg.min_sep}-shp{shp}{extras}{placement}"
+        f"-{mode}"
         f"-slip{p_slip:g}-seed{seed}"
     )
 

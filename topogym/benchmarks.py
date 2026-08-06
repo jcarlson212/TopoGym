@@ -54,3 +54,51 @@ def split_of(seed: int) -> str | None:
         if base <= seed < base + 1000:
             return name
     return None
+
+
+#: Instances generated per unit, per split. Train carries more; the
+#: evaluation splits only need enough draws to estimate a mean.
+SPLIT_COUNTS = {"tune": 3, "train": 6, "val": 3, "test": 3}
+
+#: The sizes each GridWorld2D family appears at, so no split can be
+#: overfitted to one scale. Texture and Top worlds are hand-built by
+#: their own builders at a fixed size and appear once.
+#: Keys are matched against :func:`family_of` by longest prefix, so
+#: ``Shape`` covers ``ShapeSq``/``ShapeCi``/... and ``ChamberCount``
+#: wins over ``Chambers`` for ``ChamberCount4``.
+FAMILY_SIZES = {
+    "Dilution": (50, 200),
+    "Chambers": (50, 100, 200, 400),
+    "ChamberCount": (100, 200),
+    "Decoys": (50, 100),
+    "Shape": (50, 100),
+    "Nested": (50, 100),
+    "GiveUp": (50, 100),
+    "Bottleneck": (100, 200),
+    "Maze": (50, 100),
+}
+
+#: Size extrapolation: train small, test large. Reported separately --
+#: never blended into the headline score.
+EXTRAPOLATION_TRAIN_MAX = 100
+
+#: Family hold-out: these families are withheld from training entirely,
+#: so the test measures concept transfer rather than instance
+#: generalization.
+HELD_OUT_FAMILIES = ("GiveUp", "Bottleneck", "SearchRescue", "SpaceWarp")
+
+
+def sizes_for(family: str, default: int) -> tuple:
+    """The sizes ``family`` appears at, by longest-prefix match."""
+    match = max(
+        (k for k in FAMILY_SIZES if family.startswith(k)),
+        key=len, default=None,
+    )
+    return FAMILY_SIZES[match] if match else (default,)
+
+
+def family_of(name: str) -> str:
+    """The family a registry name belongs to: ``Decoys4-50`` ->
+    ``Decoys``, ``TopKlein-50`` -> ``TopKlein``."""
+    stem = name.split("-")[0]
+    return stem.rstrip("0123456789") or stem
