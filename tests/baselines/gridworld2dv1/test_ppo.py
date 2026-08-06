@@ -6,9 +6,12 @@ ray = pytest.importorskip("ray", reason="needs topogym[benchmarks]")
 pytest.importorskip("torch", reason="needs topogym[benchmarks]")
 
 from topogym.baselines.gridworld2dv1 import BaselineConfig  # noqa: E402
+from topogym.baselines.gridworld2dv1.concrete_baselines.ppo import (  # noqa: E402
+    PPOBaseline,
+    mean_return,
+)
 from topogym.baselines.gridworld2dv1.instances import load_split  # noqa: E402
 from topogym.baselines.gridworld2dv1.multitask import SplitEnv  # noqa: E402
-from topogym.baselines.gridworld2dv1.ppo import PPOBaseline, mean_return  # noqa: E402
 
 
 def test_mean_return_reads_both_api_spellings():

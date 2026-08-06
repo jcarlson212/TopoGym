@@ -33,8 +33,10 @@ from topogym.baselines.gridworld2dv1.protocol import (
 #: name -> "module:attribute", resolved on demand so that listing the
 #: baselines never imports Ray.
 BASELINES = {
-    "random": "topogym.baselines.gridworld2dv1.random_walk:RandomBaseline",
-    "ppo": "topogym.baselines.gridworld2dv1.ppo:PPOBaseline",
+    "random": "topogym.baselines.gridworld2dv1.concrete_baselines.random_walk:RandomBaseline",
+    "ppo": "topogym.baselines.gridworld2dv1.concrete_baselines.ppo:PPOBaseline",
+    "go-explore":
+        "topogym.baselines.gridworld2dv1.concrete_baselines.goexplore:GoExploreBaseline",
 }
 
 __all__ = [

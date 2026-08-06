@@ -62,6 +62,9 @@ class BaselineConfig:
     #: Consecutive validation checks without improvement before stopping.
     patience: int = 5
     val_every: int = 5
+    #: Episodes per instance during hyperparameter search. Defaults to
+    #: the evaluation budget; lower it when a grid is wide.
+    tune_episodes: int | None = None
     #: Episodes per validation check, swept across the split rather
     #: than run per instance: this runs every ``val_every`` iterations,
     #: so a per-instance sweep would cost far more than the training it
@@ -171,6 +174,12 @@ class Baseline(abc.ABC):
     #: Short identifier used in filenames, plots, and result JSON.
     name: str = "baseline"
 
+    #: Which splits feed hyperparameter selection. Only ``test`` is
+    #: constrained, so a method that fits a selection strategy rather
+    #: than a policy may pool everything else -- it declares that here
+    #: instead of quietly reaching for it.
+    tuning_splits: tuple = ("tune",)
+
     #: Set when a baseline is trained on one group of the split rather
     #: than all of it; recorded with the results.
     group: str | None = None
@@ -199,8 +208,13 @@ class Baseline(abc.ABC):
 
     # -- the three things a baseline may customise --------------------
 
-    def select_hyperparameters(self, tune_rows: list) -> Hyperparameters:
-        """Choose hyperparameters on the tuning split, and only there."""
+    def select_hyperparameters(self, tuning: dict) -> Hyperparameters:
+        """Choose hyperparameters from the declared tuning splits.
+
+        ``tuning`` maps each name in :attr:`tuning_splits` to its rows,
+        so a method can use them as one pool or as successive rungs --
+        its choice, and never including the hold-out.
+        """
         return Hyperparameters()
 
     @abc.abstractmethod
@@ -277,9 +291,15 @@ class Baseline(abc.ABC):
         """
         from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
 
-        logger.info("[%s] selecting hyperparameters on tune (%d rows)",
-                    self.name, len(splits["tune"]))
-        hyperparameters = self.select_hyperparameters(splits["tune"])
+        assert "test" not in self.tuning_splits, (
+            "the hold-out is not a tuning split"
+        )
+        tuning = {name: splits.get(name, [])
+                  for name in self.tuning_splits}
+        logger.info("[%s] selecting hyperparameters on %s (%d rows)",
+                    self.name, "+".join(self.tuning_splits),
+                    sum(len(rows) for rows in tuning.values()))
+        hyperparameters = self.select_hyperparameters(tuning)
 
         logger.info("[%s] training on train (%d rows), stopping on val "
                     "(%d rows)", self.name, len(splits["train"]),

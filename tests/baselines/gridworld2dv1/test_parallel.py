@@ -2,10 +2,10 @@
 
 import pytest
 
+from topogym.baselines.gridworld2dv1.concrete_baselines.random_walk import RandomPolicyFactory
 from topogym.baselines.gridworld2dv1.evaluate import evaluate_split, instance_seed
 from topogym.baselines.gridworld2dv1.instances import load_split
 from topogym.baselines.gridworld2dv1.parallel import default_workers, map_instances
-from topogym.baselines.gridworld2dv1.random_walk import RandomPolicyFactory
 
 COMPARED = ("instance", "success_rate", "unique_states", "interactions",
             "lifetime_coverage")
@@ -58,7 +58,7 @@ def test_map_instances_handles_degenerate_input():
 def test_policy_factory_is_optional(workers):
     """Without a factory the run stays serial rather than failing: a
     policy wrapping a torch module cannot cross a process boundary."""
-    from topogym.baselines.gridworld2dv1.random_walk import RandomBaseline
+    from topogym.baselines.gridworld2dv1.concrete_baselines.random_walk import RandomBaseline
 
     records = evaluate_split(_rows(2), RandomBaseline().policy(),
                              episodes=1, workers=workers)
