@@ -48,69 +48,8 @@ with the universal `(x, y)` + 16-slot texture vector):
 | **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail | 🟠 in development |
 | **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal | 🟠 in development |
 
-Highlights: sealed decoys indistinguishable from chambers from the
-outside; DontFall's fatal drop where the most novel direction is
-the worst one; SpaceWarp's doorless treasure chamber, enterable
-only through one wormhole in a field of thirty (noise for
-gradient-followers, tractable for anything modeling transitions);
-ClownChase's wandering distractor paying a depleting trickle of
-reward away from the treasure; SearchRescue's trapped survivor in
-the only large persistent hole of a shrapnel field; seasons in
-EnvironmentalIceShip, where winter grows the ice until the channel
-freezes shut around you; and Möbius/Klein/RP² worlds that are locally
-flat everywhere — only globally aggregated signals (the identified
-edges are drawn with fundamental-polygon arrows) can tell them apart.
-
 Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`.
 Details per family: [docs/environments/](docs/environments/README.md).
-
-## Benchmarks
-
-| benchmark | what it tests | manifest | splits | RND+PPO | ICM+PPO | Go-Explore | status |
-|---|---|---|---|---|---|---|---|
-| **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
-
-**All three slices are in every split** — GridWorld2D, Texture, and
-Top — across 63 family-size units. The splits differ only in *which
-seeds* they draw, never in which environments they contain: every unit
-appears in all four, so tune, train, val, and test are samples of the
-same task rather than different ones.
-
-| | units | instances per split |
-|---|---|---|
-| GridWorld2D | 49 | 294 train · 147 each eval |
-| Texture | 8 | 48 train · 24 each eval |
-| Top | 6 | 36 train · 18 each eval |
-
-Seeds come from disjoint bands — tune 1000+, train 2000+, val 3000+,
-test 4000+, with the canonical seed 0 in none of them — and each
-instance carries size-scaled placement jitter, so no two are the same
-world. Every row records its canonical config, certified topology,
-turn-aware optimal route, and horizon, making a split's difficulty
-distribution auditable rather than asserted. Every split, and the
-extrapolation views, are published in `croissant.json` as their own
-Croissant record sets.
-
-GridWorld2D dominates by unit count, so report **per slice** rather
-than pooling: a single mean over all instances is mostly a GridWorld2D
-score. Scenario mechanics stay live at benchmark defaults — including
-ClownChase's depleting reward trickle toward the wrong target, which
-is deception the benchmark is meant to contain.
-
-```python
-import csv, gymnasium as gym, topogym
-
-with open("docs/splits/train.csv") as f:
-    for row in csv.DictReader(f):
-        env = gym.make(row["template_id"], seed=int(row["seed"]),
-                       placement_jitter=int(row["placement_jitter"]),
-                       size=int(row["size"]))
-        obs, info = env.reset(seed=0)
-        # ... train; row["optimal_actions"] is the turn-aware optimum
-```
-
-Regenerate with `python scripts/generate_splits.py`; browse any split
-visually with `python scripts/browse.py --all --split test -n 4`.
 
 ## Install
 
@@ -171,6 +110,54 @@ env = gym.make("TopoGym/Maze-100-v0", seed=1, teleport=True)
 env.reset(options={"teleport": (12, 40)})  # any previously visited cell
 ```
 
+## Benchmarks
+
+| benchmark | what it tests | manifest | splits | RND+PPO | ICM+PPO | Go-Explore | status |
+|---|---|---|---|---|---|---|---|
+| **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
+
+**All three slices are in every split** — GridWorld2D, Texture, and
+Top — across 63 family-size units. The splits differ only in *which
+seeds* they draw, never in which environments they contain: every unit
+appears in all four, so tune, train, val, and test are samples of the
+same task rather than different ones.
+
+| | units | instances per split |
+|---|---|---|
+| GridWorld2D | 49 | 294 train · 147 each eval |
+| Texture | 8 | 48 train · 24 each eval |
+| Top | 6 | 36 train · 18 each eval |
+
+Seeds come from disjoint bands — tune 1000+, train 2000+, val 3000+,
+test 4000+, with the canonical seed 0 in none of them — and each
+instance carries size-scaled placement jitter, so no two are the same
+world. Every row records its canonical config, certified topology,
+turn-aware optimal route, and horizon, making a split's difficulty
+distribution auditable rather than asserted. Every split, and the
+extrapolation views, are published in `croissant.json` as their own
+Croissant record sets.
+
+GridWorld2D dominates by unit count, so report **per slice** rather
+than pooling: a single mean over all instances is mostly a GridWorld2D
+score. Scenario mechanics stay live at benchmark defaults — including
+ClownChase's depleting reward trickle toward the wrong target, which
+is deception the benchmark is meant to contain.
+
+```python
+import csv, gymnasium as gym, topogym
+
+with open("docs/splits/train.csv") as f:
+    for row in csv.DictReader(f):
+        env = gym.make(row["template_id"], seed=int(row["seed"]),
+                       placement_jitter=int(row["placement_jitter"]),
+                       size=int(row["size"]))
+        obs, info = env.reset(seed=0)
+        # ... train; row["optimal_actions"] is the turn-aware optimum
+```
+
+Regenerate with `python scripts/generate_splits.py`; browse any split
+visually with `python scripts/browse.py --all --split test -n 4`.
+
 ## Play any environment yourself
 
 ```bash
@@ -206,9 +193,9 @@ legend and live H1 count top-right.
   (cross-episode) coverage, chamber entries, and return;
   `StatsRecorder` accumulates pandas-ready rows.
 
-## Learning from the topology
+## Learning from the topology w/ a map
 
-Agents consume TopoGym's topology through
+Agents can choose to consume TopoGym's topology through
 [`VisitedComplex`](docs/reference.md#visitedcomplex-build-your-own-topological-algorithms):
 feed it the states you have visited and read back the shape of what
 you know: a map of the holes you have found and the loops enclosing
@@ -232,7 +219,7 @@ Backends: `cubical` (movement-consistent on the env's own grid), `vr`
 vectors), and `witness` (de Silva–Carlsson landmarks, with the
 admit/evict policy yours to override). Coefficients: any prime or `Z`.
 
-Cost — lazy and cached but **not incremental**, so query once an
+Cost — lazy and cached but not incremental, so query once an
 episode rather than once a step. Measured over F₂ on a dense square
 archive, calling in this order and timing each with the previous
 already cached: `add` fills the archive, then the build (triggered by
