@@ -21,3 +21,7 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# Scratch output from scripts/browse.py
+seeds.png
+seeds-*.png

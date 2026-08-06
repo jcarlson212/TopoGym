@@ -215,6 +215,7 @@ class TopoEnvCore(gym.Env):
                 f"teleport target {target} has not been visited in any "
                 "previous episode on this layout"
             )
+        self._teleport_start = True
         return target
 
     def _reset_runtime(self) -> None:
@@ -223,6 +224,7 @@ class TopoEnvCore(gym.Env):
         self._visited = set()
         self.visit_counts = {}
         self._steps = 0
+        self._teleport_start = False
         # Episode length: the larger of the size floor (1.2x the side
         # length -- 60 on a 50-grid, 120 on a 100-grid) and enough
         # actions to reach the goal with buffer, HORIZON_SLACK x the
@@ -668,6 +670,8 @@ class TopoEnvCore(gym.Env):
             "known_components": self._known_components,
             "h0_merges": self._h0_merges,
             "doors_opened": len(self._open),
+            # Did this episode begin at an agent-chosen archive cell?
+            "teleport_start": self._teleport_start,
             "chambers_entered": len(self.chamber_entry_steps),
             "episode_return": self._episode_return,
         }

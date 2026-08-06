@@ -108,7 +108,7 @@ def _compose(frame: np.ndarray, label: str, px: int) -> np.ndarray:
 
 
 def contact_sheet(env_ids: list, seeds: list, split: str | None,
-                  out: pathlib.Path) -> None:
+                  out: pathlib.Path, panel: int = 0) -> None:
     import imageio.v3 as iio
 
     raw = []
@@ -117,7 +117,8 @@ def contact_sheet(env_ids: list, seeds: list, split: str | None,
         print(f"  {env_id}: seeds {seeds[0]}..{seeds[-1]}")
     # Every panel scales *up* to the widest world in the sheet, so no
     # world is ever downsampled into losing its one-cell walls.
-    px = max(CELL_PX, max(f.shape[0] for row in raw for f, _ in row))
+    px = panel or max(CELL_PX,
+                      max(f.shape[0] for row in raw for f, _ in row))
     sheet = np.concatenate([
         np.concatenate([_compose(f, label, px) for f, label in row], axis=1)
         for row in raw
@@ -194,6 +195,10 @@ def main() -> int:
     ap.add_argument("--play", action="store_true", help="interactive")
     ap.add_argument("--out", type=pathlib.Path,
                     default=pathlib.Path("seeds.png"))
+    ap.add_argument("--panel", type=int, default=0,
+                    help="force the panel size in pixels; keeps sheets "
+                         "a uniform width across chunks that hold "
+                         "different world sizes")
     ap.add_argument("--chunk", type=int, default=0,
                     help="rows per sheet; writes out-1.png, out-2.png, "
                          "... (a 43-family sheet is far too tall to "
@@ -210,9 +215,11 @@ def main() -> int:
         for i in range(0, len(env_ids), args.chunk):
             part = i // args.chunk + 1
             contact_sheet(env_ids[i:i + args.chunk], seeds, args.split,
-                          pathlib.Path(f"{stem}-{part}{suffix}"))
+                          pathlib.Path(f"{stem}-{part}{suffix}"),
+                          panel=args.panel)
         return 0
-    contact_sheet(env_ids, seeds, args.split, args.out)
+    contact_sheet(env_ids, seeds, args.split, args.out,
+                  panel=args.panel)
     return 0
 
 

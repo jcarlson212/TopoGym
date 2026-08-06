@@ -167,6 +167,42 @@ outgrow the side length (a 50×50 maze needs 674 actions). Dynamic
 worlds plan against the worst case their schedule can produce, and
 wormholes count as routes.
 
+## Archive resets
+
+`teleport=True` enables the episode-boundary probe: when an episode
+ends, the agent may choose where the next one resumes.
+
+```python
+obs, info = env.reset(seed=0)
+# ... explore until terminated or truncated ...
+env.reset(options={"teleport": (12, 40)})   # a previously visited cell
+```
+
+The reset lands directly on the target (no step is spent walking there
+and none is charged), and `info["teleport_start"]` — mirrored in
+`StatsRecorder` episode rows — records whether an episode began from
+the archive. Targets must have been visited in a previous episode on
+this layout, so resuming reveals nothing exploration had not already
+found. There is deliberately no mid-episode teleport: the choice is a
+boundary decision by construction.
+
+## VisitedComplex cost
+
+Lazy and cached, but **not incremental**: `add` records points and
+invalidates; the next query rebuilds. Cubical backend over a dense
+region — build/rims are linear, betti near-linear, representatives
+superlinear, torsion (Smith normal form) offline-only:
+
+| cells | build | betti | representatives | rims |
+|---|---|---|---|---|
+| 1k | 0.02s | 0.01s | 0.02s | ~0 |
+| 10k | 0.26s | 0.24s | 0.73s | ~0 |
+| 50k | 1.40s | 1.57s | 12.7s | ~0 |
+| 100k | 3.04s | 5.55s | 43.6s | 0.01s |
+
+Query once per episode rather than once per step; `torsion(1)` takes
+minutes past ~20k cells and is a diagnostic, not an online signal.
+
 ## Performance
 
 The step path does no topology (homology runs at generation and in

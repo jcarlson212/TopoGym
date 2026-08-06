@@ -39,6 +39,32 @@ and H1 = Z + Z/2 integrally.
 All queries are deterministic (sorted iteration), rebuilt lazily after
 ``add`` and cached until the next one; progress logs flow through the
 ``topogym`` logger at DEBUG level.
+
+Cost
+----
+Computation is **lazy and cached, but not incremental**: ``add`` only
+records points and invalidates the cache, and the next query rebuilds
+the whole complex. Querying once per episode (or every few hundred
+steps) is cheap; querying after every single ``add`` pays a full
+rebuild each time.
+
+Measured on the cubical backend over a dense visited region:
+
+===========  =======  =======  ===============  =====
+cells        build    betti    representatives  rims
+===========  =======  =======  ===============  =====
+1,000        0.02 s   0.01 s   0.02 s           ~0
+10,000       0.26 s   0.24 s   0.73 s           ~0
+50,000       1.40 s   1.57 s   12.7 s           ~0
+100,000      3.04 s   5.55 s   43.6 s           0.01 s
+===========  =======  =======  ===============  =====
+
+``build`` and ``rims`` are linear, ``betti`` is near-linear, and
+``representatives`` grows faster (it reduces each fundamental cycle
+against the 2-cell boundary space) -- comfortable to about 20,000
+cells, expensive past 50,000. ``torsion`` runs an integer Smith normal
+form and is markedly more expensive again (minutes at 20,000 cells):
+treat it as an offline diagnostic, not an online signal.
 """
 
 from __future__ import annotations
@@ -265,8 +291,11 @@ class VisitedComplex:
 
     def _build_cubical(self) -> ChainComplex:
         base = self.base
+        # Hoisted: rebuilding this set inside the comprehension makes
+        # the whole build quadratic in the archive size.
+        in_world = set(base.cells())
         cells = [c for c in sorted(self._points, key=repr)
-                 if c in set(base.cells())]
+                 if c in in_world]
         cell_set = set(cells)
         edges = []
         edge_ix: dict = {}
