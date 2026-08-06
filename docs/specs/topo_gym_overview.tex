@@ -271,6 +271,48 @@ generation time, and the accessors
 \texttt{betti\_numbers\_doors\_count\_as\_walls()} name them
 unambiguously.
 
+\subsection{The variation contract}
+\label{sec:variation}
+
+A benchmark has to say precisely what changes when the seed changes.
+Every quantity falls into exactly one tier:
+
+\begin{itemize}[leftmargin=2em, itemsep=1pt]
+  \item \textbf{Frozen by the configuration} --- world size, chamber
+        and decoy counts, room shape and side, door convention,
+        corridor length, nesting depth. These \emph{are} the family;
+        no seed touches them.
+  \item \textbf{Fixed by the placement policy} --- the macro
+        arrangement: a centered chamber, chambers spaced evenly around
+        the perimeter, decoys ringed about the center, the start in
+        the bottom-left corner. This is the family's visual identity
+        and the reason \texttt{ChamberCount8} reads as eight chambers
+        rather than eight random blobs; freezing it also means the
+        family's difficulty axis is its parameter, not packing luck.
+  \item \textbf{Sampled per seed} --- which wall side each door
+        occupies, the goal cell within its chamber, shape assignment
+        under \texttt{mixed}, maze and braid structure, corridor
+        routing, hole shapes, and --- when \texttt{placement\_jitter}
+        is positive --- a bounded perturbation of each policy anchor.
+  \item \textbf{Independent of the seed} --- \texttt{p\_slip},
+        \texttt{reward\_mode}, \texttt{actions},
+        \texttt{obs\_mode}, \texttt{complex}, \texttt{max\_steps}.
+\end{itemize}
+
+Seed \textbf{0} is the canonical specimen: the layout the
+documentation pictures, the manifest certifies, and
+\texttt{gym.make} returns when no seed is given. It is canonical only
+by being the default --- structurally it obeys the same contract as
+every other seed, because a benchmark whose first sample differs in
+kind from the rest is a trap for anyone building splits. Procedural
+mode, where the layout is resampled every episode, is available
+explicitly rather than as the accident of omitting a seed.
+
+Setting \texttt{placement="random"} drops the macro arrangement into
+the sampled tier wholesale. That is the honest switch for anyone who
+wants unconstrained placement; jitter is the gentler one, and the
+benchmark splits use it (Section~\ref{sec:benchmarks}).
+
 \subsection{Complex backends (all variants)}
 \label{sec:complex}
 
@@ -319,12 +361,9 @@ identical layouts, metadata, and rollouts.
 
 Every benchmark variant (GridWorld2D, -Texture, -Top) supports a
 \texttt{reward\_mode} configuration field. Episodes have a
-pre-determined length --- $\lfloor 1.2\max(W,H)\rfloor$ steps for a
-$W \times H$ world (60 on a 50-grid, 120 on a 100-grid), knowable
-from the configuration alone and overridable via
-\texttt{max\_steps}; short rollouts are deliberate, pairing with
-lifetime coverage and teleport resets for multi-episode exploration
---- and every environment places a goal cell by
+pre-determined length (Section~\ref{sec:horizon}), fixed by
+(configuration, seed) before the episode starts and overridable via
+\texttt{max\_steps} --- and every environment places a goal cell by
 default (removable with \texttt{goal=False} for goal-free
 exploration studies):
 \begin{itemize}[leftmargin=2em, itemsep=1pt]
@@ -351,6 +390,53 @@ the shaping field. Reward modes exist for community use, for training
 reward-consuming baselines, and for deception studies; pure
 exploration evaluations should run \texttt{none} to keep an extra
 variable out of their results.
+
+\subsection{Episode horizons}
+\label{sec:horizon}
+
+The horizon must make the goal \emph{reachable with room to spare}.
+It is not an exploration budget for a single episode: agents learn
+across many episodes, exploring early and exploiting later, so one
+episode never has to cover the world --- it has to permit reaching
+the goal and wandering on the way.
+
+\[
+  \text{horizon} \;=\; \max\!\left(
+    \lfloor 1.2\max(W,H)\rfloor,\;
+    10\left\lceil \tfrac{k \cdot d^{\star}}{10} \right\rceil
+  \right), \qquad k = 3,
+\]
+
+\noindent where $d^{\star}$ is the \emph{turn-aware} optimal: the
+fewest actions from start to goal counted in the egocentric action
+space, so the quarter-turns a corridor forces are charged (a breadth-
+first search over cell $\times$ facing). It is computed once per
+(configuration, seed), cached on the layout, and reported in the
+manifest, which is what makes a split's difficulty distribution
+auditable rather than assumed. $d^{\star}$ is measured in the
+egocentric space regardless of the configured action mode: the
+horizon is a property of the world, so selecting
+\texttt{actions="fourway"} must not silently shorten it.
+
+The size floor preserves the short-rollout intent (60 on a 50-grid,
+120 on a 100-grid) wherever it is already generous, and the second
+term lifts it only where the structure demands. That second term is
+not a refinement: shortest paths in mazes, corridor trees, and nested
+shells grow far faster than the side length --- a $50 \times 50$
+perfect maze needs $674$ actions --- so a size-only rule leaves those
+families with goals no agent, however omniscient, could reach inside
+the episode.
+
+\paragraph{Worst-case dynamics.} Where the world changes during an
+episode, $d^{\star}$ is computed against the most constrained
+configuration the schedule can produce --- for
+\texttt{EnvironmentalIceShip}, every cell any freeze wave can close.
+Ice only ever shrinks from that maximum, so a route valid there is
+valid at every step, and \emph{every} season draw is solvable rather
+than only the fortunate one. Teleporters are honoured too: a route
+through a wormhole is a real route, which is how \texttt{SpaceWarp}'s
+treasure chamber --- spatially its own component by construction --- is
+reachable at all.
 
 \subsection{Universal action and observation spaces}
 \label{sec:spaces}
@@ -897,8 +983,8 @@ registry.canonical_string(
 registry.manifest(seed=0)            # validity + assumptions per entry
 \end{lstlisting}
 
-Episodes truncate after the pre-determined $1.2\max(W,H)$ steps
-(60 on 50-grids, 120 on 100-grids; Section~\ref{sec:modes}); the
+Episodes truncate after the pre-determined horizon
+(Section~\ref{sec:horizon}); the
 sparse goal pays $+1$ by default (Section~\ref{sec:reward}).
 Archive-style teleport resets are opt-in:
 
@@ -1262,14 +1348,50 @@ exactly like the registry manifest of Section~\ref{sec:registry}.)}
 
 \subsection{The comparative benchmark}
 
-One overall benchmark for comparing agents: disjoint \textbf{train},
-\textbf{eval}, \textbf{hold-out}, and \textbf{hyperparameter-tuning}
-splits (the last reserved for pre-training hyperparameter selection,
-so tuning never touches eval or hold-out). Each split ships as a
-pinned manifest --- one row per (environment id, seed) with its
-canonical configuration and certified topology, in the same
-machine-readable format as \texttt{docs/manifest.csv} --- so a
-reported score names its exact environments.
+Splits are drawn over the product of (family, size, seed), not over
+registry ids: the registry is a curated showcase of canonical
+specimens, while a split instance is a \emph{sample from a family
+distribution}. Configurations already serialize to canonical strings,
+so a split row is a canonical string and needs no new id --- which is
+what lets every family appear at two or more sizes in every split
+without the registry growing to match.
+
+Seeds come from disjoint, widely separated bands, so an accidental
+overlap between splits is impossible and the band is legible in the
+run key: \textbf{tune} from 1000 (hyperparameter selection only,
+never eval or hold-out), \textbf{train} from 2000, \textbf{val} from
+3000, \textbf{test} from 4000. The canonical seed 0 belongs to no
+split. Split instances carry a positive
+\texttt{placement\_jitter} scaled to the world size, so every
+instance differs while the family's grammar holds --- train and test
+are demonstrably the same task, which is exactly what a
+generalization claim needs and what unconstrained placement would
+destroy by widening the difficulty distribution instead of sampling
+from it.
+
+Each split ships as a pinned manifest in the format of
+\texttt{docs/manifest.csv}, one row per instance with its canonical
+configuration, certified topology, turn-aware optimal $d^{\star}$,
+and horizon. Recording $d^{\star}$ is what makes the splits
+\emph{checkable}: anyone can confirm that train, val, and test have
+comparable difficulty distributions rather than taking it on faith.
+
+Two further splits answer different questions and are reported
+separately, never blended into the headline score: \textbf{size
+extrapolation} (train at the smaller sizes, test at 200 and 400 ---
+the \texttt{Chambers2} family exists for precisely this) and
+\textbf{family hold-out}, where whole families are withheld to
+measure concept transfer.
+
+\paragraph{Inspecting a split.} \texttt{scripts/browse.py} renders
+any environment across a seed range or a whole split as a contact
+sheet, labelling each panel with its seed, $d^{\star}$, and horizon;
+\texttt{-{}-play} cycles seeds and families interactively.
+
+\begin{lstlisting}[language=bash]
+python scripts/browse.py TopoGym/Decoys4-50-v0 --split train -n 12
+python scripts/browse.py --all --split test -n 4
+\end{lstlisting}
 
 \subsection{Skill ladders}
 

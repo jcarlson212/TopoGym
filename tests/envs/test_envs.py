@@ -38,12 +38,33 @@ def test_episode_determinism():
 
 
 def test_procedural_mode_resamples_layouts():
-    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15).unwrapped
+    """Procedural mode is opt-in; omitting the seed is not it."""
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   procedural=True).unwrapped
     env.reset(seed=1)
     a = sorted(env.layout.cell_types, key=repr)
     env.reset()
     b = sorted(env.layout.cell_types, key=repr)
-    assert a != b  # new layout each reset when layout_seed is None
+    assert a != b  # a new layout every reset
+    assert env.layout_seed is None
+
+
+def test_omitting_the_seed_gives_the_canonical_specimen():
+    """No seed means seed 0 -- the layout the docs picture and the
+    manifest certifies -- not a per-episode resample."""
+    from topogym.envs.core import CANONICAL_SEED
+
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15).unwrapped
+    env.reset(seed=3)
+    assert env.layout_seed == CANONICAL_SEED
+    first = sorted(env.layout.cell_types, key=repr)
+    env.reset(seed=99)  # a different episode seed, same world
+    assert sorted(env.layout.cell_types, key=repr) == first
+
+    pinned = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                      seed=CANONICAL_SEED).unwrapped
+    pinned.reset(seed=0)
+    assert sorted(pinned.layout.cell_types, key=repr) == first
 
 
 def _door_env(**kwargs):
@@ -334,17 +355,41 @@ def test_fourway_stays_screen_aligned_across_flip_seams(base_name):
             assert nx in (x - 1, 14) and (nx != x - 1 or ny == y)
 
 
-def test_episode_length_is_predetermined():
-    # The horizon depends only on the configured size, never the layout.
+def _grid(seed):
     env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
-                   layout_seed=3).unwrapped
+                   layout_seed=seed).unwrapped
     env.reset(seed=0)
-    assert env._max_steps == (6 * 15) // 5  # 1.2x the side length
-    for other_seed in (4, 5):
-        env2 = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
-                        layout_seed=other_seed).unwrapped
-        env2.reset(seed=0)
-        assert env2._max_steps == env._max_steps
+    return env
+
+
+def test_episode_length_is_predetermined():
+    """The horizon is fixed by (configuration, seed) before the episode
+    starts, and always leaves room to reach the goal."""
+    env = _grid(3)
+    # max(size floor, 3x the turn-aware optimal, rounded up to a ten).
+    assert env._max_steps == max((6 * 15) // 5,
+                                 -(-3 * env.optimal_actions() // 10) * 10)
+    # Same seed, same horizon: pre-determined, not sampled per episode.
+    assert _grid(3)._max_steps == env._max_steps
+    env.reset(seed=99)
+    assert env._max_steps == _grid(3)._max_steps
+
+
+def test_every_registry_goal_is_reachable_with_buffer():
+    """No environment may ship a goal the horizon cannot accommodate:
+    every layout leaves at least the slack factor of room."""
+    from topogym import registry
+    from topogym.envs.core import HORIZON_SLACK
+
+    for env_id in registry.registry_ids():
+        env = gym.make(env_id, seed=0).unwrapped
+        env.reset(seed=0)
+        optimal = env.optimal_actions()
+        if optimal is None:
+            assert not env.goal_exists or env.layout.goal is None
+            continue
+        assert optimal * HORIZON_SLACK <= env._max_steps, env_id
+        env.close()
 
 
 def test_teleport_reset():

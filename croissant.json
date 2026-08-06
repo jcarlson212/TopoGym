@@ -41,7 +41,7 @@
       "description": "One record per pinned environment id.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/manifest.csv",
       "encodingFormat": "text/csv",
-      "sha256": "db7c060061aea56c1718a083b119831ba1b53a0fb334348af5f61258cc16d056"
+      "sha256": "9e31c9b7d0ad30b7b2e21e79fe84807ec18bc980692d2e7cf5079f5515eb29e6"
     },
     {
       "@type": "cr:FileObject",
@@ -154,7 +154,7 @@
           "@type": "cr:Field",
           "@id": "environments/horizon",
           "name": "horizon",
-          "description": "Pre-determined episode length.",
+          "description": "Pre-determined episode length: the larger of the size floor and 3x the turn-aware optimal route.",
           "dataType": "sc:Integer",
           "source": {
             "fileObject": {
@@ -162,6 +162,21 @@
             },
             "extract": {
               "column": "horizon"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "environments/optimal_actions",
+          "name": "optimal_actions",
+          "description": "Fewest actions from start to goal counting turns; blank when the environment has no goal. Makes difficulty auditable.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "manifest.csv"
+            },
+            "extract": {
+              "column": "optimal_actions"
             }
           }
         },

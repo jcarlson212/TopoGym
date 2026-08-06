@@ -21,6 +21,7 @@ partition          dividing line with K bridge gaps: K-1 obstacle
 
 from __future__ import annotations
 
+import math
 from typing import Callable
 
 import numpy as np
@@ -214,10 +215,17 @@ def _attempt_2d(cfg: TopoGenConfig2D, rng: np.random.Generator) -> Layout:
                     reserved,
                 )
             plan = _feature_plan_2d(cfg, base, rng, partition_plan)
+            totals: dict = {}
+            for kind, _ in plan:
+                totals[kind] = totals.get(kind, 0) + 1
+            placed: dict = {}
             for kind, shape_fn in plan:
+                index = placed.get(kind, 0)
+                placed[kind] = index + 1
                 _place_feature_2d(
                     cfg, base, rng, kind, shape_fn, cell_types, doors,
-                    features, reserved,
+                    features, reserved, index=index,
+                    count=totals[kind],
                 )
         else:
             raise GenerationError(f"unknown style {cfg.style!r}")
@@ -257,14 +265,121 @@ def _feature_plan_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
     return plan
 
 
+def _placement_policy(cfg: TopoGenConfig2D, kind: str) -> str:
+    """The placement policy in force for a feature kind."""
+    if cfg.placement == "random":
+        return "random"
+    if kind == "chamber":
+        return cfg.chamber_placement
+    if kind == "decoy":
+        return cfg.decoy_placement
+    return "random"
+
+
+def _footprint_box(footprint: set) -> tuple:
+    """``(min_x, min_y, width, height)`` of an offset set."""
+    xs = [o[0] for o in footprint]
+    ys = [o[1] for o in footprint]
+    return min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+
+def _perimeter_target(w: int, h: int, bw: int, bh: int, index: int,
+                      count: int, margin: int) -> tuple:
+    """Bounding-box top-left for the ``index``-th of ``count`` features
+    spaced evenly clockwise around the grid's perimeter, starting at the
+    top-left. Two features land on opposite corners; four on the four
+    corners; eight on corners and edge midpoints."""
+    x0 = y0 = margin
+    x1, y1 = max(x0, w - bw - margin), max(y0, h - bh - margin)
+    span_x, span_y = x1 - x0, y1 - y0
+    perimeter = 2 * (span_x + span_y)
+    if perimeter == 0 or count <= 0:
+        return x0, y0
+    t = perimeter * index / count
+    if t < span_x:
+        return x0 + round(t), y0
+    t -= span_x
+    if t < span_y:
+        return x1, y0 + round(t)
+    t -= span_y
+    if t < span_x:
+        return x1 - round(t), y1
+    t -= span_x
+    return x0, y1 - round(t)
+
+
+def _ring_target(w: int, h: int, bw: int, bh: int, index: int,
+                 count: int, margin: int) -> tuple:
+    """Bounding-box top-left for the ``index``-th of ``count`` features
+    evenly spaced by angle on a ring about the grid center, starting due
+    north and going clockwise. The radius is the largest that keeps every
+    feature inside the margin, which also clears a centered chamber."""
+    radius = min(w, h) / 2 - max(bw, bh) / 2 - margin
+    if radius <= 0 or count <= 0:
+        return (w - bw) // 2, (h - bh) // 2
+    theta = 2 * math.pi * index / count
+    cx = w / 2 + radius * math.sin(theta)
+    cy = h / 2 - radius * math.cos(theta)
+    return round(cx - bw / 2), round(cy - bh / 2)
+
+
+def _spiral_offsets(radius: int = 4) -> list:
+    """Deterministic outward search order around a target anchor."""
+    out = [(0, 0)]
+    for r in range(1, radius + 1):
+        ring = [
+            (dx, dy)
+            for dx in range(-r, r + 1) for dy in range(-r, r + 1)
+            if max(abs(dx), abs(dy)) == r
+        ]
+        out.extend(sorted(ring, key=lambda d: (abs(d[0]) + abs(d[1]), d)))
+    return out
+
+
+_SPIRAL = _spiral_offsets()
+
+
+def _policy_anchor(cfg: TopoGenConfig2D, base: BaseMap2D,
+                   rng: np.random.Generator, policy: str, footprint: set,
+                   index: int, count: int, attempt: int) -> tuple:
+    """Anchor placing ``footprint`` where the policy says, jittered and
+    nudged outward by the attempt's spiral offset (so a blocked target
+    still resolves without falling back to random placement)."""
+    w, h = base.layout_size()
+    ox, oy, bw, bh = _footprint_box(footprint)
+    margin = max(1, cfg.min_sep)
+    if policy == "center":
+        target = ((w - bw) // 2, (h - bh) // 2)
+    elif policy == "perimeter":
+        target = _perimeter_target(w, h, bw, bh, index, count, margin)
+    elif policy == "around":
+        target = _ring_target(w, h, bw, bh, index, count, margin)
+    else:
+        raise GenerationError(f"unknown placement policy {policy!r}")
+    if cfg.placement_jitter:
+        j = cfg.placement_jitter
+        target = (target[0] + int(rng.integers(-j, j + 1)),
+                  target[1] + int(rng.integers(-j, j + 1)))
+    dx, dy = _SPIRAL[attempt % len(_SPIRAL)]
+    target = (
+        min(max(target[0] + dx, margin), max(margin, w - bw - margin)),
+        min(max(target[1] + dy, margin), max(margin, h - bh - margin)),
+    )
+    return target[0] - ox, target[1] - oy
+
+
 def _place_feature_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
                       rng: np.random.Generator, kind: str,
                       shape_fn: Callable | None, cell_types: dict,
                       doors: dict, features: list, reserved: set,
+                      index: int = 0, count: int = 1,
                       n_anchor_tries: int = 250) -> None:
     cells = base.cells()
     margin_radius = max(1, cfg.min_sep - 1)
-    for _ in range(n_anchor_tries):
+    policy = _placement_policy(cfg, kind)
+    for attempt in range(n_anchor_tries):
+        # The random draw happens either way, so switching a family to a
+        # fixed policy never perturbs random-placement layouts.
         anchor = cells[int(rng.integers(len(cells)))]
         door_free, corridor_paths = [], []
         if kind in _ROOM_KINDS_2D:
@@ -295,17 +410,9 @@ def _place_feature_2d(cfg: TopoGenConfig2D, base: BaseMap2D,
         else:
             footprint = shape_fn(rng)
             walls, interior, door_plan = set(footprint), set(), []
-        if kind == "chamber" and cfg.chamber_placement == "center":
-            # Override the sampled anchor (the rng draw is kept so
-            # random-placement layouts are unaffected): center the
-            # footprint's bounding box on the grid.
-            w, h = base.layout_size()
-            xs = [o[0] for o in footprint]
-            ys = [o[1] for o in footprint]
-            anchor = (
-                (w - (max(xs) - min(xs) + 1)) // 2 - min(xs),
-                (h - (max(ys) - min(ys) + 1)) // 2 - min(ys),
-            )
+        if policy != "random":
+            anchor = _policy_anchor(cfg, base, rng, policy, footprint,
+                                    index, count, attempt)
         margin = shapes.margin_ring(footprint, radius=margin_radius)
         mapping = map_offsets(base, anchor, footprint | margin)
         if mapping is None:
@@ -393,6 +500,13 @@ def _finalize_layout(cfg: TopoGenConfig2D, base: BaseMap2D, cells: list,
         start = min(
             start_candidates,
             key=lambda c: (c[0] + abs(h - 1 - c[1]), repr(c)),
+        )
+    elif cfg.start_placement == "center":
+        w, h = base.layout_size()
+        start = min(
+            start_candidates,
+            key=lambda c: (abs(c[0] - w // 2) + abs(c[1] - h // 2),
+                           repr(c)),
         )
 
     adj = build_adjacency(free_set, base.neighbors)

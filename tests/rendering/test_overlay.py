@@ -21,7 +21,9 @@ def test_h1_cycle_is_strictly_visited_and_innermost():
     env = gym.make("TopoGym/Decoys2-50-v0", seed=1,
                    obs_mode="global").unwrapped
     env.reset(seed=0)
-    decoy = next(f for f in env.layout.features if f.kind == "decoy")
+    # The centered chamber: decoys now ring the border, too close to
+    # the edge for a loose encircling loop to stay inside the grid.
+    decoy = next(f for f in env.layout.features if f.kind == "chamber")
     ring = _ring(decoy.cells, 3)
     assert all(env.layout.cell_types.get(c, 0) == 0 for c in ring)
     env.lifetime_visit_counts.update({c: 1 for c in ring})

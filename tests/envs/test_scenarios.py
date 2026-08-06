@@ -341,7 +341,10 @@ def test_search_rescue_barrels_explode_and_warn():
 
 def test_search_rescue_gets_a_longer_horizon():
     env, _, _ = _make("SearchRescue")
-    assert env._max_steps == int(1.56 * ((6 * 61) // 5))  # 113
+    # The hand-tuned multiplier is gone: the horizon follows the
+    # general rule, which gives SearchRescue far more than the floor.
+    assert env._max_steps > (6 * 61) // 5
+    assert env.optimal_actions() * 3 <= env._max_steps
     override = gym.make("TopoGym/SearchRescue-v0", seed=1, actions="fourway",
                         max_steps=40).unwrapped
     override.reset(seed=0)

@@ -137,7 +137,7 @@ def _drive_toward(env, delta, heading, emit) -> int:
     return _DIRS.index(sensed) if sensed in _DIRS else heading
 
 
-def record_gif(env_id: str, path: pathlib.Path, seed: int = 1,
+def record_gif(env_id: str, path: pathlib.Path, seed: int = 0,
                max_steps: int = 700, stride: int = 3) -> None:
     import imageio.v3 as iio
     import numpy as np
@@ -333,7 +333,7 @@ def write_stills_and_gallery() -> dict:
     ]:
         import imageio.v3 as iio
 
-        env = gym.make(env_id, seed=1, reveal_hidden=True).unwrapped
+        env = gym.make(env_id, seed=0, reveal_hidden=True).unwrapped
         env.reset(seed=0)
         layout = env.layout
         w, _h = layout.base.layout_size()

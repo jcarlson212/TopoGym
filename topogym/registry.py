@@ -60,16 +60,25 @@ def _build_registry() -> dict:
 
     # Dilution: one chamber, no decoys; difficulty scales with the world.
     for size in (50, 200):
-        add(f"Dilution-{size}", _open_cfg(size))
+        add(f"Dilution-{size}", _open_cfg(
+            size, chamber_placement="center",
+            start_placement="bottom_left"))
     # Chambers2: two chambers, fixed geometry; the world-scaling family.
     for size in (50, 100, 200, 400):
-        add(f"Chambers2-{size}", _open_cfg(size, n_chambers=2))
+        add(f"Chambers2-{size}", _open_cfg(
+            size, n_chambers=2, chamber_placement="perimeter",
+            start_placement="bottom_left"))
     # ChamberCount: k separated chambers at fixed world size.
     for k in (1, 2, 4, 8):
-        add(f"ChamberCount{k}-200", _open_cfg(200, n_chambers=k))
+        add(f"ChamberCount{k}-200", _open_cfg(
+            200, n_chambers=k, chamber_placement="perimeter",
+            start_placement="center"))
     # Decoys: one chamber among k sealed decoys.
     for k in (0, 1, 2, 4, 8):
-        add(f"Decoys{k}-50", _open_cfg(50, n_decoys=k))
+        add(f"Decoys{k}-50", _open_cfg(
+            50, n_decoys=k, chamber_placement="center",
+            decoy_placement="around",
+            start_placement="bottom_left"))
     # Shape: area-matched chamber shapes.
     for shape in ("square", "circle", "triangle", "star"):
         add(f"Shape{SHAPE_CODES[shape]}-50",
@@ -168,10 +177,12 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
     cs = cfg.chamber_side if cfg.chamber_side is not None else 0
     ds = cfg.decoy_side if cfg.decoy_side is not None else cs
     placement = ""
-    if cfg.chamber_placement == "center":
-        placement += "-ctr"
-    if cfg.start_placement == "bottom_left":
-        placement += "-bl"
+    placement += {"center": "-ctr", "perimeter": "-per"}.get(
+        cfg.chamber_placement, "")
+    placement += "-ring" if cfg.decoy_placement == "around" else ""
+    placement += {"bottom_left": "-bl", "center": "-sc"}.get(
+        cfg.start_placement, "")
+    placement += f"-j{cfg.placement_jitter}" if cfg.placement_jitter else ""
     return (
         f"TG-GridWorld2D-S{size}-C{cfg.n_chambers}-D{cfg.n_decoys}"
         f"-cs{cs}-ds{ds}-sep{cfg.min_sep}-shp{shp}{placement}-{mode}"
