@@ -43,9 +43,20 @@ class TopoGenConfig2D:
     chamber_side: int | None = None  # exact outer side; overrides the range
     decoy_side: int | None = None  # exact decoy side; defaults to chamber's
     chamber_shape: str = "square"  # square | circle | triangle | star | mixed
-    chamber_placement: str = "random"  # "random" | "center" (single-chamber
-    # families that read best centered: Shape, GiveUp)
-    start_placement: str = "random"  # "random" | "bottom_left"
+    # -- placement policies ---------------------------------------------
+    # The macro arrangement of a family is part of its identity, so the
+    # registry pins it while seeds keep varying the micro detail (door
+    # sides, goal cell, shapes). Set ``placement="random"`` to drop the
+    # whole arrangement back into the sampled tier.
+    chamber_placement: str = "random"  # "random" | "center" | "perimeter"
+    decoy_placement: str = "random"  # "random" | "around" (ring about
+    # the grid center, evenly spaced by angle)
+    start_placement: str = "random"  # "random" | "bottom_left" | "center"
+    placement_jitter: int = 0  # cells of uniform perturbation applied to
+    # policy anchors; 0 in the registry (canonical specimens), > 0 in
+    # benchmark splits so instances differ while the grammar holds
+    placement: str | None = None  # master override; "random" ignores the
+    # three policies above
     decoy_shape: str = "square"  # area-matched at equal side (never
     # confounds shape with size)
     min_sep: int = 2  # minimum pairwise Chebyshev separation between walls

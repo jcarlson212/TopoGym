@@ -96,7 +96,9 @@ info["topology"]["betti_z2"]         # [1, 4, 0] — doors walkable
 info["topology"]["betti_z2_sealed"]  # [2, 5, 0] — doors count as walls
 ```
 
-Episodes truncate after a pre-determined `1.2 * max(W, H)` steps (60 on a 50-grid); the
+Episodes truncate after a pre-determined horizon — the larger of
+`1.2 * max(W, H)` and 3x the turn-aware optimal route, so the goal is
+always reachable with room to wander; the
 goal pays +1 terminal reward by default (`reward_mode="sparse"`) and
 sits inside a designated chamber. `reward_mode="none"` for pure
 exploration, `"coverage"`, `"deceptive"`; `goal=False` removes the goal;

@@ -32,7 +32,7 @@ REFERENCE_SEED = 0
 
 FIELDS = (
     "env_id", "slice", "family", "canonical_config", "reference_seed",
-    "size", "horizon", "n_cells", "n_free_cells",
+    "size", "horizon", "optimal_actions", "n_cells", "n_free_cells",
     "betti_z2", "betti_z2_sealed", "homology",
 )
 
@@ -68,6 +68,7 @@ def _rows() -> list:
             "reference_seed": REFERENCE_SEED,
             "size": max(md.size),
             "horizon": env._max_steps,
+            "optimal_actions": env.optimal_actions() or "",
             "n_cells": md.n_cells,
             "n_free_cells": md.n_free_cells,
             "betti_z2": " ".join(map(str, md.betti_z2)),
@@ -193,7 +194,13 @@ def main() -> int:
                            "any seed regenerates deterministically."),
                     _field("size", "sc:Integer", "Grid side length."),
                     _field("horizon", "sc:Integer",
-                           "Pre-determined episode length."),
+                           "Pre-determined episode length: the larger "
+                           "of the size floor and 3x the turn-aware "
+                           "optimal route."),
+                    _field("optimal_actions", "sc:Integer",
+                           "Fewest actions from start to goal counting "
+                           "turns; blank when the environment has no "
+                           "goal. Makes difficulty auditable."),
                     _field("n_cells", "sc:Integer", "Total cells."),
                     _field("n_free_cells", "sc:Integer",
                            "Traversable cells."),

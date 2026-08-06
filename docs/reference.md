@@ -128,6 +128,45 @@ any prime or `"Z"` — a fully-visited Klein bottle gives b1=2 over F2,
 b1=1 over F3, and H1 = Z + Z/2 integrally. Deterministic; logs at
 DEBUG on the `topogym` logger.
 
+## Seeds, placement, and splits
+
+`gym.make(id)` with no seed returns the **canonical specimen** (seed 0)
+— the layout the docs picture and the manifest certifies. Layouts are
+fixed per (config, seed) and stable across episodes; `procedural=True`
+opts into resampling every episode.
+
+What a seed changes is contractual: world size, counts, shapes, and
+door convention are frozen by the configuration; the *macro
+arrangement* is frozen by the family's placement policy
+(`chamber_placement` ∈ random/center/perimeter, `decoy_placement` ∈
+random/around, `start_placement` ∈ random/bottom_left/center); door
+sides, goal cell, maze structure, and `placement_jitter` perturbations
+are sampled per seed. `placement="random"` drops the arrangement into
+the sampled tier wholesale.
+
+Benchmark splits (`topogym.benchmarks`) draw from disjoint seed bands
+— tune 1000+, train 2000+, val 3000+, test 4000+, canonical seed 0 in
+none of them — with size-scaled jitter so instances differ while the
+grammar holds. Browse any of it:
+
+```bash
+python scripts/browse.py TopoGym/Decoys4-50-v0 --split train -n 12
+python scripts/browse.py --all --split test -n 4      # every family
+python scripts/browse.py TopoGym/Maze-50-v0 --play    # interactive
+```
+
+## Episode horizons
+
+`horizon = max(1.2 * max(W, H), 10 * ceil(3 * optimal / 10))`, where
+`optimal` is the **turn-aware** shortest route (`env.optimal_actions()`
+— BFS over cell × facing, so corridor turns are charged, computed in
+the egocentric space regardless of the configured action mode and
+cached per layout). The floor keeps short rollouts where they already
+work; the second term rescues structured families whose shortest paths
+outgrow the side length (a 50×50 maze needs 674 actions). Dynamic
+worlds plan against the worst case their schedule can produce, and
+wormholes count as routes.
+
 ## Performance
 
 The step path does no topology (homology runs at generation and in

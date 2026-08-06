@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import math
 import os
 from collections import deque
 from collections.abc import Iterable
@@ -63,6 +64,9 @@ COMPLEX_BACKENDS = ("cubical", "rips")
 
 #: Set TOPOGYM_DEBUG=1 to stream everything the env computes each step
 #: to the console (the "topogym" logger at DEBUG level).
+HORIZON_SLACK = 3.0  # goal reachable with room to wander
+CANONICAL_SEED = 0  # the layout gym.make returns when no seed is given
+
 logger = logging.getLogger("topogym")
 logger.addHandler(logging.NullHandler())
 if os.environ.get("TOPOGYM_DEBUG") and not logger.handlers[1:]:
@@ -89,13 +93,16 @@ class TopoEnvCore(gym.Env):
                  reward_mode: str = "sparse", goal: bool = True,
                  p_slip: float = 0.0,
                  complex: str = "cubical", max_steps: int | None = None,
-                 teleport: bool = False,
+                 teleport: bool = False, procedural: bool = False,
                  render_mode: str | None = None, reveal_hidden: bool = False,
                  **overrides):
         # The registry interface spells the layout seed simply "seed":
-        # gym.make("TopoGym/Dilution-50-v0", seed=3).
-        if layout_seed is None:
-            layout_seed = seed
+        # gym.make("TopoGym/Dilution-50-v0", seed=3). Omitting it gives
+        # the canonical specimen -- the layout the docs picture and the
+        # manifest certifies -- rather than a per-episode resample;
+        # procedural=True asks for resampling explicitly.
+        if layout_seed is None and not procedural:
+            layout_seed = seed if seed is not None else CANONICAL_SEED
         cfg = config if config is not None else self._default_config()
         if isinstance(cfg, dict):
             cfg = self._config_class()(**cfg)
@@ -216,16 +223,26 @@ class TopoEnvCore(gym.Env):
         self._visited = set()
         self.visit_counts = {}
         self._steps = 0
-        # The episode length is pre-determined by the configured grid
-        # size alone (never by the sampled layout): 1.2x the side
-        # length (60 on a 50-grid, 120 on a 100-grid) unless max_steps
-        # overrides it. Short rollouts are the point: multi-episode
-        # exploration runs on lifetime coverage and teleport resets.
+        # Episode length: the larger of the size floor (1.2x the side
+        # length -- 60 on a 50-grid, 120 on a 100-grid) and enough
+        # actions to reach the goal with buffer, HORIZON_SLACK x the
+        # turn-aware optimal, rounded up to a multiple of ten. Agents
+        # learn across many episodes, so the budget only has to make
+        # the goal *reachable* with room to wander -- not to cover the
+        # world in one episode. Structured families (mazes, corridor
+        # trees, nested shells) have shortest paths that grow far
+        # faster than the side length, so the floor alone leaves them
+        # unsolvable.
         if self._max_steps_cfg:
             self._max_steps = self._max_steps_cfg
         else:
             w, h = self.layout.base.layout_size()
-            self._max_steps = max(1, (6 * max(w, h)) // 5)
+            floor = max(1, (6 * max(w, h)) // 5)
+            optimal = self.optimal_actions()
+            need = 0
+            if optimal:
+                need = math.ceil(HORIZON_SLACK * optimal / 10) * 10
+            self._max_steps = max(floor, need)
         # Observed-region filtration (see module docstring).
         self._observed_free = set()
         self._known_uf = _UnionFind()
@@ -324,6 +341,59 @@ class TopoEnvCore(gym.Env):
                                self.layout.base.neighbors)
         self._ricci_cache = (self.layout, ricci)
         return ricci
+
+    def _planning_blocked(self) -> set:
+        """Cells impassable when planning the optimal route. Variants
+        extend this with the worst case of their dynamics, so a horizon
+        derived from it holds at every step of the episode."""
+        return {
+            cell for cell, t in self.layout.cell_types.items()
+            if t in (C.WALL, C.HOLE, C.HAZARD)
+        }
+
+    def _planning_teleport(self, cell: tuple) -> tuple:
+        """Where stepping onto ``cell`` actually lands the agent.
+        Variants with teleporters override; identity by default."""
+        return cell
+
+    def optimal_actions(self) -> int | None:
+        """Fewest actions from start to goal, counting the turns the
+        egocentric action mode charges (BFS over cell x facing).
+
+        Deliberately independent of the configured action mode: the
+        horizon is a property of the world, so switching to
+        ``actions="fourway"`` must not silently shorten it. ``None``
+        when there is no goal or no route exists. Cached on the layout,
+        so it costs one search per (configuration, seed)."""
+        cached = self.layout.extras.get("optimal_actions", 0)
+        if cached:
+            return None if cached < 0 else cached
+        goal = self.layout.goal
+        if goal is None or not self.goal_exists:
+            return None
+        base = self.layout.base
+        blocked = self._planning_blocked()
+        state = base.turn_left(base.initial_state(self.layout.start))
+        seen = {state}
+        queue = deque([(state, 0)])
+        found = None
+        while queue:
+            current, dist = queue.popleft()
+            if current.cell == goal:
+                found = dist
+                break
+            nxts = [base.turn_left(current), base.turn_right(current)]
+            ahead = base.forward(current)
+            if ahead is not None and ahead.cell not in blocked:
+                landing = self._planning_teleport(ahead.cell)
+                nxts.append(ahead if landing == ahead.cell
+                            else base.initial_state(landing))
+            for nxt in nxts:
+                if nxt not in seen:
+                    seen.add(nxt)
+                    queue.append((nxt, dist + 1))
+        self.layout.extras["optimal_actions"] = found if found else -1
+        return found
 
     def homology_stats(self, which: str = "observed") -> HomologyStats:
         """Per-dimension hole counts as a :class:`HomologyStats`.

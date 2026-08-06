@@ -55,7 +55,7 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
         if scenario == "search_rescue":
             # The rescue traversal earns 56% more steps by default
             # (a 30% and a further 20% extension).
-            kwargs.setdefault("max_steps", int(1.56 * ((6 * size) // 5)))
+            pass  # horizon derives from the optimal route (core)
         super().__init__(**kwargs)
 
     def _generate(self, seed: int) -> Layout:
@@ -111,6 +111,24 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             self._clowns = []
 
     # -- mechanics -----------------------------------------------------------
+
+    def _planning_teleport(self, cell: tuple) -> tuple:
+        """Wormholes move the agent on entry, so a route to a chamber
+        reachable only through one is a real route (SpaceWarp's treasure
+        interior is spatially its own component by construction)."""
+        return self.layout.extras.get("wormholes", {}).get(cell, cell)
+
+    def _planning_blocked(self) -> set:
+        """Worst case over the season schedule: every cell any wave can
+        freeze counts as blocked, so a route that survives this survives
+        the whole episode (ice only ever shrinks from the maximum) and
+        every season draw is solvable, not just the lucky one."""
+        blocked = super()._planning_blocked()
+        seasonal = self.layout.extras.get("seasonal")
+        if seasonal:
+            for layer in seasonal.get("grow_layers", ()):
+                blocked |= set(layer)
+        return blocked
 
     def _sight_state(self) -> tuple:
         return super()._sight_state() + (
