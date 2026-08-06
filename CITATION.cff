@@ -12,6 +12,8 @@ version: 0.1.0
 keywords:
   - reinforcement learning
   - topology
+  - geometry
+  - shapes
   - exploration
   - benchmark
   - gymnasium

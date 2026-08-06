@@ -14,6 +14,8 @@ keywords = [
     "reinforcement-learning",
     "gymnasium",
     "topology",
+    "geometry",
+    "shapes",
     "exploration",
     "benchmark",
     "gridworld",
@@ -31,9 +33,21 @@ dependencies = ["gymnasium>=0.29", "numpy>=1.21", "gudhi>=3.8"]
 testing = ["pytest>=7.0", "networkx>=3.0"]
 play = ["pygame>=2.1"]
 assets = ["imageio>=2.31"]  # GIF generation for the docs gallery
-benchmarks = ["ray>=2.9", "rliable>=1.2"]  # baseline/benchmark runs
-# (never core deps): Ray for distributed runs, rliable for aggregate
-# statistics (IQM, stratified bootstrap CIs, performance profiles)
+# Baseline/benchmark runs; never core deps. Ray RLlib supplies the
+# reference algorithms (we do not reimplement PPO), rliable the
+# aggregate statistics (IQM, stratified bootstrap CIs, performance
+# profiles), matplotlib the published figures.
+benchmarks = [
+    "ray[rllib]>=2.9",
+    "torch>=2.0",
+    "rliable>=1.2",
+    # rliable reaches pandas through arch, and that chain is narrow:
+    # arch 8 rejects rliable's bootstrap call, arch 7 breaks on
+    # pandas 3. These pins are what actually resolves.
+    "arch>=7.2,<8",
+    "pandas>=2.0,<3",
+    "matplotlib>=3.7",
+]
 graph = ["networkx>=3.0"]  # env.graph() as a networkx.Graph
 
 [project.urls]
@@ -46,6 +60,9 @@ include = ["topogym*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: exercises a real training loop; deselect with -m 'not slow'",
+]
 
 [tool.ruff]
 line-length = 100

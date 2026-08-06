@@ -25,3 +25,6 @@ htmlcov/
 # Scratch output from scripts/browse.py
 seeds.png
 seeds-*.png
+
+# Baseline run side effects: logs, checkpoints, per-step traces.
+runs/
