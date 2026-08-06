@@ -1176,6 +1176,50 @@ fully-visited Klein bottle reports $b_1 = 2$ over $\F_2$, $b_1 = 1$
 over $\F_3$, and $H_1 = \Z \oplus \Z/2$ integrally
 \cite{carlsson09}.
 
+\paragraph{Recommended use.} This is the intended way to consume
+TopoGym's topology in an agent. Rather than reading ground truth out
+of the environment, an agent feeds the structure what it has actually
+visited and reads back the shape of what it knows --- a map of the
+holes it has found and the loops that enclose them, in its own choice
+of complex and coefficient ring. The representative cycles are the
+practical payload: each is a closed walk through archive-restorable
+states, so an agent can treat them as targets to return to, edges to
+push outward, or features to encode. Think of it as the agent's own
+map to the interesting holes in a world, learned from experience and
+usable as a signal --- while the certified metadata stays where it
+belongs, as the answer key for scoring rather than an input.
+
+\paragraph{Cost.} Computation is lazy and cached but \emph{not}
+incremental: \texttt{add} records points and invalidates, and the
+next query rebuilds. Measured on the cubical backend over a dense
+visited region:
+
+\begin{center}
+\small
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+\textbf{cells} & \textbf{build} & \textbf{betti} &
+\textbf{representatives} & \textbf{rims} \\
+\midrule
+1{,}000   & 0.02\,s & 0.01\,s & 0.02\,s  & $\sim$0 \\
+10{,}000  & 0.26\,s & 0.24\,s & 0.73\,s  & $\sim$0 \\
+50{,}000  & 1.40\,s & 1.57\,s & 12.7\,s  & $\sim$0 \\
+100{,}000 & 3.04\,s & 5.55\,s & 43.6\,s  & 0.01\,s \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The build and rims are linear in the archive, \texttt{betti}
+near-linear, and \texttt{representatives} superlinear --- comfortable
+to roughly 20{,}000 cells and expensive past 50{,}000. The costs are
+sequential, so extracting cycles from a 100{,}000-cell archive is the
+build plus the extraction, about 47\,s in total. For scale, only
+\texttt{Chambers2-400} has more free cells than that; a 50-grid
+archive is around 2{,}500 cells, where the same call takes
+$0.02$\,s. Query once an episode rather than once a step, and treat
+\texttt{torsion} --- an integer Smith normal form, minutes at
+20{,}000 cells --- as an offline diagnostic.
+
 \paragraph{Design.} All three backends reduce to one
 \texttt{ChainComplex} (cells per dimension, integer boundary maps),
 so higher-dimensional features arrive by adding cells, not new
@@ -1390,74 +1434,74 @@ sheet, labelling each panel with its seed, $d^{\star}$, and horizon;
 
 \begin{lstlisting}[language=bash]
 python scripts/browse.py TopoGym/Decoys4-50-v0 --split train -n 12
-python scripts/browse.py --all --split test -n 4 --chunk 8
+python scripts/browse.py --all --split tune -n 4 --chunk 5 --panel 400
 \end{lstlisting}
 
-\noindent Figures~\ref{fig:test-split-1}--\ref{fig:test-split-9}
-are that command's output for the hold-out split: every family at
-four test seeds, which is what the splits actually look like.
+\noindent Figures~\ref{fig:tune-split-1}--\ref{fig:tune-split-9}
+are that command's output: every family at four tuning seeds, which
+is what the splits actually look like.
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-1.png}
-  \caption{The hold-out (\textbf{test}) split, part 1 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-1}
+  \includegraphics[width=\linewidth]{../splits/tune-split-1.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 1 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-1}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-2.png}
-  \caption{The hold-out (\textbf{test}) split, part 2 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-2}
+  \includegraphics[width=\linewidth]{../splits/tune-split-2.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 2 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-2}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-3.png}
-  \caption{The hold-out (\textbf{test}) split, part 3 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-3}
+  \includegraphics[width=\linewidth]{../splits/tune-split-3.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 3 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-3}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-4.png}
-  \caption{The hold-out (\textbf{test}) split, part 4 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-4}
+  \includegraphics[width=\linewidth]{../splits/tune-split-4.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 4 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-4}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-5.png}
-  \caption{The hold-out (\textbf{test}) split, part 5 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-5}
+  \includegraphics[width=\linewidth]{../splits/tune-split-5.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 5 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-5}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-6.png}
-  \caption{The hold-out (\textbf{test}) split, part 6 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-6}
+  \includegraphics[width=\linewidth]{../splits/tune-split-6.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 6 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-6}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-7.png}
-  \caption{The hold-out (\textbf{test}) split, part 7 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-7}
+  \includegraphics[width=\linewidth]{../splits/tune-split-7.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 7 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-7}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-8.png}
-  \caption{The hold-out (\textbf{test}) split, part 8 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-8}
+  \includegraphics[width=\linewidth]{../splits/tune-split-8.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 8 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-8}
 \end{figure}
 
 \begin{figure}[p]
   \centering
-  \includegraphics[width=\linewidth]{../splits/test-split-9.png}
-  \caption{The hold-out (\textbf{test}) split, part 9 of 9: four instances of each family at seeds 4000--4003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
-  \label{fig:test-split-9}
+  \includegraphics[width=\linewidth]{../splits/tune-split-9.png}
+  \caption{The hyperparameter-tuning (\textbf{tune}) split, part 9 of 9: four instances of each family at seeds 1000--1003 with size-scaled placement jitter. Each panel is labelled with its seed, turn-aware optimal $d^{\star}$, and horizon. Instances differ while the family's arrangement holds --- and the $d^{\star}$ values along a row show the difficulty distribution the split is drawn from.}
+  \label{fig:tune-split-9}
 \end{figure}
 
 \subsection{Skill ladders \textnormal{(in development)}}
