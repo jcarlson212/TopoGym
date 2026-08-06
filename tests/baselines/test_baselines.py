@@ -261,3 +261,87 @@ def test_aggregate_breaks_out_per_group():
     totals = aggregate(instances)
     assert set(totals["per_group"]) == {"Decoys", "Maze"}
     assert totals["per_group"]["Maze"]["instances"] == 1
+
+
+# -- archive methods -------------------------------------------------
+
+def test_evaluation_offers_every_method_the_boundary_probe():
+    """An archive method must be able to choose where each episode
+    resumes; the harness must not decide that for it."""
+    from topogym.baselines.evaluate import evaluate_instance
+
+    row = load_split("test")[0]
+    chosen = []
+
+    def choose_reset(env, info):
+        # Return somewhere already stood on: the archive's whole point.
+        visited = sorted(env._ever_visited | env._visited)
+        if not visited:
+            return None
+        target = visited[len(visited) // 2]
+        chosen.append(target)
+        return target
+
+    record = evaluate_instance(row, RandomBaseline().policy(),
+                               episodes=4, trace=False,
+                               choose_reset=choose_reset)
+    assert chosen, "the probe was never offered"
+    assert record["archive_resets"] == len(chosen)
+    assert record["episodes"] == 4
+
+
+def test_archive_resets_need_no_hook_by_default():
+    from topogym.baselines.evaluate import evaluate_instance
+
+    record = evaluate_instance(load_split("test")[0],
+                               RandomBaseline().policy(),
+                               episodes=2, trace=False)
+    assert record["archive_resets"] == 0  # inert unless asked for
+
+
+def test_instances_enable_archive_resets():
+    env = make_instance(load_split("test")[0])
+    assert env.unwrapped.teleport is True
+
+
+def test_contiguous_exposure_keeps_one_world_for_a_run():
+    """Archive methods need a run of episodes on the same world, and
+    the instance must survive the boundary so its archive does."""
+    from topogym.baselines.multitask import SplitEnv
+
+    rows = load_split("train")[::40][:3]
+    assert len({r["unit"] for r in rows}) == 3  # genuinely distinct
+    env = SplitEnv({"rows": rows, "seed": 0, "sequential": True,
+                    "episodes_per_instance": 3})
+    seen = []
+    for _ in range(9):
+        env.reset(seed=0)
+        seen.append(env.row["unit"])
+    assert seen == [rows[0]["unit"]] * 3 + [rows[1]["unit"]] * 3 + \
+        [rows[2]["unit"]] * 3
+    env.close()
+
+    # The default stays i.i.d. for gradient methods.
+    plain = SplitEnv({"rows": rows, "seed": 0, "sequential": True})
+    units = []
+    for _ in range(3):
+        plain.reset(seed=0)
+        units.append(plain.row["unit"])
+    assert units == [r["unit"] for r in rows]
+    plain.close()
+
+
+def test_lifetime_state_survives_a_contiguous_boundary():
+    from topogym.baselines.multitask import SplitEnv
+
+    rows = load_split("train")[:1]
+    env = SplitEnv({"rows": rows, "seed": 0, "episodes_per_instance": 3})
+    env.reset(seed=0)
+    for _ in range(20):
+        env.step(2)
+    core = env.env.unwrapped
+    before = len(core._ever_visited | core._visited)
+    env.reset(seed=1)  # same world: the archive must not be discarded
+    core = env.env.unwrapped
+    assert len(core._ever_visited | core._visited) >= before
+    env.close()

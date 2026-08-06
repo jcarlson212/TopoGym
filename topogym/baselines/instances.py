@@ -56,8 +56,14 @@ def make_instance(row: dict, flatten: bool = True, **overrides):
 
     ``flatten`` applies :class:`FlatObservation`, which every baseline
     uses; pass ``False`` to inspect the raw patch.
+
+    Archive resets are enabled on every instance. They are inert unless
+    a baseline asks for one -- a policy that never calls the
+    episode-boundary probe cannot tell the difference -- but without
+    them an archive method could not run at all, and the comparison
+    would be decided by the harness rather than by the methods.
     """
-    kwargs = {"seed": int(row["seed"])}
+    kwargs = {"seed": int(row["seed"]), "teleport": True}
     if row.get("placement_jitter"):
         kwargs["placement_jitter"] = int(row["placement_jitter"])
     if row["slice"] == "GridWorld2D":
