@@ -162,7 +162,13 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
         "episodes": episodes,
         "interactions": interactions,
         "archive_resets": archive_resets,
+        # Summed over the instance's whole episode budget. Aggregates
+        # then average across *instances*, not across instance-episodes
+        # -- so under the sparse default this reads as "goals reached
+        # in the budget". The per-episode form is the interpretable
+        # one (it is the success rate when every goal pays 1).
         "cumulative_return": total_return,
+        "return_per_episode": total_return / max(1, episodes),
         "success_rate": len(solved) / episodes,
         "chambers_entered": len(chambers_seen),
         "median_steps_to_goal": (float(np.median(solved))
@@ -233,13 +239,14 @@ class InstanceTask:
     def __init__(self, policy_factory: Callable, episodes: int,
                  seed: int, track_topology: bool = False,
                  choose_reset_factory: Callable | None = None,
-                 env_options: dict | None = None):
+                 env_options: dict | None = None, trace: bool = True):
         self.policy_factory = policy_factory
         self.episodes = episodes
         self.seed = seed
         self.track_topology = track_topology
         self.choose_reset_factory = choose_reset_factory
         self.env_options = env_options or {}
+        self.trace = trace
 
     def __call__(self, row: dict) -> dict:
         # Rebuilt per instance, seeded from the instance: see
@@ -251,7 +258,7 @@ class InstanceTask:
                         if self.choose_reset_factory else None)
         return evaluate_instance(
             row, policy, episodes=self.episodes, seed=self.seed,
-            track_topology=self.track_topology,
+            trace=self.trace, track_topology=self.track_topology,
             choose_reset=choose_reset, env_options=self.env_options,
         )
 
@@ -265,7 +272,8 @@ def _build(factory: Callable, seed: int):
 
 
 def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
-                   seed: int = 0, track_topology: bool = False,
+                   seed: int = 0, trace: bool = True,
+                   track_topology: bool = False,
                    choose_reset: Callable | None = None,
                    choose_reset_factory: Callable | None = None,
                    policy_factory: Callable | None = None,
@@ -285,13 +293,13 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
 
         task = InstanceTask(policy_factory, episodes, seed,
                             track_topology, choose_reset_factory,
-                            env_options)
+                            env_options, trace)
         return map_instances(task, rows, workers=workers)
 
     records = []
     for i, row in enumerate(rows):
         records.append(evaluate_instance(
-            row, policy, episodes=episodes, seed=seed,
+            row, policy, episodes=episodes, seed=seed, trace=trace,
             track_topology=track_topology, choose_reset=choose_reset,
             env_options=env_options,
         ))

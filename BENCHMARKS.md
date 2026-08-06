@@ -47,6 +47,25 @@ interquartile means come from
 |---|---|---|---|---|
 | `random` | 0 | budget exhausted | — | `—` (tuning inconclusive) |
 
+## How each baseline explores
+
+One hold-out instance per world, the same seed for every algorithm, so
+the behaviours are directly comparable. An archive method's teleports
+show up as jumps -- that is the mechanism, not a rendering glitch.
+
+| world | `random` | `go-explore` |
+|---|---|---|
+| `BankRobber` | ![random](benchmarks/gridworld2dv1/gifs/BankRobber-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/BankRobber-go-explore.gif) |
+| `ClownChase` | ![random](benchmarks/gridworld2dv1/gifs/ClownChase-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/ClownChase-go-explore.gif) |
+| `DontFall` | ![random](benchmarks/gridworld2dv1/gifs/DontFall-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/DontFall-go-explore.gif) |
+| `EnvironmentalIceShip` | ![random](benchmarks/gridworld2dv1/gifs/EnvironmentalIceShip-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/EnvironmentalIceShip-go-explore.gif) |
+| `IceShip` | ![random](benchmarks/gridworld2dv1/gifs/IceShip-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/IceShip-go-explore.gif) |
+| `Ladders` | ![random](benchmarks/gridworld2dv1/gifs/Ladders-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/Ladders-go-explore.gif) |
+| `SearchRescue` | ![random](benchmarks/gridworld2dv1/gifs/SearchRescue-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/SearchRescue-go-explore.gif) |
+| `SpaceWarp` | ![random](benchmarks/gridworld2dv1/gifs/SpaceWarp-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/SpaceWarp-go-explore.gif) |
+| `TopRP2-50` | ![random](benchmarks/gridworld2dv1/gifs/TopRP2-50-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/TopRP2-50-go-explore.gif) |
+| `TopTorus-50` | ![random](benchmarks/gridworld2dv1/gifs/TopTorus-50-random.gif) | ![go-explore](benchmarks/gridworld2dv1/gifs/TopTorus-50-go-explore.gif) |
+
 ## What is recorded
 
 Each `benchmarks/results/<algorithm>.json` carries every

@@ -110,7 +110,8 @@ class PPOBaseline(Baseline):
 
     # -- the protocol -------------------------------------------------
 
-    def select_hyperparameters(self, tune_rows: list) -> Hyperparameters:
+    def select_hyperparameters(self, tuning: dict) -> Hyperparameters:
+        tune_rows = tuning.get("tune", [])
         best, best_score, searched = None, -float("inf"), []
         for candidate in self.tune_grid:
             score = self._score_candidate(tune_rows, candidate)

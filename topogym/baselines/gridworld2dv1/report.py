@@ -404,6 +404,30 @@ def write_benchmarks_md(
                 f"| {_percent(group['success_rate'])} | {steps} |"
             )
 
+    lines += ["", "## How each baseline explores", "",
+              "One hold-out instance per world, the same seed for every",
+              "algorithm. An archive method's teleports show up as",
+              "jumps -- that is the mechanism, not a rendering glitch.",
+              "Recorded by `scripts/record_baseline_gifs.py`.", ""]
+    gif_dir = pathlib.Path(plots_dir).parent / "gifs"
+    if (pathlib.Path(__file__).resolve().parents[3] / gif_dir).is_dir():
+        algorithms = sorted(results)
+        lines += ["| world | " + " | ".join(f"`{a}`" for a in algorithms)
+                  + " |",
+                  "|---" * (len(algorithms) + 1) + "|"]
+        worlds = sorted({
+            path.stem.rsplit(f"-{a}", 1)[0]
+            for a in algorithms
+            for path in (pathlib.Path(__file__).resolve().parents[3]
+                         / gif_dir).glob(f"*-{a}.gif")
+        })
+        for world in worlds:
+            cells = " | ".join(
+                f"![{a}]({gif_dir}/{world}-{a}.gif)" for a in algorithms
+            )
+            lines.append(f"| `{world}` | {cells} |")
+        lines.append("")
+
     lines += ["", "## Discovery curves", ""]
     for key, label, title in FIGURES:
         lines += [f"### {title}", "",

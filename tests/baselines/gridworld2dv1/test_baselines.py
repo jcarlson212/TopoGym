@@ -16,13 +16,13 @@ from topogym.baselines.gridworld2dv1 import (
     TrainingReport,
     get_baseline,
 )
+from topogym.baselines.gridworld2dv1.concrete_baselines.random_walk import RandomBaseline
 from topogym.baselines.gridworld2dv1.instances import (
     FlatObservation,
     load_split,
     make_instance,
 )
 from topogym.baselines.gridworld2dv1.protocol import Baseline as BaseClass
-from topogym.baselines.gridworld2dv1.random_walk import RandomBaseline
 from topogym.baselines.gridworld2dv1.report import (
     _bootstrap_ci,
     _full_support,
