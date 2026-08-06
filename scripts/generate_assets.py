@@ -50,7 +50,11 @@ STILL_PX = 480  # every still is exactly STILL_PX x STILL_PX
 
 def _fit(frame, px: int):
     """Nearest-neighbor resample to exactly (px, px): uniform asset
-    sizes across environments of different grid sizes."""
+    sizes across environments of different grid sizes.
+
+    Callers must pick a tile size whose render is no larger than ``px``
+    -- shrinking here drops whole rows, which erases one-cell walls.
+    """
     import numpy as np
 
     h, w = frame.shape[:2]
@@ -145,7 +149,7 @@ def record_gif(env_id: str, path: pathlib.Path, seed: int = 0,
     env = gym.make(env_id, seed=seed, reward_mode="none").unwrapped
     env.reset(seed=0)
     w, h = env.layout.base.layout_size()
-    tile = max(4, GIF_PX // max(w, h))
+    tile = max(1, GIF_PX // max(w, h))  # never downsample: see _fit
     frames = [_fit(render_rgb_2d(env, tile=tile), GIF_PX)]
     tick = [0]
 
@@ -338,7 +342,7 @@ def write_stills_and_gallery() -> dict:
         layout = env.layout
         w, _h = layout.base.layout_size()
         iio.imwrite(ENVS_DIR / f"{name}.png",
-                    _fit(render_rgb_2d(env, tile=max(2, STILL_PX // w)),
+                    _fit(render_rgb_2d(env, tile=max(1, STILL_PX // w)),
                          STILL_PX))
         b = list(layout.metadata.betti_z2)
         betti[name] = b

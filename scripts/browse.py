@@ -29,7 +29,8 @@ from topogym import benchmarks, registry  # noqa: E402
 from topogym.rendering.overlay import _draw_text  # noqa: E402
 from topogym.rendering.rgb import render_rgb_2d  # noqa: E402
 
-CELL_PX = 240  # each panel in the contact sheet
+CELL_PX = 240  # world area of each panel in the contact sheet
+HEADER_PX = 10  # label strip *above* the world, never painted over it
 
 
 def _fit(frame: np.ndarray, px: int) -> np.ndarray:
@@ -38,6 +39,13 @@ def _fit(frame: np.ndarray, px: int) -> np.ndarray:
     ys = (np.arange(px) * h) // px
     xs = (np.arange(px) * w) // px
     return frame[np.ix_(ys, xs)]
+
+
+def _tile_for(w: int, h: int, px: int) -> int:
+    """Cell size that never forces a downsample. Nearest-neighbor
+    shrinking drops whole rows, which erases one-cell walls -- a
+    chamber ring on a 200-grid comes out as two disconnected sides."""
+    return max(1, px // max(w, h))
 
 
 def _seed_list(args) -> list:
@@ -75,16 +83,18 @@ def _make(env_id: str, seed: int, split: str | None):
 def _panel(env_id: str, seed: int, split: str | None) -> np.ndarray:
     env = _make(env_id, seed, split)
     w, h = env.layout.base.layout_size()
-    tile = max(2, CELL_PX // max(w, h))
+    tile = _tile_for(w, h, CELL_PX)
     frame = _fit(render_rgb_2d(env, tile=tile), CELL_PX)
     optimal, horizon = env.optimal_actions(), env._max_steps
     label = f"{seed}"
     if optimal:
         label += f"  {optimal}/{horizon}"
-    frame[:9, :] = (24, 24, 30)
-    _draw_text(frame, 3, 2, label, (235, 235, 240))
+    panel = np.zeros((CELL_PX + HEADER_PX, CELL_PX, 3), dtype=frame.dtype)
+    panel[:HEADER_PX, :] = (24, 24, 30)
+    _draw_text(panel, 3, 2, label, (235, 235, 240))
+    panel[HEADER_PX:, :] = frame
     env.close()
-    return frame
+    return panel
 
 
 def contact_sheet(env_ids: list, seeds: list, split: str | None,
@@ -115,7 +125,7 @@ def play(env_id: str, split: str | None) -> None:
     while running:
         env = _make(ids[index], seed, cur_split)
         w, h = env.layout.base.layout_size()
-        tile = max(2, 700 // max(w, h))
+        tile = _tile_for(w, h, 700)
         frame = _fit(render_rgb_2d(env, tile=tile), 700)
         pygame.display.set_caption(
             f"{ids[index]}  seed={seed}"
