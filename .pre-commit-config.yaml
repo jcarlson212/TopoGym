@@ -23,6 +23,16 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      # The benchmark roster decides what a published benchmark *is*, so
+      # it gets a must-pass gate of its own: the test-gate above is a
+      # ratio (>= 90%), and a single drifted invariant would sail through
+      # it. Cheap -- it reads the shipped CSVs, it does not generate.
+      - id: benchmark-roster
+        name: benchmark roster matches published splits
+        entry: python3 -m pytest tests/test_splits.py -q
+        language: system
+        pass_filenames: false
+        files: ^(topogym/benchmarks\.(json|py)|docs/splits/|scripts/generate_splits\.py)
       # Croissant metadata is generated from the registry, so it can
       # drift silently whenever generation or certification changes.
       # Scoped to the files that can actually change it -- it makes

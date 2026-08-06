@@ -145,6 +145,55 @@ trusted publishing (no tokens). To cut a release:
 The workflow can also be re-run manually from the Actions tab
 (`workflow_dispatch`) if a publish fails after the release exists.
 
+## Benchmark metadata and terminology
+
+Four words get used precisely around the benchmark, and only two of them
+are defined elsewhere.
+
+| term | meaning |
+|---|---|
+| **family** | registry entries sharing a grammar, named by the id stem with trailing digits stripped (`Decoys4-50` → `Decoys`). Roster keys match by *longest prefix*, so `Shape` covers `ShapeSq`/`ShapeCi`/… and `ChamberCount` wins over `Chambers` for `ChamberCount4`. |
+| **slice** | which kind of world a family is: `GridWorld2D` (generated, swept over sizes), `Top` (one base manifold each, fixed size), `Texture` (hand-built scenarios). Baselines report per slice as well as overall. |
+| **unit** | one (family, size) cell of a benchmark — `Decoys4-50`. Each split carries several seeded instances per unit. Identical configurations collapse to one unit and the dropped labels survive as `aliases`. |
+| **benchmark version** | a named, frozen roster of families — currently just `gridworld2d-v1`. |
+
+*Split* (the seed bands: tune/train/val/test) and *canonical specimen*
+(seed 0) are defined in
+[docs/reference.md](docs/reference.md#seeds-placement-and-splits); the
+certified-metadata vocabulary is in the same file under *Certified
+metadata*.
+
+[`topogym/benchmarks.json`](topogym/benchmarks.json) is the **sole
+authority on benchmark membership**: it lists, per version, which
+families are in, at which sizes, in which slice, and which are held out
+of training. A family listed under no version is in no benchmark. So
+**adding a registry entry does not add it to a benchmark** — it is
+generated, certified and pictured like everything else, but no split
+carries it until a version declares it. That is what keeps published
+results stable as the registry grows.
+
+A new version is a *complete roster*, not a diff on its predecessor, so
+it may both add and remove families while earlier versions stay exactly
+as published. Versions marked `"frozen": true` are immutable.
+
+To change what a benchmark contains:
+
+```bash
+# 1. edit the roster (a new version; do not edit a frozen one)
+# 2. regenerate the splits it defines -- deliberate work, run on demand
+python scripts/generate_splits.py
+# 3. republish the metadata over the new CSVs
+python scripts/generate_croissant.py
+```
+
+Three gates hold this together, mirroring the version-sync lockstep: the
+`benchmark-roster` pre-commit hook (its own hook because the `test-gate`
+hook is a *ratio* — one drifted invariant would slip through 90%), the
+`croissant` hook, and CI. `tests/test_splits.py` checks the roster
+against the shipped CSVs in **both** directions, so neither a roster edit
+without regeneration nor a regeneration without a roster edit can land
+quietly.
+
 ## Reporting issues
 
 Use the issue templates — for proposing environments there is a dedicated
