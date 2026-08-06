@@ -10,6 +10,7 @@ agent has actually reached, all against step count.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from collections.abc import Callable
 
@@ -178,10 +179,87 @@ def _mean_curve(points: list) -> list:
             for step in sorted(grouped)]
 
 
+def instance_seed(base_seed: int, row: dict) -> int:
+    """A seed determined by the instance, not by evaluation order.
+
+    A stateful policy built once and reused across a sweep carries its
+    random stream from one instance to the next, so results depend on
+    how the work was sharded -- serial and parallel runs disagree, and
+    neither is reproducible. Deriving each instance's seed from its own
+    canonical configuration makes an evaluation a pure function of
+    ``(row, base seed)``, which is the property the benchmark's
+    determinism guarantee needs.
+    """
+    digest = hashlib.sha256(
+        f"{base_seed}:{row.get('canonical_config', row.get('unit'))}"
+        .encode()
+    ).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
+class InstanceTask:
+    """One instance's evaluation, as a picklable unit of work.
+
+    Holds the *factory* for a policy rather than a policy: a live
+    policy may wrap a torch module, and shipping one per task would
+    cost more than the evaluation. Module-level with plain attributes,
+    because a process pool has to pickle it.
+    """
+
+    def __init__(self, policy_factory: Callable, episodes: int,
+                 seed: int, track_topology: bool = False,
+                 choose_reset_factory: Callable | None = None):
+        self.policy_factory = policy_factory
+        self.episodes = episodes
+        self.seed = seed
+        self.track_topology = track_topology
+        self.choose_reset_factory = choose_reset_factory
+
+    def __call__(self, row: dict) -> dict:
+        # Rebuilt per instance, seeded from the instance: see
+        # instance_seed. Cheap for a policy, and the only way the
+        # result does not depend on which worker took the row.
+        derived = instance_seed(self.seed, row)
+        policy = _build(self.policy_factory, derived)
+        choose_reset = (_build(self.choose_reset_factory, derived)
+                        if self.choose_reset_factory else None)
+        return evaluate_instance(
+            row, policy, episodes=self.episodes, seed=self.seed,
+            track_topology=self.track_topology,
+            choose_reset=choose_reset,
+        )
+
+
+def _build(factory: Callable, seed: int):
+    """Call a factory, passing the seed if it accepts one."""
+    try:
+        return factory(seed)
+    except TypeError:
+        return factory()
+
+
 def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                    seed: int = 0, track_topology: bool = False,
-                   choose_reset: Callable | None = None) -> list:
-    """Evaluate every hold-out instance, in manifest order."""
+                   choose_reset: Callable | None = None,
+                   choose_reset_factory: Callable | None = None,
+                   policy_factory: Callable | None = None,
+                   workers: int = 1) -> list:
+    """Evaluate every hold-out instance, in manifest order.
+
+    Instances are independent and separately seeded, so the loop
+    parallelises exactly. Doing so needs ``policy_factory`` -- a
+    picklable, zero-argument callable that builds the policy inside
+    each worker; without one the run stays serial, which is correct
+    for a policy that cannot cross a process boundary.
+    """
+    if policy_factory is not None:
+        # Same code path serial or parallel, so the two cannot drift.
+        from topogym.baselines.parallel import map_instances
+
+        task = InstanceTask(policy_factory, episodes, seed,
+                            track_topology, choose_reset_factory)
+        return map_instances(task, rows, workers=workers)
+
     records = []
     for i, row in enumerate(rows):
         records.append(evaluate_instance(

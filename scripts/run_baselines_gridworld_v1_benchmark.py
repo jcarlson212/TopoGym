@@ -32,6 +32,7 @@ from topogym.baselines import (
     get_baseline,
 )
 from topogym.baselines.instances import load_split
+from topogym.baselines.parallel import default_workers
 from topogym.baselines.protocol import GROUPINGS, group_rows
 from topogym.baselines.report import (
     aggregate,
@@ -86,6 +87,11 @@ def main() -> int:
                         help="rollout workers (default: cores - 2)")
     parser.add_argument("--envs-per-runner", type=int, default=4,
                         help="environments vectorised inside each worker")
+    parser.add_argument("--eval-workers", type=int, default=None,
+                        help="processes for the hold-out sweep and for "
+                             "archive-selection sweeps (default: "
+                             "cores - 2); instances are independent, so "
+                             "this is close to linear")
     parser.add_argument("--num-learners", type=int, default=0)
     parser.add_argument("--gpus-per-learner", type=int, default=0,
                         help="CUDA devices per learner; Apple MPS is not "
@@ -130,10 +136,13 @@ def main() -> int:
                else max(1, (os.cpu_count() or 4) - 2))
     if args.smoke:
         runners = 0
+    eval_workers = (1 if args.smoke else
+                    (args.eval_workers if args.eval_workers is not None
+                     else default_workers()))
     logger.info("grouping=%s | env runners=%d x %d envs | learners=%d "
-                "(gpus/learner=%d)", args.group, runners,
-                args.envs_per_runner, args.num_learners,
-                args.gpus_per_learner)
+                "(gpus/learner=%d) | eval workers=%d", args.group,
+                runners, args.envs_per_runner, args.num_learners,
+                args.gpus_per_learner, eval_workers)
 
     for name in [n.strip() for n in args.baselines.split(",") if n.strip()]:
         logger.info("=== %s ===", name)
@@ -164,6 +173,10 @@ def main() -> int:
                 train_batch_size=500 if args.smoke else 4000,
                 num_env_runners=runners,
                 num_envs_per_runner=args.envs_per_runner,
+                eval_workers=(1 if args.smoke else
+                              (args.eval_workers
+                               if args.eval_workers is not None
+                               else default_workers())),
                 num_learners=args.num_learners,
                 gpus_per_learner=args.gpus_per_learner,
                 run_dir=RUNS / name / key,

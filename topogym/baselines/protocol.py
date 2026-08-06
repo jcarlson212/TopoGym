@@ -81,6 +81,9 @@ class BaselineConfig:
     #: gradient methods; archive methods need a contiguous run for an
     #: archive to accumulate on a given world.
     train_episodes_per_instance: int = 1
+    #: Processes for the hold-out sweep and for archive-selection
+    #: sweeps. Instances are independent, so this is close to linear.
+    eval_workers: int = 1
     num_learners: int = 0
     #: CUDA devices per learner. Apple MPS is not a Ray GPU resource, so
     #: leave this at 0 on Apple silicon.
@@ -200,6 +203,29 @@ class Baseline(abc.ABC):
         """
         return None
 
+    def policy_factory(self):
+        """A picklable, zero-argument callable building :meth:`policy`
+        inside a worker process, or ``None`` when the policy cannot
+        cross a process boundary.
+
+        Returning ``None`` is not a failure -- a policy wrapping a
+        torch module is legitimately process-bound -- it simply keeps
+        that baseline's evaluation serial.
+        """
+        return None
+
+    def choose_reset_factory(self):
+        """A picklable builder for :meth:`choose_reset`, or ``None``.
+
+        Needed only for parallel evaluation, where the hook has to be
+        constructed inside each worker. A bound method is not a
+        factory, and an archive that lives in the driver cannot be
+        shared across processes -- so an archive method supplies one
+        here and rebuilds its archive per instance, which is what it
+        does anyway.
+        """
+        return None
+
     def close(self) -> None:
         """Release anything :meth:`fit` acquired."""
 
@@ -228,6 +254,9 @@ class Baseline(abc.ABC):
             splits["test"], self.policy(),
             episodes=self.config.eval_episodes, seed=self.config.seed,
             choose_reset=self.choose_reset,
+            choose_reset_factory=self.choose_reset_factory(),
+            policy_factory=self.policy_factory(),
+            workers=self.config.eval_workers,
         )
         return BaselineResult(
             algorithm=self.name,

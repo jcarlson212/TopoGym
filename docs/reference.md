@@ -246,9 +246,22 @@ probe cannot tell it was offered. For training, `BaselineConfig`'s
 `train_episodes_per_instance` gives the same contiguity where a method
 needs its archive to accumulate.
 
-Evaluation is single-process by construction: Ray parallelises training
-rollouts, but every reported number is produced in the driver from one
-`StatsRecorder`, so there is nothing to reconcile across workers. Each
+Parallelism has two layers. Ray parallelises PPO's *rollouts*
+(`--num-env-runners`, `--envs-per-runner`). Everything else the
+benchmark does is a loop over instances — the hold-out sweep, and the
+archive-selection sweeps a method like Go-Explore needs — and those run
+across processes via `--eval-workers` (default: cores − 2), which is
+close to linear since instances are independent.
+
+Parallelism is a scheduling detail, never a result: each instance is
+seeded from its own canonical configuration, so an evaluation is a pure
+function of `(row, seed)` and a 16-worker run reproduces a 1-worker run
+exactly. A test pins that. Getting this wrong is easy — a policy built
+once per worker carries its random stream between instances, and the
+answer then depends on which worker took which row. Parallel evaluation
+needs `Baseline.policy_factory()`, a picklable builder; a policy that
+cannot cross a process boundary simply returns `None` and stays
+serial. Each
 instance record carries the *complete* native metric set, not just what
 the figures plot; `--track-topology` additionally timestamps hole
 discoveries (GUDHI every step, so it is opt-in). Aggregation is
