@@ -990,10 +990,21 @@ Archive-style teleport resets are opt-in:
 
 \begin{lstlisting}
 env = gym.make("TopoGym/Maze-100-v0", seed=1, teleport=True)
-env.reset(seed=0)
-# ... explore ...
-env.reset(options={"teleport": (12, 40)})  # any visited cell
+obs, info = env.reset(seed=0)
+# ... explore until terminated or truncated ...
+cell = archive.choose(info)                # the boundary probe
+env.reset(options={"teleport": cell})      # any previously visited cell
 \end{lstlisting}
+
+\noindent The choice is a decision \emph{at the episode boundary},
+never mid-episode: when an episode ends the agent may pick where the
+next one resumes. The reset lands directly on the chosen cell --- no
+step is spent walking there and none is charged --- and
+\texttt{info["teleport\_start"]} records that the episode began from
+the archive, so a run's episodes remain legible as chosen or default.
+Targets are restricted to cells visited in a previous episode on this
+layout, so resuming can never reveal anything exploration had not
+already found.
 
 \subsection{The generator and the fluent spec API}
 

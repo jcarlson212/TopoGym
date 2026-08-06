@@ -6,11 +6,13 @@
 research.**
 
 TopoGym is a [Gymnasium](https://gymnasium.farama.org) environment
-library where the *shape* of every world — its chambers, decoys, loops,
+library where the shape of every world — its chambers (rooms), decoys (filled rooms), loops,
 and identifications — is known exactly: computed from the free-space
 cell complex by [GUDHI](https://gudhi.inria.fr/) and cross-checked
 against the analytic expectation at generation time. Everything is
-**deterministic up to seeds**, end to end.
+**deterministic up to seeds**, end to end. We provide benchmarks for 
+reinforcement learning researchers to test how good their agents are at exploring 
+complex environment shapes.
 
 <table>
 <tr>
@@ -34,7 +36,7 @@ against the analytic expectation at generation time. Everything is
 ## Why
 
 Exploration methods increasingly claim to exploit environment
-*structure*: enclosed regions that must be entered to be known, decoys
+structure: enclosed regions that must be entered to be known, decoys
 that punish persistence, loops that shouldn't be re-searched, reward
 gradients that lie. Testing those claims needs environments whose
 structure is **certified** (computed, not assumed), **controllable**
@@ -59,15 +61,15 @@ with the universal `(x, y)` + 16-slot texture vector):
 | **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail |
 | **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal |
 
-Highlights: sealed **decoys** indistinguishable from chambers from the
-outside; **DontFall**'s fatal drop where the most novel direction is
-the worst one; **SpaceWarp**'s doorless treasure chamber, enterable
+Highlights: sealed decoys indistinguishable from chambers from the
+outside; DontFall's fatal drop where the most novel direction is
+the worst one; SpaceWarp's doorless treasure chamber, enterable
 only through one wormhole in a field of thirty (noise for
 gradient-followers, tractable for anything modeling transitions);
-**ClownChase**'s wandering distractor paying a depleting trickle of
-reward away from the treasure; **SearchRescue**'s trapped survivor in
+ClownChase's wandering distractor paying a depleting trickle of
+reward away from the treasure; SearchRescue's trapped survivor in
 the only large persistent hole of a shrapnel field; seasons in
-**EnvironmentalIceShip**, where winter grows the ice until the channel
+EnvironmentalIceShip, where winter grows the ice until the channel
 freezes shut around you; and Möbius/Klein/RP² worlds that are locally
 flat everywhere — only globally aggregated signals (the identified
 edges are drawn with fundamental-polygon arrows) can tell them apart.
@@ -168,6 +170,48 @@ legend and live H1 count top-right.
 - **Stats built in**: `info` tracks within-episode coverage, lifetime
   (cross-episode) coverage, chamber entries, and return;
   `StatsRecorder` accumulates pandas-ready rows.
+
+## Learning from the topology
+
+Agents consume TopoGym's topology through
+[`VisitedComplex`](docs/reference.md#visitedcomplex-build-your-own-topological-algorithms):
+feed it the states you have visited and read back the shape of what
+you know: a map of the holes you have found and the loops enclosing
+them. The representative cycles are closed walks through
+archive-restorable states, so an agent can treat them as places to
+return to, frontiers to push, or features to encode. The certified
+metadata stays the answer key for scoring; this is the signal.
+
+```python
+from topogym.tda import VisitedComplex
+
+vc = VisitedComplex.from_env(env)   # seeded with lifetime visits
+vc.add(new_cells)                   # feed states as you explore
+vc.betti()                          # (b0, b1) over the chosen ring
+vc.representatives()                # a closed loop of cells per hole
+vc.rims(observed=seen)              # where each loop can still tighten
+```
+
+Backends: `cubical` (movement-consistent on the env's own grid), `vr`
+(Vietoris–Rips at any `epsilon`, over cells or your encoder's
+vectors), and `witness` (de Silva–Carlsson landmarks, with the
+admit/evict policy yours to override). Coefficients: any prime or `Z`.
+
+Cost, cubical backend over a dense archive — lazy and cached, but not
+incremental, so query once an episode rather than once a step:
+
+| cells | build | betti | representatives | rims |
+|---|---|---|---|---|
+| 1k | 0.02s | 0.01s | 0.02s | ~0 |
+| 10k | 0.26s | 0.24s | 0.73s | ~0 |
+| 50k | 1.40s | 1.57s | 12.7s | ~0 |
+| 100k | 3.04s | 5.55s | 43.6s | 0.01s |
+
+Build and rims are linear, `betti` near-linear, `representatives`
+superlinear — comfortable to ~20k cells. Costs are sequential, so
+cycles from a 100k-cell archive take the build plus the extraction
+(~47s); a 50-grid archive is ~2.5k cells, where it is 0.02s.
+`torsion()` runs a Smith normal form and is an offline diagnostic.
 
 ## Documentation
 

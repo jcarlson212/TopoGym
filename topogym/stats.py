@@ -204,6 +204,9 @@ class StatsRecorder(gym.Wrapper):
             "doors_opened": info["doors_opened"],
             "h0_merges": info["h0_merges"],
             "goal_reached": self._goal_reached,
+            # True when the agent chose this episode's start from the
+            # archive at the previous episode's boundary.
+            "teleport_start": info.get("teleport_start", False),
             "unique_states": len(self._core._visited),
             "steps_to_success": self._steps_to_success,
             "optimal_steps": self._optimal,
