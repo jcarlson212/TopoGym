@@ -15,6 +15,9 @@ seed belongs to no split.
 
 from __future__ import annotations
 
+import json
+import pathlib
+
 #: The documented, pictured, manifest-certified instance of every id.
 CANONICAL_SEED = 0
 
@@ -60,41 +63,106 @@ def split_of(seed: int) -> str | None:
 #: evaluation splits only need enough draws to estimate a mean.
 SPLIT_COUNTS = {"tune": 3, "train": 6, "val": 3, "test": 3}
 
-#: The sizes each GridWorld2D family appears at, so no split can be
-#: overfitted to one scale. Texture and Top worlds are hand-built by
-#: their own builders at a fixed size and appear once.
-#: Keys are matched against :func:`family_of` by longest prefix, so
-#: ``Shape`` covers ``ShapeSq``/``ShapeCi``/... and ``ChamberCount``
-#: wins over ``Chambers`` for ``ChamberCount4``.
-FAMILY_SIZES = {
-    "Dilution": (50, 200),
-    "Chambers": (50, 100, 200, 400),
-    "ChamberCount": (100, 200),
-    "Decoys": (50, 100),
-    "Shape": (50, 100),
-    "Nested": (50, 100),
-    "GiveUp": (50, 100),
-    "Bottleneck": (100, 200),
-    "Maze": (50, 100),
-}
+#: The official benchmark roster (``topogym/benchmarks.json``): which
+#: families each version-tagged benchmark contains. It is the sole
+#: authority on membership -- a registry entry listed under no version
+#: is in no benchmark, so extending the registry never changes a
+#: published benchmark. See the ``$comment`` in that file.
+ROSTER_PATH = pathlib.Path(__file__).with_name("benchmarks.json")
 
-#: Size extrapolation: train small, test large. Reported separately --
-#: never blended into the headline score.
-EXTRAPOLATION_TRAIN_MAX = 100
+with open(ROSTER_PATH, encoding="utf-8") as _f:
+    _ROSTER = json.load(_f)
 
-#: Family hold-out: these families are withheld from training entirely,
-#: so the test measures concept transfer rather than instance
-#: generalization.
-HELD_OUT_FAMILIES = ("GiveUp", "Bottleneck", "SearchRescue", "SpaceWarp")
+#: version id -> benchmark definition.
+BENCHMARKS: dict = _ROSTER["benchmarks"]
+
+#: The benchmark assumed when a caller names no version.
+DEFAULT_BENCHMARK: str = _ROSTER["default"]
 
 
-def sizes_for(family: str, default: int) -> tuple:
-    """The sizes ``family`` appears at, by longest-prefix match."""
-    match = max(
-        (k for k in FAMILY_SIZES if family.startswith(k)),
+def benchmark(version: str | None = None) -> dict:
+    """The definition of a benchmark version."""
+    name = version or DEFAULT_BENCHMARK
+    if name not in BENCHMARKS:
+        raise ValueError(
+            f"unknown benchmark {name!r}; declared versions are "
+            f"{sorted(BENCHMARKS)} (see {ROSTER_PATH.name})"
+        )
+    return BENCHMARKS[name]
+
+
+def families(version: str | None = None) -> dict:
+    """``family -> {slice, sizes, held_out}`` for a benchmark version."""
+    return benchmark(version)["families"]
+
+
+def declared_family(family: str, version: str | None = None):
+    """The roster key ``family`` belongs to by longest-prefix match, or
+    ``None`` when it belongs to no family in this benchmark.
+
+    Prefix matching is what lets ``Shape`` cover ``ShapeSq``/``ShapeCi``
+    and ``ChamberCount`` win over ``Chambers`` for ``ChamberCount4``.
+    """
+    return max(
+        (k for k in families(version) if family.startswith(k)),
         key=len, default=None,
     )
-    return FAMILY_SIZES[match] if match else (default,)
+
+
+def in_benchmark(name: str, version: str | None = None) -> bool:
+    """Whether a registry id or family name is in a benchmark's scope.
+
+    Everything else is registry-only: generated, certified and pictured,
+    but carried by no split until a benchmark version declares it.
+    """
+    return declared_family(family_of(name), version) is not None
+
+
+def entry_for(family: str, version: str | None = None):
+    """The roster entry governing ``family``, or ``None``."""
+    key = declared_family(family, version)
+    return families(version)[key] if key else None
+
+
+def sizes_for(family: str, default: int, version: str | None = None):
+    """The sizes ``family`` appears at, by longest-prefix match.
+
+    Falls back to ``(default,)`` for families in no benchmark, so
+    callers outside the split machinery still get a usable answer.
+    """
+    entry = entry_for(family, version)
+    return tuple(entry["sizes"]) if entry else (default,)
+
+
+def slice_of(family: str, version: str | None = None):
+    """The slice (``GridWorld2D``/``Top``/``Texture``) of ``family``."""
+    entry = entry_for(family, version)
+    return entry["slice"] if entry else None
+
+
+def held_out_families(version: str | None = None) -> tuple:
+    """Families withheld from training entirely, so the family-hold-out
+    test measures concept transfer rather than instance generalization."""
+    return tuple(
+        name for name, entry in families(version).items()
+        if entry.get("held_out")
+    )
+
+
+def extrapolation_train_max(version: str | None = None) -> int:
+    """Size extrapolation: train at or below this, test above it.
+    Reported separately -- never blended into the headline score."""
+    return benchmark(version)["extrapolation_train_max"]
+
+
+#: Convenience views of the default benchmark, kept as module constants
+#: because they read better at call sites than the accessors above.
+FAMILY_SIZES = {
+    name: tuple(entry["sizes"])
+    for name, entry in families().items()
+}
+HELD_OUT_FAMILIES = held_out_families()
+EXTRAPOLATION_TRAIN_MAX = extrapolation_train_max()
 
 
 def family_of(name: str) -> str:

@@ -19,13 +19,20 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from topogym.baselines import BASELINES, BaselineConfig, get_baseline
+from topogym.baselines import (
+    BASELINES,
+    BaselineConfig,
+    BaselineResult,
+    get_baseline,
+)
 from topogym.baselines.instances import load_split
+from topogym.baselines.protocol import GROUPINGS, group_rows
 from topogym.baselines.report import (
     aggregate,
     load_results,
@@ -68,6 +75,19 @@ def main() -> int:
     parser.add_argument("--track-topology", action="store_true",
                         help="also timestamp hole discoveries (runs "
                              "GUDHI every step; slow)")
+    parser.add_argument("--group", default="family", choices=GROUPINGS,
+                        help="what one policy is trained on: 'all' asks "
+                             "for a single general explorer, 'unit' is "
+                             "the Procgen-style per-world setting "
+                             "(default: family)")
+    parser.add_argument("--num-env-runners", type=int, default=None,
+                        help="rollout workers (default: cores - 2)")
+    parser.add_argument("--envs-per-runner", type=int, default=4,
+                        help="environments vectorised inside each worker")
+    parser.add_argument("--num-learners", type=int, default=0)
+    parser.add_argument("--gpus-per-learner", type=int, default=0,
+                        help="CUDA devices per learner; Apple MPS is not "
+                             "a Ray GPU resource, so leave at 0 there")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--plots-only", action="store_true",
                         help="redraw figures from published JSON")
@@ -96,29 +116,65 @@ def main() -> int:
 
     splits = load_splits(args.limit)
     RUNS.mkdir(parents=True, exist_ok=True)
+    runners = (args.num_env_runners if args.num_env_runners is not None
+               else max(1, (os.cpu_count() or 4) - 2))
+    if args.smoke:
+        runners = 0
+    logger.info("grouping=%s | env runners=%d x %d envs | learners=%d "
+                "(gpus/learner=%d)", args.group, runners,
+                args.envs_per_runner, args.num_learners,
+                args.gpus_per_learner)
 
     for name in [n.strip() for n in args.baselines.split(",") if n.strip()]:
-        config = BaselineConfig(
-            seed=args.seed,
-            max_iterations=args.max_iterations,
-            eval_episodes=args.episodes,
-            val_every=1 if args.smoke else 5,
-            patience=1 if args.smoke else 5,
-            tune_iterations=1 if args.smoke else 2,
-            train_batch_size=500 if args.smoke else 4000,
-            num_env_runners=0 if args.smoke else 2,
-            run_dir=RUNS / name,
-        )
-        baseline = get_baseline(name)(config)
         logger.info("=== %s ===", name)
-        try:
-            result = baseline.run(splits)
-        finally:
-            baseline.close()
-        result.aggregates = aggregate(result.instances, seed=args.seed)
-        result.curves = mean_curves(result.instances)
-        write_result(result, results_dir)
-        headline = result.aggregates
+        grouped = {
+            key: {split: group_rows(rows, args.group).get(key, [])
+                  for split, rows in splits.items()}
+            for key in group_rows(splits["train"], args.group)
+        }
+        merged = BaselineResult(algorithm=name)
+        merged.training = {"grouping": args.group, "groups": {}}
+        merged.hyperparameters = {"grouping": args.group, "groups": {}}
+        for group_index, (key, group_splits) in enumerate(
+            sorted(grouped.items()), start=1
+        ):
+            if not group_splits["test"]:
+                logger.info("[%s] %s has no hold-out rows; skipped",
+                            name, key)
+                continue
+            logger.info("[%s] group %d/%d: %s", name, group_index,
+                        len(grouped), key)
+            config = BaselineConfig(
+                seed=args.seed,
+                max_iterations=args.max_iterations,
+                eval_episodes=args.episodes,
+                val_every=1 if args.smoke else 5,
+                patience=1 if args.smoke else 5,
+                tune_iterations=1 if args.smoke else 2,
+                train_batch_size=500 if args.smoke else 4000,
+                num_env_runners=runners,
+                num_envs_per_runner=args.envs_per_runner,
+                num_learners=args.num_learners,
+                gpus_per_learner=args.gpus_per_learner,
+                run_dir=RUNS / name / key,
+            )
+            baseline = get_baseline(name)(config)
+            baseline.group = key
+            try:
+                result = baseline.run(group_splits)
+            finally:
+                baseline.close()
+            for record in result.instances:
+                record["group"] = key
+            merged.instances.extend(result.instances)
+            merged.training["groups"][key] = result.training
+            merged.hyperparameters["groups"][key] = result.hyperparameters
+            merged.config = result.config
+
+        merged.aggregates = aggregate(merged.instances, seed=args.seed)
+        merged.curves = mean_curves(merged.instances)
+        write_result(merged, results_dir)
+        headline = merged.aggregates
         logger.info(
             "%s: success %.3f | median steps to goal %s %s",
             name, headline["success_rate"] or 0.0,

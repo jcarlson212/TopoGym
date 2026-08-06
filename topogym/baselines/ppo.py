@@ -84,7 +84,14 @@ class PPOBaseline(Baseline):
             PPOConfig()
             .environment("topogym_split",
                          env_config={"rows": rows, "seed": seed})
-            .env_runners(num_env_runners=self.config.num_env_runners)
+            .env_runners(
+                num_env_runners=self.config.num_env_runners,
+                num_envs_per_env_runner=self.config.num_envs_per_runner,
+            )
+            .learners(
+                num_learners=self.config.num_learners,
+                num_gpus_per_learner=self.config.gpus_per_learner,
+            )
             .training(
                 lr=params["lr"],
                 gamma=params["gamma"],

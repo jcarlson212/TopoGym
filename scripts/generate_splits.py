@@ -56,9 +56,15 @@ def _units() -> list:
         size = cfg.size if isinstance(cfg.size, int) else max(cfg.size)
         by_key[(stem_of(name), size)] = name
 
-    units, seen = [], set()
+    units, seen, skipped = [], set(), set()
     for name, cfg in registry.REGISTRY.items():
         family = benchmarks.family_of(name)
+        # The roster is the sole authority on membership: a registry
+        # entry it does not declare is registry-only, so growing the
+        # registry cannot alter a published benchmark.
+        if not benchmarks.in_benchmark(name):
+            skipped.add(family)
+            continue
         stem = stem_of(name)
         base_size = cfg.size if isinstance(cfg.size, int) else max(cfg.size)
         for size in benchmarks.sizes_for(family, base_size):
@@ -69,12 +75,28 @@ def _units() -> list:
             units.append((f"{stem}-{size}", f"TopoGym/{template}-v0",
                           family, "GridWorld2D", size,
                           dataclasses.replace(cfg, size=size)))
-    for name in registry.TOP_TOPOLOGIES:
-        units.append((f"{name}-50", f"TopoGym/{name}-50-v0", name,
-                      "Top", 50, None))
-    for name in registry.TEXTURE_SCENARIOS:
-        units.append((name, f"TopoGym/{name}-v0", name, "Texture",
-                      0, None))
+
+    # Top and Texture worlds are hand-built by their own builders, so
+    # the roster carries them by name rather than by size sweep.
+    for family, entry in benchmarks.families().items():
+        catalog = {"Top": registry.TOP_TOPOLOGIES,
+                   "Texture": registry.TEXTURE_SCENARIOS}.get(entry["slice"])
+        if catalog is None:
+            continue
+        if family not in catalog:
+            raise SystemExit(
+                f"roster declares {family!r} in slice {entry['slice']} but "
+                f"registry has no such entry -- fix topogym/benchmarks.json"
+            )
+        for size in entry["sizes"]:
+            unit = f"{family}-{size}" if entry["slice"] == "Top" else family
+            env = (f"TopoGym/{family}-{size}-v0" if entry["slice"] == "Top"
+                   else f"TopoGym/{family}-v0")
+            units.append((unit, env, family, entry["slice"], size, None))
+
+    if skipped:
+        print(f"registry-only families (in no benchmark): "
+              f"{', '.join(sorted(skipped))}")
 
     # Distinct registry ids can name the same configuration -- ShapeSq
     # is Dilution with the square shape spelled out -- and a split that

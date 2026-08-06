@@ -215,3 +215,49 @@ def test_published_artifacts_are_written(tmp_path):
     text = document.read_text()
     assert "TopoGym-v1 benchmark results" in text
     assert "`demo`" in text and "12.0" in text
+
+
+# -- grouping --------------------------------------------------------
+
+def test_groupings_partition_without_loss():
+    from topogym.baselines.protocol import GROUPINGS, group_rows
+
+    rows = load_split("train")
+    sizes = {}
+    for grouping in GROUPINGS:
+        groups = group_rows(rows, grouping)
+        assert sum(len(v) for v in groups.values()) == len(rows)
+        # No row lands in two groups.
+        keys = [id(r) for group in groups.values() for r in group]
+        assert len(keys) == len(set(keys))
+        sizes[grouping] = len(groups)
+    # Coarse to fine: one general explorer, then slices, then families,
+    # then individual worlds.
+    assert sizes["all"] == 1
+    assert sizes["all"] < sizes["slice"] < sizes["family"] <= sizes["unit"]
+    with pytest.raises(ValueError, match="unknown grouping"):
+        group_rows(rows, "nope")
+
+
+def test_hardware_knobs_reach_the_config():
+    config = BaselineConfig(num_env_runners=16, num_envs_per_runner=4,
+                            num_learners=1, gpus_per_learner=0)
+    payload = config.to_dict()
+    assert payload["num_env_runners"] == 16
+    assert payload["num_envs_per_runner"] == 4
+    assert payload["num_learners"] == 1
+    assert payload["gpus_per_learner"] == 0
+
+
+def test_aggregate_breaks_out_per_group():
+    instances = [
+        {"median_steps_to_goal": 10.0, "success_rate": 1.0,
+         "lifetime_coverage": 0.5, "optimal_actions": 5, "slice": "A",
+         "group": "Decoys"},
+        {"median_steps_to_goal": 30.0, "success_rate": 0.5,
+         "lifetime_coverage": 0.2, "optimal_actions": 5, "slice": "A",
+         "group": "Maze"},
+    ]
+    totals = aggregate(instances)
+    assert set(totals["per_group"]) == {"Decoys", "Maze"}
+    assert totals["per_group"]["Maze"]["instances"] == 1

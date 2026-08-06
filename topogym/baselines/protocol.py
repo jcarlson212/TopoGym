@@ -49,7 +49,17 @@ class BaselineConfig:
     val_episodes: int = 10
     #: Episodes per hold-out instance at final evaluation.
     eval_episodes: int = 5
+    #: Rollout parallelism. Environment stepping is the bottleneck for
+    #: these worlds -- the policy is a small MLP over a 49-dim vector --
+    #: so cores matter and accelerators mostly do not.
     num_env_runners: int = 2
+    #: Environments vectorised inside each runner; multiplies throughput
+    #: without another process.
+    num_envs_per_runner: int = 1
+    num_learners: int = 0
+    #: CUDA devices per learner. Apple MPS is not a Ray GPU resource, so
+    #: leave this at 0 on Apple silicon.
+    gpus_per_learner: int = 0
     train_batch_size: int = 4000
     #: Where checkpoints and logs go; gitignored by convention.
     run_dir: pathlib.Path | None = None
@@ -126,6 +136,10 @@ class Baseline(abc.ABC):
     #: Short identifier used in filenames, plots, and result JSON.
     name: str = "baseline"
 
+    #: Set when a baseline is trained on one group of the split rather
+    #: than all of it; recorded with the results.
+    group: str | None = None
+
     def __init__(self, config: BaselineConfig | None = None):
         self.config = config or BaselineConfig()
 
@@ -179,3 +193,25 @@ class Baseline(abc.ABC):
             training=report.to_dict(),
             instances=instances,
         )
+
+
+#: How split rows may be partitioned before training. A baseline is
+#: trained once per group, which is the axis that decides what the
+#: benchmark is measuring: ``all`` asks for one general explorer,
+#: ``unit`` is the Procgen-style setting where a policy sees one world
+#: family at one size and generalises across seeds.
+GROUPINGS = ("all", "slice", "family", "unit")
+
+
+def group_rows(rows: list, grouping: str) -> dict:
+    """Partition split rows by the chosen grouping, in a stable order."""
+    if grouping not in GROUPINGS:
+        raise ValueError(
+            f"unknown grouping {grouping!r}; expected one of {GROUPINGS}"
+        )
+    if grouping == "all":
+        return {"all": list(rows)}
+    grouped: dict = {}
+    for row in rows:
+        grouped.setdefault(row[grouping], []).append(row)
+    return dict(sorted(grouped.items()))

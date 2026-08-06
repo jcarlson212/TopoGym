@@ -133,11 +133,24 @@ reimplement PPO. A variant such as RND or ICM subclasses `PPOBaseline`
 and overrides one hook, and an algorithm that never uses PPO (Go-Explore
 explores randomly by default) implements the same small interface.
 
+`--group` decides what one policy is trained on, and therefore what is
+being measured. `family` (the default) trains a policy per family
+across its sizes and seeds, in the spirit of Procgen's train-on-levels,
+test-on-held-out-levels design; `unit` is the strictest per-world
+version; `all` asks instead for a single general explorer across every
+family at once.
+
 ```bash
 pip install topogym[benchmarks]
-python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
+python scripts/run_baselines_gridworld_v1_benchmark.py \
+    --baselines random,ppo --group family --num-env-runners 16
 python scripts/run_baselines_gridworld_v1_benchmark.py --smoke   # pipeline check
 ```
+
+Environment stepping is the bottleneck — the policy is a small MLP over
+a 49-dimensional vector — so throughput comes from `--num-env-runners`
+and `--envs-per-runner`, not from an accelerator. `--gpus-per-learner`
+is there for CUDA machines; Apple MPS is not a Ray GPU resource.
 
 Published artefacts land in [`benchmarks/`](benchmarks/README.md) and are
 committed; Ray logs, checkpoints, and per-step traces land in `runs/`
