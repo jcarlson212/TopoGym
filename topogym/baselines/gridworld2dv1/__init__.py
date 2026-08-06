@@ -35,6 +35,12 @@ from topogym.baselines.gridworld2dv1.protocol import (
 BASELINES = {
     "random": "topogym.baselines.gridworld2dv1.concrete_baselines.random_walk:RandomBaseline",
     "ppo": "topogym.baselines.gridworld2dv1.concrete_baselines.ppo:PPOBaseline",
+    "icm-ppo":
+        "topogym.baselines.gridworld2dv1.concrete_baselines.intrinsic"
+        ":ICMBaseline",
+    "rnd-ppo":
+        "topogym.baselines.gridworld2dv1.concrete_baselines.intrinsic"
+        ":RNDBaseline",
     "go-explore-phase1":
         "topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1:GoExplorePhase1Baseline",
 }

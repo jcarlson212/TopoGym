@@ -46,6 +46,16 @@ DEFAULT_ENVS = (
 )
 
 GIF_PX = 420
+
+#: A GIF should play in about five seconds. Browsers clamp frame delays
+#: to roughly 20 ms, so that is ~250 frames -- fewer than a long
+#: episode has steps. Frames are therefore spaced evenly across the
+#: whole run and *labelled with their true step number*, so what is
+#: skipped is visible rather than implied.
+TARGET_SECONDS = 5.0
+MIN_FRAME_MS = 20
+MAX_FRAMES = int(TARGET_SECONDS * 1000 / MIN_FRAME_MS)
+
 logger = logging.getLogger("topogym")
 
 
@@ -56,10 +66,23 @@ def _fit(frame: np.ndarray, px: int) -> np.ndarray:
     return frame[np.ix_(ys, xs)]
 
 
-def record(row: dict, baseline, path: pathlib.Path, episodes: int,
-           stride: int) -> int:
-    """Drive one baseline through an instance, saving every stride-th
-    frame. Returns the number of frames written."""
+def _label(frame: np.ndarray, text: str) -> np.ndarray:
+    """Stamp the step number into a corner of the frame."""
+    from topogym.rendering.overlay import _draw_text
+
+    frame[:11, :4 * len(text) + 6] = (18, 18, 22)
+    _draw_text(frame, 3, 3, text, (240, 240, 245))
+    return frame
+
+
+def record(row: dict, baseline, path: pathlib.Path,
+           episodes: int) -> int:
+    """Drive one baseline through an instance and write the GIF.
+
+    Every step is rendered, then frames are sampled evenly so the
+    result plays in about :data:`TARGET_SECONDS`. Each frame carries
+    the step and episode it came from.
+    """
     import imageio.v3 as iio
 
     env = make_instance(row, reveal_hidden=True,
@@ -67,27 +90,38 @@ def record(row: dict, baseline, path: pathlib.Path, episodes: int,
     core = env.unwrapped
     policy = baseline.policy()
     tile = max(1, GIF_PX // max(core._probe_layout().base.layout_size()))
-    frames, info, tick = [], {}, 0
+    frames, labels, info, tick = [], [], {}, 0
 
     for episode in range(episodes):
         target = (baseline.choose_reset(core, info) if episode else None)
         options = ({"teleport": tuple(int(v) for v in target)}
                    if target is not None else None)
         obs, info = env.reset(seed=episode, options=options)
-        frames.append(_fit(render_rgb_2d(core, tile=tile), GIF_PX))
+        frames.append(render_rgb_2d(core, tile=tile))
+        labels.append(f"{episode}-{tick}")
         while True:
             obs, _reward, terminated, truncated, info = env.step(
                 policy(obs, core))
             tick += 1
-            if tick % stride == 0:
-                frames.append(_fit(render_rgb_2d(core, tile=tile),
-                                   GIF_PX))
+            frames.append(render_rgb_2d(core, tile=tile))
+            labels.append(f"{episode}-{tick}")
             if terminated or truncated:
                 break
-    frames += [frames[-1]] * 6  # hold the final frame
-    iio.imwrite(path, np.stack(frames), duration=80, loop=0)
+
+    # Space the kept frames evenly over the whole run rather than
+    # truncating it, so the GIF shows the shape of the exploration.
+    if len(frames) > MAX_FRAMES:
+        keep = np.linspace(0, len(frames) - 1, MAX_FRAMES).astype(int)
+        frames = [frames[i] for i in keep]
+        labels = [labels[i] for i in keep]
+    duration = max(MIN_FRAME_MS,
+                   int(TARGET_SECONDS * 1000 / max(1, len(frames))))
+    rendered = [_label(_fit(frame, GIF_PX), label)
+                for frame, label in zip(frames, labels)]
+    rendered += [rendered[-1]] * 4  # hold the final frame
+    iio.imwrite(path, np.stack(rendered), duration=duration, loop=0)
     env.close()
-    return len(frames)
+    return len(rendered)
 
 
 def main() -> int:
@@ -95,7 +129,6 @@ def main() -> int:
     parser.add_argument("--envs", default=",".join(DEFAULT_ENVS))
     parser.add_argument("--baselines", default="random,go-explore")
     parser.add_argument("--episodes", type=int, default=6)
-    parser.add_argument("--stride", type=int, default=4)
     parser.add_argument("--seed-index", type=int, default=0,
                         help="which hold-out seed of the unit to use")
     parser.add_argument("--benchmark", default=BENCHMARK)
@@ -105,6 +138,8 @@ def main() -> int:
                         format="%(levelname)s %(message)s")
     logger.setLevel(logging.INFO)
 
+    # Recordings come from the hold-out, the same split the reported
+    # numbers do, so what is watched is what was measured.
     rows = load_split("test")
     out = ROOT / "benchmarks" / args.benchmark / "gifs"
     out.mkdir(parents=True, exist_ok=True)
@@ -126,8 +161,7 @@ def main() -> int:
             folder = out / name
             folder.mkdir(parents=True, exist_ok=True)
             path = folder / f"{unit}.gif"
-            frames = record(row, baseline, path, args.episodes,
-                            args.stride)
+            frames = record(row, baseline, path, args.episodes)
             logger.info("%s seed=%s %s -> %s (%d frames)", unit,
                         row["seed"], name, path.name, frames)
             written += 1
