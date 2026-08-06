@@ -59,13 +59,21 @@ FIGURE_STYLE = {
 #: Curves are cumulative over the whole evaluation budget, so the
 #: captions say so: a per-episode reading would answer a different and
 #: much less interesting question.
+#: Every curve is a fraction in [0, 1]: hold-out worlds differ in size
+#: by two orders of magnitude, so a mean of raw counts would mostly
+#: report which worlds are large.
 FIGURES = (
-    ("unique_states", "unique states visited",
-     "States discovered over the evaluation budget"),
-    ("chambers_entered", "chambers entered",
+    ("coverage", "fraction of reachable space visited",
+     "Space discovered over the evaluation budget"),
+    ("chambers_entered", "fraction of chambers entered",
      "Chambers entered over the evaluation budget"),
     ("curvature_reached", "fraction of negatively curved cells reached",
      "Bottleneck structure reached over the budget"),
+    # Not a fraction: reward does not scale with world size, so the raw
+    # total is already comparable. Under the sparse default this counts
+    # goals reached.
+    ("cumulative_return", "cumulative reward",
+     "Reward accumulated over the evaluation budget"),
 )
 
 
@@ -326,8 +334,10 @@ def _format_ci(point, interval) -> str:
     return f"{point:.1f} [{interval[0]:.1f}, {interval[1]:.1f}]"
 
 
-def write_benchmarks_md(results: dict, path: pathlib.Path,
-                        plots_dir: str = "benchmarks/plots") -> pathlib.Path:
+def write_benchmarks_md(
+    results: dict, path: pathlib.Path,
+    plots_dir: str = "benchmarks/gridworld2dv1/plots",
+) -> pathlib.Path:
     """Regenerate BENCHMARKS.md from the published result JSON.
 
     Generated rather than written by hand, so the document cannot

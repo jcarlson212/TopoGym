@@ -6,7 +6,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from topogym.baselines import (
+from topogym.baselines.gridworld2dv1 import (
     BASELINES,
     SPLIT_USAGE,
     Baseline,
@@ -16,14 +16,14 @@ from topogym.baselines import (
     TrainingReport,
     get_baseline,
 )
-from topogym.baselines.instances import (
+from topogym.baselines.gridworld2dv1.instances import (
     FlatObservation,
     load_split,
     make_instance,
 )
-from topogym.baselines.protocol import Baseline as BaseClass
-from topogym.baselines.random_walk import RandomBaseline
-from topogym.baselines.report import (
+from topogym.baselines.gridworld2dv1.protocol import Baseline as BaseClass
+from topogym.baselines.gridworld2dv1.random_walk import RandomBaseline
+from topogym.baselines.gridworld2dv1.report import (
     _bootstrap_ci,
     _full_support,
     aggregate,
@@ -60,8 +60,9 @@ def test_listing_baselines_never_imports_ray():
     import sys
 
     code = (
-        "import sys; from topogym.baselines import BASELINES, "
-        "get_baseline; get_baseline('random'); "
+        "import sys; "
+        "from topogym.baselines.gridworld2dv1 import get_baseline; "
+        "get_baseline('random'); "
         "print('ray' in sys.modules or 'torch' in sys.modules)"
     )
     out = subprocess.run([sys.executable, "-c", code],
@@ -134,7 +135,7 @@ def test_instances_are_reproducible_from_their_rows():
 # -- evaluation ------------------------------------------------------
 
 def test_evaluation_records_the_full_native_metric_set():
-    from topogym.baselines.evaluate import evaluate_instance
+    from topogym.baselines.gridworld2dv1.evaluate import evaluate_instance
 
     row = load_split("test")[0]
     record = evaluate_instance(row, RandomBaseline().policy(), episodes=1)
@@ -145,7 +146,8 @@ def test_evaluation_records_the_full_native_metric_set():
                 "steps_to_h1_holes", "unique_states"):
         assert key in record["metrics"], key
     assert set(record["curves"]) == {
-        "unique_states", "chambers_entered", "curvature_reached"}
+        "coverage", "chambers_entered", "curvature_reached",
+        "cumulative_return"}
 
 
 # -- aggregation and reporting ---------------------------------------
@@ -187,14 +189,14 @@ def test_aggregate_reports_intervals_and_per_slice():
 
 def test_mean_curves_average_by_step_with_standard_error():
     instances = [
-        {"curves": {"unique_states": [[5, 10.0]], "chambers_entered": [],
+        {"curves": {"coverage": [[5, 0.10]], "chambers_entered": [],
                     "curvature_reached": []}},
-        {"curves": {"unique_states": [[5, 20.0]], "chambers_entered": [],
+        {"curves": {"coverage": [[5, 0.20]], "chambers_entered": [],
                     "curvature_reached": []}},
     ]
     curves = mean_curves(instances)
-    step, mean, error, count = curves["unique_states"][0]
-    assert (step, mean, count) == (5, 15.0, 2)
+    step, mean, error, count = curves["coverage"][0]
+    assert (step, mean, count) == (5, pytest.approx(0.15), 2)
     assert error > 0
 
 
@@ -220,7 +222,7 @@ def test_published_artifacts_are_written(tmp_path):
 # -- grouping --------------------------------------------------------
 
 def test_groupings_partition_without_loss():
-    from topogym.baselines.protocol import GROUPINGS, group_rows
+    from topogym.baselines.gridworld2dv1.protocol import GROUPINGS, group_rows
 
     rows = load_split("train")
     sizes = {}
@@ -268,7 +270,7 @@ def test_aggregate_breaks_out_per_group():
 def test_evaluation_offers_every_method_the_boundary_probe():
     """An archive method must be able to choose where each episode
     resumes; the harness must not decide that for it."""
-    from topogym.baselines.evaluate import evaluate_instance
+    from topogym.baselines.gridworld2dv1.evaluate import evaluate_instance
 
     row = load_split("test")[0]
     chosen = []
@@ -291,7 +293,7 @@ def test_evaluation_offers_every_method_the_boundary_probe():
 
 
 def test_archive_resets_need_no_hook_by_default():
-    from topogym.baselines.evaluate import evaluate_instance
+    from topogym.baselines.gridworld2dv1.evaluate import evaluate_instance
 
     record = evaluate_instance(load_split("test")[0],
                                RandomBaseline().policy(),
@@ -307,7 +309,7 @@ def test_instances_enable_archive_resets():
 def test_contiguous_exposure_keeps_one_world_for_a_run():
     """Archive methods need a run of episodes on the same world, and
     the instance must survive the boundary so its archive does."""
-    from topogym.baselines.multitask import SplitEnv
+    from topogym.baselines.gridworld2dv1.multitask import SplitEnv
 
     rows = load_split("train")[::40][:3]
     assert len({r["unit"] for r in rows}) == 3  # genuinely distinct
@@ -332,7 +334,7 @@ def test_contiguous_exposure_keeps_one_world_for_a_run():
 
 
 def test_lifetime_state_survives_a_contiguous_boundary():
-    from topogym.baselines.multitask import SplitEnv
+    from topogym.baselines.gridworld2dv1.multitask import SplitEnv
 
     rows = load_split("train")[:1]
     env = SplitEnv({"rows": rows, "seed": 0, "episodes_per_instance": 3})
@@ -345,3 +347,96 @@ def test_lifetime_state_survives_a_contiguous_boundary():
     core = env.env.unwrapped
     assert len(core._ever_visited | core._visited) >= before
     env.close()
+
+
+def test_baselines_are_scoped_to_a_benchmark_version():
+    """Each benchmark version owns its baselines, so a later version
+    can change protocol or splits without disturbing published runs."""
+    import pytest as _pytest
+
+    from topogym.baselines import (
+        BENCHMARK_PACKAGES,
+        DEFAULT_BENCHMARK,
+        baselines_for,
+    )
+
+    assert DEFAULT_BENCHMARK in BENCHMARK_PACKAGES
+    package = baselines_for(DEFAULT_BENCHMARK)
+    assert set(package.BASELINES) >= {"random", "ppo"}
+    assert all(entry.startswith("topogym.baselines.gridworld2dv1")
+               for entry in package.BASELINES.values())
+    with _pytest.raises(KeyError, match="no baselines for benchmark"):
+        baselines_for("nope-v9")
+
+
+def test_published_artifacts_are_filed_under_the_benchmark_version():
+    """Results from different benchmark versions must not share a
+    directory, however similar their filenames."""
+    root = pathlib.Path(__file__).resolve().parents[3]
+    published = root / "benchmarks" / "gridworld2dv1"
+    assert (published / "results").is_dir()
+    assert (published / "plots").is_dir()
+    # Nothing may sit loose at the top of benchmarks/ but the README.
+    stray = [p.name for p in (root / "benchmarks").iterdir()
+             if p.is_file() and p.name != "README.md"]
+    assert not stray, f"unversioned artefacts: {stray}"
+
+
+def test_curves_are_fractions_so_sizes_are_comparable():
+    """Hold-out worlds differ in size by two orders of magnitude, so a
+    mean of raw counts would mostly report which worlds are large."""
+    from topogym.baselines.gridworld2dv1.evaluate import evaluate_instance
+    from topogym.baselines.gridworld2dv1.report import FIGURES
+
+    rows = load_split("test")
+    small = min(rows, key=lambda r: int(r["n_free_cells"]))
+    large = max(rows, key=lambda r: int(r["n_free_cells"]))
+    assert int(large["n_free_cells"]) > 50 * int(small["n_free_cells"])
+
+    for row in (small, large):
+        record = evaluate_instance(row, RandomBaseline().policy(),
+                                   episodes=1)
+        for key, _label, _title in FIGURES:
+            values = [v for _step, v in record["curves"][key]]
+            assert values, key
+            if key == "cumulative_return":
+                continue  # reward is not size-relative; see FIGURES
+            assert all(0.0 <= v <= 1.0 for v in values), (key, row["unit"])
+
+
+def test_baselines_declare_the_terms_they_are_measured_on():
+    """A baseline states its action space, observation and reward
+    modes rather than inheriting them silently, and the declaration is
+    recorded with the results."""
+    from topogym import ActionMode
+
+    default = RandomBaseline(BaselineConfig())
+    assert default.actions == ActionMode.EGOCENTRIC
+    assert default.env_options() == {"actions": "egocentric"}
+
+    class Fourway(RandomBaseline):
+        name = "random-fourway"
+        actions = ActionMode.FOURWAY
+        obs_mode = "vector"
+        reward_mode = "coverage"
+
+    options = Fourway(BaselineConfig()).env_options()
+    assert options == {"actions": "fourway", "obs_mode": "vector",
+                       "reward_mode": "coverage"}
+
+    result = Fourway(BaselineConfig(eval_episodes=1)).run(_splits(1))
+    assert result.config["env_options"] == options  # recorded, not lost
+
+
+def test_action_enums_are_usable_as_actions():
+    import gymnasium as gym
+
+    from topogym import ActionMode, EgocentricAction, FourwayAction
+
+    assert ActionMode.EGOCENTRIC.actions is EgocentricAction
+    assert ActionMode.FOURWAY.actions is FourwayAction
+    env = gym.make("TopoGym/Dilution-50-v0").unwrapped
+    env.reset(seed=0)
+    env.step(EgocentricAction.FORWARD)  # an IntEnum *is* the action
+    assert env._steps == 1
+    assert env.action_space.contains(int(EgocentricAction.TURN_LEFT))

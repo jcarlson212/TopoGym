@@ -37,7 +37,22 @@ class FlatObservation(gym.ObservationWrapper):
         return (np.asarray(observation, dtype=np.float32).reshape(-1)
                 / float(C.OBS_MAX))
 
-SPLIT_DIR = pathlib.Path(__file__).resolve().parents[2] / "docs" / "splits"
+def _split_dir() -> pathlib.Path:
+    """Locate ``docs/splits`` by walking up from this file.
+
+    Counting parent directories breaks the moment a module moves --
+    which is exactly what happened when baselines were nested under a
+    benchmark version, and it resolved to ``topogym/docs/splits``.
+    """
+    here = pathlib.Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "docs" / "splits"
+        if candidate.is_dir():
+            return candidate
+    return here.parents[3] / "docs" / "splits"
+
+
+SPLIT_DIR = _split_dir()
 
 
 def load_split(split: str, path: pathlib.Path | None = None) -> list:

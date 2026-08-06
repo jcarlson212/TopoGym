@@ -5,10 +5,10 @@ import pytest
 ray = pytest.importorskip("ray", reason="needs topogym[benchmarks]")
 pytest.importorskip("torch", reason="needs topogym[benchmarks]")
 
-from topogym.baselines import BaselineConfig  # noqa: E402
-from topogym.baselines.instances import load_split  # noqa: E402
-from topogym.baselines.multitask import SplitEnv  # noqa: E402
-from topogym.baselines.ppo import PPOBaseline, mean_return  # noqa: E402
+from topogym.baselines.gridworld2dv1 import BaselineConfig  # noqa: E402
+from topogym.baselines.gridworld2dv1.instances import load_split  # noqa: E402
+from topogym.baselines.gridworld2dv1.multitask import SplitEnv  # noqa: E402
+from topogym.baselines.gridworld2dv1.ppo import PPOBaseline, mean_return  # noqa: E402
 
 
 def test_mean_return_reads_both_api_spellings():
@@ -75,7 +75,7 @@ def test_ppo_trains_and_produces_a_policy():
             val_every=1, patience=1, val_episodes=1,
         ))
         report = baseline.fit(rows, rows, __import__(
-            "topogym.baselines.protocol", fromlist=["Hyperparameters"]
+            "topogym.baselines.gridworld2dv1.protocol", fromlist=["Hyperparameters"]
         ).Hyperparameters({"lr": 3e-4, "entropy_coeff": 0.01}))
         assert report.iterations >= 1
         act = baseline.policy()

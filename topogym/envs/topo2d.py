@@ -36,10 +36,12 @@ from topogym.rendering.rgb import render_rgb_2d
 class TopoGrid2DEnv(TopoEnvCore):
     DIM = 2
 
-    # egocentric actions
-    ACTION_LEFT, ACTION_RIGHT, ACTION_FORWARD = 0, 1, 2
-    # fourway actions (the spec's universal action space)
-    MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT = 0, 1, 2, 3
+    # The action codes are public API (topogym.TURN_LEFT, ...); these
+    # aliases keep the class readable without a second definition.
+    ACTION_LEFT, ACTION_RIGHT, ACTION_FORWARD = (
+        C.TURN_LEFT, C.TURN_RIGHT, C.FORWARD)
+    MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT = (
+        C.MOVE_UP, C.MOVE_DOWN, C.MOVE_LEFT, C.MOVE_RIGHT)
 
     #: quarter-turns right to face each fourway direction from "up"
     _FOURWAY_TURNS = {MOVE_UP: 0, MOVE_DOWN: 2, MOVE_LEFT: 3, MOVE_RIGHT: 1}

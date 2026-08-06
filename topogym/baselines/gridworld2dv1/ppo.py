@@ -2,7 +2,7 @@
 
 The algorithm is RLlib's -- TopoGym does not reimplement PPO. What
 lives here is how PPO meets the protocol in
-:mod:`topogym.baselines.protocol`: hyperparameters chosen on ``tune``,
+:mod:`topogym.baselines.gridworld2dv1.protocol`: hyperparameters chosen on ``tune``,
 gradients taken on ``train``, stopping decided on ``val``.
 
 Variants subclass rather than copy. An intrinsic-reward method such as
@@ -22,7 +22,7 @@ from collections.abc import Callable
 
 import numpy as np
 
-from topogym.baselines.protocol import (
+from topogym.baselines.gridworld2dv1.protocol import (
     Baseline,
     Hyperparameters,
     TrainingReport,
@@ -76,14 +76,21 @@ class PPOBaseline(Baseline):
         from ray.rllib.algorithms.ppo import PPOConfig
         from ray.tune.registry import register_env
 
-        from topogym.baselines.multitask import SplitEnv
+        from topogym.baselines.gridworld2dv1.multitask import SplitEnv
 
         register_env("topogym_split", SplitEnv)
         params = {**self.defaults, **values}
         return (
             PPOConfig()
-            .environment("topogym_split",
-                         env_config={"rows": rows, "seed": seed})
+            .environment(
+                "topogym_split",
+                env_config={
+                    "rows": rows, "seed": seed,
+                    "env_options": self.env_options(),
+                    "episodes_per_instance":
+                        self.config.train_episodes_per_instance,
+                },
+            )
             .env_runners(
                 num_env_runners=self.config.num_env_runners,
                 num_envs_per_env_runner=self.config.num_envs_per_runner,
@@ -134,7 +141,7 @@ class PPOBaseline(Baseline):
 
     def fit(self, train_rows: list, val_rows: list,
             hyperparameters: Hyperparameters) -> TrainingReport:
-        from topogym.baselines.multitask import SplitEnv
+        from topogym.baselines.gridworld2dv1.multitask import SplitEnv
 
         self._algorithm = self.algorithm_config(
             train_rows, hyperparameters.values, self.config.seed

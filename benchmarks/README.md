@@ -1,19 +1,30 @@
 # Published benchmark artefacts
 
 Everything here is committed: it is the record of what the reference
-baselines scored, and it is regenerated only by
+baselines scored. Artefacts are filed under the benchmark version that
+produced them, mirroring `topogym/baselines/<version>/` — results from
+different benchmark versions are different things, however similar
+their filenames, and must not share a directory.
+
+```
+benchmarks/
+  gridworld2dv1/
+    results/<algorithm>.json   every evaluated hold-out instance with the
+                               complete native metric set, the rliable
+                               aggregates, the chosen hyperparameters,
+                               and how training stopped
+    plots/<metric>.{pdf,png}   the published figures — PDF for the
+                               paper, PNG for the repository
+```
+
+The generated summary is [`../BENCHMARKS.md`](../BENCHMARKS.md), linked
+from the README. Regenerate everything with:
 
 ```bash
 python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
 ```
 
-| path | contents |
-|---|---|
-| `results/<algorithm>.json` | every evaluated hold-out instance with the complete native metric set, the rliable aggregates, the chosen hyperparameters, and how training stopped |
-| `plots/<metric>.{pdf,png}` | the published figures — PDF for the paper, PNG for the repository |
-| `../BENCHMARKS.md` | the generated summary, linked from the README |
-
 Run side effects — Ray logs, checkpoints, per-step traces — go to
-`runs/`, which is **not** committed. The split between the two is
-deliberate: what a reader needs to check a claim is versioned, and
-what only the machine that produced it needs is not.
+`runs/<version>/`, which is **not** committed. The split between the
+two is deliberate: what a reader needs to check a claim is versioned,
+and what only the machine that produced it needs is not.

@@ -13,7 +13,7 @@ interquartile means come from
 
 | algorithm | success rate | median steps to goal [95% CI] | efficiency IQM [95% CI] | instances solved | mean coverage |
 |---|---|---|---|---|---|
-| `random` | 0.0% | — | 0.0 [0.0, 0.0] | 0/189 | 11.0% |
+| `random` | 0.0% | — | 0.0 [0.0, 0.0] | 0/189 | 11.1% |
 
 ## Per slice
 
@@ -25,17 +25,21 @@ interquartile means come from
 
 ## Discovery curves
 
-### States discovered over the evaluation budget
+### Space discovered over the evaluation budget
 
-![unique states visited](benchmarks/plots/unique_states.png)
+![fraction of reachable space visited](benchmarks/gridworld2dv1/plots/coverage.png)
 
 ### Chambers entered over the evaluation budget
 
-![chambers entered](benchmarks/plots/chambers_entered.png)
+![fraction of chambers entered](benchmarks/gridworld2dv1/plots/chambers_entered.png)
 
 ### Bottleneck structure reached over the budget
 
-![fraction of negatively curved cells reached](benchmarks/plots/curvature_reached.png)
+![fraction of negatively curved cells reached](benchmarks/gridworld2dv1/plots/curvature_reached.png)
+
+### Reward accumulated over the evaluation budget
+
+![cumulative reward](benchmarks/gridworld2dv1/plots/cumulative_return.png)
 
 ## Training
 
