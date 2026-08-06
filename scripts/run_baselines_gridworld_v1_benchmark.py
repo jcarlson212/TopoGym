@@ -57,6 +57,28 @@ BENCHMARK = "gridworld2dv1"
 logger = logging.getLogger("topogym")
 
 
+def _record_gifs(name: str, test_rows: list, benchmark: str) -> None:
+    """Record the baseline exploring a few hold-out worlds.
+
+    Done here rather than in a separate pass so the recordings come
+    from the same split, seed and policy as the reported numbers.
+    """
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from record_baseline_gifs import DEFAULT_ENVS, record
+
+    from topogym.baselines.gridworld2dv1 import get_baseline
+
+    out = PUBLISHED / benchmark / "gifs" / name
+    out.mkdir(parents=True, exist_ok=True)
+    for unit in DEFAULT_ENVS:
+        rows = [row for row in test_rows if row["unit"] == unit]
+        if not rows:
+            continue
+        baseline = get_baseline(name)(BaselineConfig(seed=0))
+        frames = record(rows[0], baseline, out / f"{unit}.gif", 6)
+        logger.info("recorded %s/%s.gif (%d frames)", name, unit, frames)
+
+
 def load_splits(limit: int | None) -> dict:
     splits = {name: load_split(name) for name in SPLITS}
     if limit:
@@ -79,6 +101,11 @@ def main() -> int:
     parser.add_argument("--episodes", type=int, default=50,
                         help="evaluation episodes per hold-out instance")
     parser.add_argument("--max-iterations", type=int, default=200)
+    parser.add_argument("--record-gifs", action="store_true",
+                        help="also record how the baseline explores a "
+                             "few hold-out worlds, during the test "
+                             "phase and from the same split the "
+                             "reported numbers come from")
     parser.add_argument("--track-topology", action="store_true",
                         help="also timestamp hole discoveries (runs "
                              "GUDHI every step; slow)")
@@ -207,6 +234,9 @@ def main() -> int:
             merged.training["groups"][key] = result.training
             merged.hyperparameters["groups"][key] = result.hyperparameters
             merged.config = result.config
+
+        if args.record_gifs and not args.smoke:
+            _record_gifs(name, splits["test"], args.benchmark)
 
         merged.aggregates = aggregate(merged.instances, seed=args.seed)
         merged.curves = mean_curves(merged.instances)
