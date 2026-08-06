@@ -35,8 +35,8 @@ from topogym.baselines.gridworld2dv1.protocol import (
 BASELINES = {
     "random": "topogym.baselines.gridworld2dv1.concrete_baselines.random_walk:RandomBaseline",
     "ppo": "topogym.baselines.gridworld2dv1.concrete_baselines.ppo:PPOBaseline",
-    "go-explore":
-        "topogym.baselines.gridworld2dv1.concrete_baselines.goexplore:GoExploreBaseline",
+    "go-explore-phase1":
+        "topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1:GoExplorePhase1Baseline",
 }
 
 __all__ = [

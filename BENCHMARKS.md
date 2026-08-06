@@ -30,18 +30,18 @@ algorithm. An archive method's teleports show up as
 jumps -- that is the mechanism, not a rendering glitch.
 Recorded by `scripts/record_baseline_gifs.py`.
 
-| world | `go-explore` | `random` |
+| world | `go-explore-phase1` | `random` |
 |---|---|---|
-| `BankRobber` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/BankRobber.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/BankRobber.gif) |
-| `ClownChase` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/ClownChase.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/ClownChase.gif) |
-| `DontFall` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/DontFall.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/DontFall.gif) |
-| `EnvironmentalIceShip` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/EnvironmentalIceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/EnvironmentalIceShip.gif) |
-| `IceShip` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/IceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/IceShip.gif) |
-| `Ladders` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/Ladders.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/Ladders.gif) |
-| `SearchRescue` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/SearchRescue.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SearchRescue.gif) |
-| `SpaceWarp` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/SpaceWarp.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SpaceWarp.gif) |
-| `TopRP2-50` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/TopRP2-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopRP2-50.gif) |
-| `TopTorus-50` | ![go-explore](benchmarks/gridworld2dv1/gifs/go-explore/TopTorus-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopTorus-50.gif) |
+| `BankRobber` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/BankRobber.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/BankRobber.gif) |
+| `ClownChase` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/ClownChase.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/ClownChase.gif) |
+| `DontFall` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/DontFall.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/DontFall.gif) |
+| `EnvironmentalIceShip` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/EnvironmentalIceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/EnvironmentalIceShip.gif) |
+| `IceShip` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/IceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/IceShip.gif) |
+| `Ladders` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/Ladders.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/Ladders.gif) |
+| `SearchRescue` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/SearchRescue.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SearchRescue.gif) |
+| `SpaceWarp` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/SpaceWarp.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SpaceWarp.gif) |
+| `TopRP2-50` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/TopRP2-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopRP2-50.gif) |
+| `TopTorus-50` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/TopTorus-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopTorus-50.gif) |
 
 
 ## Discovery curves

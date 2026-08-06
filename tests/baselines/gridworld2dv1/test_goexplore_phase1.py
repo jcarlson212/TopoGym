@@ -3,11 +3,11 @@
 import pytest
 
 from topogym.baselines.gridworld2dv1 import BaselineConfig, get_baseline
-from topogym.baselines.gridworld2dv1.concrete_baselines.goexplore import (
+from topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1 import (
     ATTRIBUTES,
     DEFAULTS,
     Archive,
-    GoExploreBaseline,
+    GoExplorePhase1Baseline,
     GoExploreReset,
     GoExploreResetFactory,
 )
@@ -104,7 +104,7 @@ def test_go_explore_uses_the_boundary_probe_and_explores_further():
     """The archive is the whole point: same random policy, more of the
     world seen, because episodes resume from chosen cells."""
     row = next(r for r in load_split("test") if r["unit"] == "Decoys4-50")
-    baseline = GoExploreBaseline(BaselineConfig(seed=0))
+    baseline = GoExplorePhase1Baseline(BaselineConfig(seed=0))
     with_archive = evaluate_instance(
         row, baseline.policy(), episodes=15, trace=False,
         choose_reset=baseline.choose_reset,
@@ -119,7 +119,7 @@ def test_go_explore_uses_the_boundary_probe_and_explores_further():
 
 
 def test_pools_every_non_holdout_split_and_never_the_holdout():
-    baseline = GoExploreBaseline()
+    baseline = GoExplorePhase1Baseline()
     assert set(baseline.tuning_splits) == {"tune", "train", "val"}
     assert "test" not in baseline.tuning_splits
 
@@ -135,8 +135,8 @@ def test_reset_factory_is_picklable_for_parallel_sweeps():
 
 
 def test_registered_under_its_name():
-    assert get_baseline("go-explore") is GoExploreBaseline
-    assert GoExploreBaseline.name == "go-explore"
+    assert get_baseline("go-explore-phase1") is GoExplorePhase1Baseline
+    assert GoExplorePhase1Baseline.name == "go-explore-phase1"
 
 
 def test_level_weight_is_one():
@@ -150,7 +150,7 @@ def test_level_weight_is_one():
 
 def test_return_is_reported_per_episode_as_well_as_total():
     row = load_split("test")[0]
-    record = evaluate_instance(row, GoExploreBaseline().policy(),
+    record = evaluate_instance(row, GoExplorePhase1Baseline().policy(),
                                episodes=4, trace=False)
     assert record["return_per_episode"] == pytest.approx(
         record["cumulative_return"] / 4)
@@ -161,10 +161,10 @@ def test_successive_halving_thins_candidates_across_rungs():
     grid costs 28 sweeps rather than 48."""
     from topogym.baselines.gridworld2dv1.instances import load_split
 
-    baseline = GoExploreBaseline(
+    baseline = GoExplorePhase1Baseline(
         BaselineConfig(seed=0, tune_episodes=1, eval_workers=1))
     baseline.selection_rungs = (("tune", 3), ("train", 2), ("val", 1))
-    baseline.tune_grid = GoExploreBaseline.tune_grid[:4]
+    baseline.tune_grid = GoExplorePhase1Baseline.tune_grid[:4]
     tuning = {name: load_split(name)[:2]
               for name in ("tune", "train", "val")}
 
@@ -179,11 +179,11 @@ def test_successive_halving_thins_candidates_across_rungs():
 
 
 def test_full_grid_and_rungs_are_declared():
-    assert len(GoExploreBaseline.tune_grid) == 16
-    assert GoExploreBaseline.selection_rungs == (
+    assert len(GoExplorePhase1Baseline.tune_grid) == 16
+    assert GoExplorePhase1Baseline.selection_rungs == (
         ("tune", 8), ("train", 4), ("val", 1))
-    sweeps, survivors = 0, len(GoExploreBaseline.tune_grid)
-    for _split, keep in GoExploreBaseline.selection_rungs:
+    sweeps, survivors = 0, len(GoExplorePhase1Baseline.tune_grid)
+    for _split, keep in GoExplorePhase1Baseline.selection_rungs:
         sweeps += survivors
         survivors = min(survivors, keep)
-    assert sweeps == 28 < 3 * len(GoExploreBaseline.tune_grid)
+    assert sweeps == 28 < 3 * len(GoExplorePhase1Baseline.tune_grid)
