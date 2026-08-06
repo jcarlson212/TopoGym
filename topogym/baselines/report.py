@@ -154,6 +154,22 @@ def aggregate(instances: list, seed: int = 0) -> dict:
         }
         for name, group in _group_by(instances, "slice").items()
     }
+    if any("group" in record for record in instances):
+        out["per_group"] = {
+            name: {
+                "instances": int(len(group)),
+                "success_rate": float(np.mean(
+                    [r["success_rate"] for r in group])),
+                "median_steps_to_goal": _bootstrap_ci(
+                    np.array([r["median_steps_to_goal"] for r in group
+                              if r["median_steps_to_goal"] is not None],
+                             dtype=float),
+                    np.median, BOOTSTRAP_REPS, seed)[0],
+            }
+            for name, group in _group_by(
+                [r for r in instances if "group" in r], "group"
+            ).items()
+        }
     return out
 
 

@@ -1,0 +1,61 @@
+{
+  "$schema_version": 1,
+  "$comment": [
+    "The official roster of TopoGym benchmarks: which families a named,",
+    "version-tagged benchmark contains, at which sizes, and which of them",
+    "are withheld from training. This file is the sole authority on",
+    "benchmark membership -- a registry entry that is not listed under some",
+    "benchmark version here is in no benchmark. Adding a family to",
+    "topogym/registry.py therefore never changes a published benchmark.",
+    "",
+    "A version is a complete roster, not a diff on its predecessor, so a",
+    "later version may both add and remove families while earlier versions",
+    "stay exactly as they were published. Versions marked frozen are",
+    "immutable: their roster must keep matching the CSVs already shipped in",
+    "docs/splits/, which tests/test_splits.py enforces in both directions.",
+    "",
+    "Family keys are matched against topogym.benchmarks.family_of by longest",
+    "prefix, so 'Shape' covers ShapeSq/ShapeCi/... and 'ChamberCount' wins",
+    "over 'Chambers' for ChamberCount4. A size of 0 means the family is not",
+    "size-parameterized: its builder fixes the geometry and it appears once."
+  ],
+  "default": "gridworld2d-v1",
+  "benchmarks": {
+    "gridworld2d-v1": {
+      "title": "TopoGym GridWorld2D v1",
+      "frozen": true,
+      "extrapolation_train_max": 100,
+      "families": {
+        "Dilution":     {"slice": "GridWorld2D", "sizes": [50, 200]},
+        "Chambers":     {"slice": "GridWorld2D", "sizes": [50, 100, 200, 400]},
+        "ChamberCount": {"slice": "GridWorld2D", "sizes": [100, 200]},
+        "Decoys":       {"slice": "GridWorld2D", "sizes": [50, 100]},
+        "Shape":        {"slice": "GridWorld2D", "sizes": [50, 100]},
+        "Nested":       {"slice": "GridWorld2D", "sizes": [50, 100]},
+        "Maze":         {"slice": "GridWorld2D", "sizes": [50, 100]},
+        "GiveUp":       {"slice": "GridWorld2D", "sizes": [50, 100],
+                         "held_out": true},
+        "Bottleneck":   {"slice": "GridWorld2D", "sizes": [100, 200],
+                         "held_out": true},
+
+        "TopPlane":     {"slice": "Top", "sizes": [50]},
+        "TopCylinder":  {"slice": "Top", "sizes": [50]},
+        "TopMobius":    {"slice": "Top", "sizes": [50]},
+        "TopTorus":     {"slice": "Top", "sizes": [50]},
+        "TopKlein":     {"slice": "Top", "sizes": [50]},
+        "TopRP2":       {"slice": "Top", "sizes": [50]},
+
+        "IceShip":               {"slice": "Texture", "sizes": [0]},
+        "Ladders":               {"slice": "Texture", "sizes": [0]},
+        "BankRobber":            {"slice": "Texture", "sizes": [0]},
+        "DontFall":              {"slice": "Texture", "sizes": [0]},
+        "ClownChase":            {"slice": "Texture", "sizes": [0]},
+        "EnvironmentalIceShip":  {"slice": "Texture", "sizes": [0]},
+        "SpaceWarp":             {"slice": "Texture", "sizes": [0],
+                                  "held_out": true},
+        "SearchRescue":          {"slice": "Texture", "sizes": [0],
+                                  "held_out": true}
+      }
+    }
+  }
+}

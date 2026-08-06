@@ -58,6 +58,11 @@ Repository = "https://github.com/jcarlson212/TopoGym"
 [tool.setuptools.packages.find]
 include = ["topogym*"]
 
+# The benchmark roster is read at import time, so it must ship in the
+# wheel alongside the code it governs.
+[tool.setuptools.package-data]
+topogym = ["benchmarks.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [

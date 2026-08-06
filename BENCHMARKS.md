@@ -13,15 +13,13 @@ interquartile means come from
 
 | algorithm | success rate | median steps to goal [95% CI] | efficiency IQM [95% CI] | instances solved | mean coverage |
 |---|---|---|---|---|---|
-| `random` | 0.0% | — | 0.0 [0.0, 0.0] | 0/189 | 4.0% |
+| `random` | 0.0% | — | 0.0 [0.0, 0.0] | 0/3 | 6.2% |
 
 ## Per slice
 
 | algorithm | slice | instances | success rate | median steps to goal |
 |---|---|---|---|---|
-| `random` | GridWorld2D | 147 | 0.0% | — |
-| `random` | Texture | 24 | 0.0% | — |
-| `random` | Top | 18 | 0.0% | — |
+| `random` | Texture | 3 | 0.0% | — |
 
 ## Discovery curves
 

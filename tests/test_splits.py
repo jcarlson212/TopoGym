@@ -69,6 +69,11 @@ def test_every_declared_family_size_is_covered():
                for row in _rows("train")}
     checked = 0
     for name, cfg in registry.REGISTRY.items():
+        # Registry-only families are carried by no split, by design; the
+        # roster decides membership. See test_undeclared_family_is_in_no_
+        # benchmark for that contract.
+        if not benchmarks.in_benchmark(name):
+            continue
         family = benchmarks.family_of(name)
         base = cfg.size if isinstance(cfg.size, int) else max(cfg.size)
         declared = benchmarks.sizes_for(family, base)
@@ -82,6 +87,44 @@ def test_every_declared_family_size_is_covered():
             assert key in present, f"{family} at size {size} is missing"
             checked += 1
     assert checked > 40
+
+
+def test_frozen_benchmark_roster_matches_published_splits():
+    """A frozen version is immutable: the roster and the CSVs already
+    shipped must agree in *both* directions, so neither a roster edit nor
+    a regeneration can silently change what a published benchmark is."""
+    for version, spec in benchmarks.BENCHMARKS.items():
+        if not spec.get("frozen"):
+            continue
+        declared = set(benchmarks.families(version))
+        published = {r["family"] for r in _rows("train")}
+        resolved = {f: benchmarks.declared_family(f, version)
+                    for f in published}
+        undeclared = sorted(f for f, k in resolved.items() if k is None)
+        assert not undeclared, (
+            f"{version} splits carry undeclared families {undeclared} -- "
+            f"add them to topogym/benchmarks.json or regenerate the splits"
+        )
+        missing = declared - set(resolved.values())
+        assert not missing, (
+            f"{version} declares {sorted(missing)} but no split carries "
+            f"them -- run python scripts/generate_splits.py"
+        )
+
+
+def test_undeclared_family_is_in_no_benchmark():
+    """Absence from the roster is the definition of "in no benchmark", so
+    adding a registry family cannot alter a published benchmark."""
+    assert not benchmarks.in_benchmark("Braid25-50")
+    assert benchmarks.slice_of("Braid") is None
+    assert benchmarks.entry_for("Braid") is None
+    # ...and it falls back to its own size rather than inventing a sweep.
+    assert benchmarks.sizes_for("Braid", 50) == (50,)
+    # Every family the registry ships today *is* declared, so the roster
+    # and the registry are in sync as published.
+    from topogym import registry
+
+    assert all(benchmarks.in_benchmark(n) for n in registry.REGISTRY)
 
 
 def test_difficulty_distributions_are_comparable():
