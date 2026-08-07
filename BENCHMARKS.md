@@ -13,15 +13,15 @@ interquartile means come from
 
 | algorithm | success rate | median steps to goal [95% CI] | efficiency IQM [95% CI] | instances solved | mean coverage |
 |---|---|---|---|---|---|
-| `random` | 0.0% | — | 0.0 [0.0, 0.0] | 0/189 | 11.1% |
+| `go-explore-phase1` | 0.0% | — | 0.0 [0.0, 0.0] | 0/189 | 37.1% |
 
 ## Per slice
 
 | algorithm | slice | instances | success rate | median steps to goal |
 |---|---|---|---|---|
-| `random` | GridWorld2D | 147 | 0.0% | — |
-| `random` | Texture | 24 | 0.0% | — |
-| `random` | Top | 18 | 0.0% | — |
+| `go-explore-phase1` | GridWorld2D | 147 | 0.0% | — |
+| `go-explore-phase1` | Texture | 24 | 0.0% | — |
+| `go-explore-phase1` | Top | 18 | 0.0% | — |
 
 ## How each baseline explores
 
@@ -30,18 +30,18 @@ algorithm. An archive method's teleports show up as
 jumps -- that is the mechanism, not a rendering glitch.
 Recorded by `scripts/record_baseline_gifs.py`.
 
-| world | `go-explore-phase1` | `random` |
-|---|---|---|
-| `BankRobber` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/BankRobber.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/BankRobber.gif) |
-| `ClownChase` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/ClownChase.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/ClownChase.gif) |
-| `DontFall` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/DontFall.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/DontFall.gif) |
-| `EnvironmentalIceShip` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/EnvironmentalIceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/EnvironmentalIceShip.gif) |
-| `IceShip` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/IceShip.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/IceShip.gif) |
-| `Ladders` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/Ladders.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/Ladders.gif) |
-| `SearchRescue` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/SearchRescue.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SearchRescue.gif) |
-| `SpaceWarp` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/SpaceWarp.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/SpaceWarp.gif) |
-| `TopRP2-50` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/TopRP2-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopRP2-50.gif) |
-| `TopTorus-50` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/TopTorus-50.gif) | ![random](benchmarks/gridworld2dv1/gifs/random/TopTorus-50.gif) |
+| world | `go-explore-phase1` | `icm-ppo` | `ppo` | `rnd-ppo` |
+|---|---|---|---|---|
+| `BankRobber` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/BankRobber.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/BankRobber.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/BankRobber.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/BankRobber.gif) |
+| `ClownChase` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/ClownChase.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/ClownChase.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/ClownChase.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/ClownChase.gif) |
+| `DontFall` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/DontFall.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/DontFall.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/DontFall.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/DontFall.gif) |
+| `EnvironmentalIceShip` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/EnvironmentalIceShip.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/EnvironmentalIceShip.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/EnvironmentalIceShip.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/EnvironmentalIceShip.gif) |
+| `IceShip` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/IceShip.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/IceShip.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/IceShip.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/IceShip.gif) |
+| `Ladders` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/Ladders.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/Ladders.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/Ladders.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/Ladders.gif) |
+| `SearchRescue` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/SearchRescue.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/SearchRescue.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/SearchRescue.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/SearchRescue.gif) |
+| `SpaceWarp` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/SpaceWarp.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/SpaceWarp.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/SpaceWarp.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/SpaceWarp.gif) |
+| `TopRP2-50` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/TopRP2-50.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/TopRP2-50.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/TopRP2-50.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/TopRP2-50.gif) |
+| `TopTorus-50` | ![go-explore-phase1](benchmarks/gridworld2dv1/gifs/go-explore-phase1/TopTorus-50.gif) | ![icm-ppo](benchmarks/gridworld2dv1/gifs/icm-ppo/TopTorus-50.gif) | ![ppo](benchmarks/gridworld2dv1/gifs/ppo/TopTorus-50.gif) | ![rnd-ppo](benchmarks/gridworld2dv1/gifs/rnd-ppo/TopTorus-50.gif) |
 
 
 ## Discovery curves
@@ -66,7 +66,7 @@ Recorded by `scripts/record_baseline_gifs.py`.
 
 | algorithm | iterations | why it stopped | best validation return | hyperparameters |
 |---|---|---|---|---|
-| `random` | 0 | budget exhausted | — | `—` (tuning inconclusive) |
+| `go-explore-phase1` | 0 | nothing is trained; the archive strategy is chosen by the tuning sweep | — | `{'eps1': 0.001, 'eps2': 1e-05, 'w_a': 0.3, 'p_a': 0.5, 'w_n': 3.0}` |
 
 ## What is recorded
 
