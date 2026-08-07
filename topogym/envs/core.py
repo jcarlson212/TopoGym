@@ -373,17 +373,29 @@ class TopoEnvCore(gym.Env):
         goal = self.layout.goal
         if goal is None or not self.goal_exists:
             return None
+        found = self.actions_between(self.layout.start, goal)
+        self.layout.extras["optimal_actions"] = found if found else -1
+        return found
+
+    def actions_between(self, source: tuple, target: tuple) -> int | None:
+        """Fewest actions from ``source`` to ``target``, charging turns
+        exactly as :meth:`optimal_actions` does.
+
+        Exposed because "how far apart are these two places, in the
+        currency the agent spends" is a question about the world rather
+        than about the start cell -- families whose premise is a
+        distance (EpicChase spaces its chambers an episode apart) have
+        to be able to state it, and archive methods have to be able to
+        cost a return trip. ``None`` when no route exists."""
         base = self.layout.base
         blocked = self._planning_blocked()
-        state = base.turn_left(base.initial_state(self.layout.start))
+        state = base.turn_left(base.initial_state(source))
         seen = {state}
         queue = deque([(state, 0)])
-        found = None
         while queue:
             current, dist = queue.popleft()
-            if current.cell == goal:
-                found = dist
-                break
+            if current.cell == target:
+                return dist
             nxts = [base.turn_left(current), base.turn_right(current)]
             ahead = base.forward(current)
             if ahead is not None and ahead.cell not in blocked:
@@ -394,8 +406,7 @@ class TopoEnvCore(gym.Env):
                 if nxt not in seen:
                     seen.add(nxt)
                     queue.append((nxt, dist + 1))
-        self.layout.extras["optimal_actions"] = found if found else -1
-        return found
+        return None
 
     def homology_stats(self, which: str = "observed") -> HomologyStats:
         """Per-dimension hole counts as a :class:`HomologyStats`.

@@ -27,7 +27,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import gymnasium as gym  # noqa: E402
 
 import topogym  # noqa: E402,F401
-from topogym import registry  # noqa: E402
+from topogym import benchmarks, registry  # noqa: E402
 from topogym.core import constants as C  # noqa: E402
 from topogym.rendering.rgb import render_rgb_2d  # noqa: E402
 
@@ -197,6 +197,10 @@ FAMILY_DOCS = {
                   "homology signal, pure bottleneck difficulty.",
     "Maze": "A seeded perfect maze (simply connected); the braid knob "
             "opens loops, each adding one H1 class.",
+    "EpicChase": "Chambers spaced a full episode apart along one long "
+                 "spiral corridor: no single episode can reach the "
+                 "goal, so progress requires resuming where the last "
+                 "one stopped.",
     "TopPlane": "The canonical corner-chamber layout on the walled "
                 "plane — the control for the Top slice.",
     "TopCylinder": "Corner chambers on a cylinder: one wrapping axis.",
@@ -306,7 +310,20 @@ def write_env_pages(betti: dict) -> None:
             art = f"../envs/{entries[0][0]}.png"
         if art:
             lines += [f'<img src="{art}" width="360"/>', ""]
-        lines += [FAMILY_DOCS.get(fam, ""), "", _SPACES_BLURB]
+        lines += [FAMILY_DOCS.get(fam, ""), ""]
+        reason = next((why for key, why in benchmarks.STANDALONE.items()
+                       if fam.startswith(key)), None)
+        if reason:
+            lines += [f"> **In no benchmark.** {reason}", ""]
+        lines += [_SPACES_BLURB]
+        pinned = {registry.EXTRA_KWARGS.get(name, {}).get("max_steps")
+                  for name, _ in entries}
+        if len(pinned) == 1 and (budget := pinned.pop()):
+            lines += [
+                f"This family pins its horizon at **{budget} steps** "
+                "rather than deriving it from the layout: the budget is "
+                "the premise, and the world is sized to fit it.", "",
+            ]
         lines += ["## Registered configurations", ""]
         lines += ["| id | certified b(Z/2) |", "|---|---|"]
         for name, env_id in entries:

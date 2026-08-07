@@ -203,6 +203,9 @@ def _attempt_2d(cfg: TopoGenConfig2D, rng: np.random.Generator) -> Layout:
         elif style == "nested":
             modes.build_nested(cfg, base, rng, cell_types, doors, features,
                                Feature, DoorSpec)
+        elif style == "spiral":
+            modes.build_spiral(cfg, base, rng, cell_types, doors,
+                               features, Feature, DoorSpec)
         elif style == "corridor":
             modes.build_corridor(cfg, base, rng, cell_types, features,
                                  Feature)

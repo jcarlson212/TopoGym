@@ -35,6 +35,8 @@ GIFs show a coverage explorer navigating. Regenerate with
 | **Bottleneck6-100** | `TopoGym/Bottleneck6-100-v0` | `[1, 0, 0]` | <img src="Bottleneck6-100.gif" width="200"/> |
 | **Maze-50** | `TopoGym/Maze-50-v0` | `[1, 0, 0]` | <img src="Maze-50.gif" width="200"/> |
 | **Maze-100** | `TopoGym/Maze-100-v0` | `[1, 0, 0]` | <img src="Maze-100.png" width="200"/> |
+| **EpicChase4-90** | `TopoGym/EpicChase4-90-v0` | `[1, 0, 0]` | <img src="EpicChase4-90.png" width="200"/> |
+| **EpicChase8-120** | `TopoGym/EpicChase8-120-v0` | `[1, 0, 0]` | <img src="EpicChase8-120.png" width="200"/> |
 | **TopPlane-50** | `TopoGym/TopPlane-50-v0` | `[1, 0, 0]` | <img src="TopPlane-50.png" width="200"/> |
 | **TopCylinder-50** | `TopoGym/TopCylinder-50-v0` | `[1, 1, 0]` | <img src="TopCylinder-50.png" width="200"/> |
 | **TopMobius-50** | `TopoGym/TopMobius-50-v0` | `[1, 1, 0]` | <img src="TopMobius-50.png" width="200"/> |

@@ -11,6 +11,7 @@ One page per family; ids are stable across releases.
 - [GiveUp](GiveUp.md) — The chamber's door hides behind a dead-end corridor of the given length; longer corridors punish giving up early.
 - [Bottleneck](Bottleneck.md) — A tree of rooms joined by width-1 corridors: zero homology signal, pure bottleneck difficulty.
 - [Maze](Maze.md) — A seeded perfect maze (simply connected); the braid knob opens loops, each adding one H1 class.
+- [EpicChase](EpicChase.md) — Chambers spaced a full episode apart along one long spiral corridor: no single episode can reach the goal, so progress requires resuming where the last one stopped.
 - [TopPlane](TopPlane.md) — The canonical corner-chamber layout on the walled plane — the control for the Top slice.
 - [TopCylinder](TopCylinder.md) — Corner chambers on a cylinder: one wrapping axis.
 - [TopMobius](TopMobius.md) — Corner chambers on a Möbius band: crossing the seam mirrors orientation.

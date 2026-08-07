@@ -11,6 +11,10 @@ placed in a free field by rejection sampling):
   parameterized length, carved out of a solid wall mass. The tree
   constraint keeps the free space simply connected (b1 = 0): the pure
   bottleneck regime, with corridor length as the difficulty axis.
+- **spiral** -- one long spiral corridor out from the centre, with
+  chambers spaced a full episode apart along it, so no episode can
+  reach two. The EpicChase family: solving it *requires* resuming
+  where the last episode stopped.
 - **braid** (maze post-processing) — opening loops in a perfect maze with
   a given density; every opened cell encloses wall, so each adds exactly
   one H1 class.
@@ -264,3 +268,248 @@ def diagonal_pinches(cell_types: dict) -> list:
             if d in obs and (x + 1, y) not in obs and (x, y + dy) not in obs:
                 out.append(((x, y), d))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Spiral (the EpicChase family)
+# ---------------------------------------------------------------------------
+
+_SPIRAL_DIRS = ((1, 0), (0, 1), (-1, 0), (0, -1))  # E, S, W, N
+
+
+def _spiral_path(w: int, h: int, pitch: int, radius: int = 0) -> list:
+    """Corridor cells of a rectangular spiral out from the centre.
+
+    Leg ``i`` runs ``(i // 2 + 1) * pitch`` cells, which is the standard
+    square spiral: consecutive arms sit exactly ``pitch`` apart, so the
+    wall band between them is ``pitch - 1`` cells thick. The walk stops
+    at the first step that would leave the one-cell border.
+    """
+    x, y = w // 2, h // 2
+    path = [(x, y)]
+    leg = 0
+    while True:
+        dx, dy = _SPIRAL_DIRS[leg % 4]
+        for _ in range((leg // 2 + 1) * pitch):
+            nx, ny = x + dx, y + dy
+            margin = radius + 1
+            if not (margin <= nx < w - margin
+                    and margin <= ny < h - margin):
+                return path
+            x, y = nx, ny
+            path.append((x, y))
+        leg += 1
+        if leg > 4 * (max(w, h) // max(1, pitch) + 2):  # cannot happen
+            return path
+
+
+def _action_costs(path: list) -> list:
+    """Cumulative *actions* to reach each corridor cell from the start.
+
+    Distance along a spiral is not the number of cells: under the
+    egocentric action space a corner costs an extra turn action. The
+    family's whole premise -- one chamber per episode -- is a claim
+    about actions, so the spacing is measured in the currency the agent
+    actually spends. Fourway agents pay less, which only makes the
+    guarantee safer.
+    """
+    costs = [0]
+    facing = None
+    for i in range(1, len(path)):
+        step = (path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1])
+        turn = 1 if (facing is not None and step != facing) else 0
+        facing = step
+        costs.append(costs[-1] + 1 + turn)
+    return costs
+
+
+def _turn_aware_costs(base, free: set, source: tuple) -> dict:
+    """Fewest actions from ``source`` to every cell of ``free``,
+    charging a turn exactly as the environment does.
+
+    A widened corridor lets the agent cut its corners, so counting
+    cells along the centreline would *overstate* how far apart the
+    chambers are -- and overstating is the one error this family
+    cannot afford, since the spacing is the whole premise. Measure it
+    in the currency the agent spends, over the space actually carved.
+    """
+    from collections import deque
+
+    state = base.turn_left(base.initial_state(source))
+    seen = {state}
+    best: dict = {source: 0}
+    queue = deque([(state, 0)])
+    while queue:
+        current, dist = queue.popleft()
+        best.setdefault(current.cell, dist)
+        nxts = [base.turn_left(current), base.turn_right(current)]
+        ahead = base.forward(current)
+        if ahead is not None and ahead.cell in free:
+            nxts.append(ahead)
+        for nxt in nxts:
+            if nxt not in seen:
+                seen.add(nxt)
+                queue.append((nxt, dist + 1))
+    return best
+
+
+def _pocket(path: list, index: int, side: int, radius: int,
+            sign: int) -> tuple | None:
+    """A chamber pocket hanging off the corridor at ``path[index]``, or
+    None if it does not fit. ``sign`` picks which side it opens onto."""
+    half = side // 2
+    reach = half + radius + 1
+    if not reach <= index < len(path) - reach:
+        return None
+    run = {(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1])
+           for i in range(index - reach, index + reach)}
+    if len(run) != 1:  # a corner: no straight run to hang a chamber on
+        return None
+    forward = run.pop()
+    normal = (-forward[1] * sign, forward[0] * sign)
+    ax, ay = path[index]
+    door = (ax + normal[0] * (radius + 1), ay + normal[1] * (radius + 1))
+    interior = [
+        (ax + normal[0] * depth + forward[0] * along,
+         ay + normal[1] * depth + forward[1] * along)
+        for depth in range(radius + 2, radius + 2 + side)
+        for along in range(-half, side - half)
+    ]
+    return door, tuple(interior)
+
+
+def build_spiral(cfg: TopoGenConfig2D, base: BaseMap2D,
+                 rng: np.random.Generator, cell_types: dict, doors: dict,
+                 features: list, feature_cls: type, door_cls: type) -> None:
+    """Carve one wide spiral corridor with chambers spaced a full
+    episode apart.
+
+    The spacing is the point. Chambers sit at least ``spiral_arc``
+    actions from one another along the corridor -- measured, not
+    assumed -- and the family is registered with an episode budget just
+    over ``spiral_arc``, so a single episode can reach exactly one of
+    them. Finding a goal hidden in some chamber therefore *requires*
+    returning to where the last episode left off, which is what an
+    archive is for and why this family is a stress test rather than a
+    benchmark entry.
+    """
+    if cfg.base != "square":
+        raise ModeError('style "spiral" requires base="square"')
+    w, h = _rect_dims(cfg)
+    arc = int(cfg.spiral_arc)
+    if arc < 8:
+        raise ModeError('style "spiral" requires spiral_arc >= 8')
+    side = max(1, (cfg.chamber_side or 5) - 2)  # chamber interior side
+    radius = max(0, (int(cfg.spiral_width) - 1) // 2)  # corridor half-width
+    # Arms sit `pitch` apart, which must hold: half a corridor, the
+    # door, the chamber, and a wall before the next arm's edge.
+    pitch = side + 2 * radius + 3
+    n_chambers = int(cfg.n_chambers)
+
+    path = _spiral_path(w, h, pitch, radius)
+    for cell in base.cells():
+        cell_types[cell] = WALL
+    free = set()
+    for cx, cy in path:
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                free.add((cx + dx, cy + dy))
+    for cell in free:
+        cell_types.pop(cell, None)
+
+    costs = _turn_aware_costs(base, free, path[0])
+    # Targets: one episode apart, plus a seeded slack that only ever
+    # widens the gap, so the guarantee survives every draw.
+    # A few actions of floor above `arc`: distances are measured to
+    # each door from the start, and a door-to-door route can come in a
+    # little under the difference of those two numbers. The floor keeps
+    # the *measured* gap at or above a full episode regardless.
+    targets, acc = [], 0
+    for _ in range(n_chambers):
+        acc += arc + 4 + int(rng.integers(0, arc // 5 + 1))
+        targets.append(acc)
+
+    placed, cursor = 0, 1
+    for target in targets:
+        while cursor < len(path) and costs.get(path[cursor], 0) < target:
+            cursor += 1
+        pocket = None
+        for index in range(cursor, len(path)):
+            for sign in (1, -1):
+                candidate = _pocket(path, index, side, radius, sign)
+                if candidate is None:
+                    continue
+                door, interior = candidate
+                cells = (door, *interior)
+                if any(not (0 <= c[0] < w and 0 <= c[1] < h)
+                       for c in cells):
+                    continue
+                # The pocket may touch the corridor at its door and
+                # nowhere else, or it opens a loop and the family stops
+                # being a chain of forced returns.
+                pocket_set = set(cells)
+                touching = {
+                    nb for c in cells for nb in base.neighbors(c)
+                    if nb not in pocket_set and nb in free
+                }
+                if len(touching) != 1:
+                    continue
+                pocket = (door, interior, index)
+                break
+            if pocket is not None:
+                break
+        if pocket is None:
+            break
+        door, interior, index = pocket
+        cursor = index + 1
+        for cell in interior:
+            cell_types.pop(cell, None)
+        cell_types[door] = DOOR
+        spec = door_cls(door, "open", tries=0)
+        doors[door] = spec
+        free.update((door, *interior))
+        features.append(feature_cls(
+            kind="chamber",
+            # The chamber's wall *is* the ambient mass the spiral was
+            # carved from, so it encloses nothing of its own: the
+            # pocket contributes no obstacle component to either
+            # reading, and both certify at b1 = 0.
+            cells=(), interior=tuple(sorted(interior)),
+            doors=(spec,),
+            meta={"components": 0, "door_cells": (door,),
+                  "corridors": (), "arc_actions": costs.get(door, 0)},
+        ))
+        placed += 1
+
+    if placed < n_chambers:
+        raise ModeError(
+            f"a {w}x{h} spiral of pitch {pitch} holds {placed} chambers "
+            f"spaced {arc} actions apart, not {n_chambers}"
+        )
+
+
+def spiral_side(n_chambers: int, arc: int, chamber_side: int = 5,
+                width: int = 1) -> int:
+    """The smallest world (to the nearest ten) whose spiral holds
+    ``n_chambers`` chambers spaced ``arc`` actions apart.
+
+    Derived rather than hand-tuned, so the registry can declare the two
+    numbers that define the family -- how many chambers and how far
+    apart -- and let the world size follow.
+    """
+    radius = max(0, (width - 1) // 2)
+    pitch = max(1, chamber_side - 2) + 2 * radius + 3
+    # Worst case: every gap draws its full slack, the pocket search
+    # walks past the target to the next straight run, and a wide
+    # corridor lets the agent cut every corner -- so ask for a third
+    # more corridor than the centreline arithmetic suggests.
+    needed = (4 * (n_chambers * (arc + arc // 5) + 4 * pitch)) // 3
+    side = 20
+    while side <= 2000:
+        costs = _action_costs(_spiral_path(side, side, pitch, radius))
+        if costs[-1] >= needed:
+            return side
+        side += 10
+    raise ModeError(
+        f"no practical world fits {n_chambers} chambers {arc} apart"
+    )

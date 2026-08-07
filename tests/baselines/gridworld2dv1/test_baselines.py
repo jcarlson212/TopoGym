@@ -534,3 +534,57 @@ def test_one_signal_for_the_whole_sweep():
     ])
     assert signal == "return"
     assert ranked[0]["lr"] == 1  # not the high-coverage one
+
+
+# -- per-instance adaptation -----------------------------------------
+
+def test_per_instance_adaptation_is_declared_and_off_by_default():
+    """Adapting inside a hold-out world is a different question from
+    transferring a fixed policy, so it has to be visible."""
+    from topogym.baselines.gridworld2dv1 import get_baseline
+
+    for name in ("random", "ppo", "go-explore-phase1"):
+        assert get_baseline(name)().adapts_per_instance is False
+
+    class Adaptive(RandomBaseline):
+        name = "adaptive"
+        adapts_per_instance = True
+
+    result = Adaptive(BaselineConfig(eval_episodes=1)).run(_splits(1))
+    assert result.config["adapts_per_instance"] is True
+
+
+def test_the_report_marks_an_adapting_method():
+    import pathlib
+    import tempfile
+
+    from topogym.baselines.gridworld2dv1.report import write_benchmarks_md
+
+    payload = {
+        "aggregates": {"instances_evaluated": 1, "instances_solved": 1,
+                       "success_rate": 1.0, "median_steps_to_goal": 5.0,
+                       "median_steps_to_goal_ci": [4.0, 6.0],
+                       "mean_lifetime_coverage": 0.5, "efficiency": {},
+                       "per_slice": {}},
+        "config": {"adapts_per_instance": True},
+    }
+    with tempfile.TemporaryDirectory() as folder:
+        path = write_benchmarks_md({"adaptive": payload},
+                                   pathlib.Path(folder) / "B.md")
+        text = path.read_text()
+    assert "`adaptive †`" in text
+    assert "discarded with it" in text  # the fairness condition stated
+
+
+def test_evaluation_rebuilds_the_policy_per_instance():
+    """The property that makes per-instance adaptation fair: each
+    instance is handed a freshly built policy, so weights adapted on
+    one hold-out world cannot reach another."""
+    import inspect
+
+    from topogym.baselines.gridworld2dv1.evaluate import InstanceTask
+
+    source = inspect.getsource(InstanceTask.__call__)
+    assert "policy_factory" in source
+    # Built inside the call, per row -- not cached on the task.
+    assert "self._policy" not in source

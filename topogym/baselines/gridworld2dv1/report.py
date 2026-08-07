@@ -370,6 +370,14 @@ def write_benchmarks_md(
         "interquartile means come from",
         "[rliable](https://github.com/google-research/rliable).",
         "",
+        "A **†** marks a method that adapts *within* each hold-out",
+        "instance -- Go-Explore's phase 2 robustifies a trajectory in",
+        "the world that produced it. Every instance still starts from",
+        "the same frozen checkpoint and the adapted weights are",
+        "discarded with it, so nothing learned on one hold-out world",
+        "reaches another: this is online adaptation inside the stated",
+        "episode budget, not training on the hold-out.",
+        "",
         "## Headline",
         "",
         "| algorithm | success rate | median steps to goal [95% CI] | "
@@ -379,6 +387,8 @@ def write_benchmarks_md(
     for name, payload in sorted(results.items()):
         totals = payload.get("aggregates", {})
         efficiency = totals.get("efficiency", {})
+        if payload.get("config", {}).get("adapts_per_instance"):
+            name = f"{name} †"
         steps = _format_ci(totals.get("median_steps_to_goal"),
                            totals.get("median_steps_to_goal_ci"))
         eff = _format_ci(efficiency.get("iqm"), efficiency.get("iqm_ci"))

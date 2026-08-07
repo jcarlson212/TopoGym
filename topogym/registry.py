@@ -27,11 +27,29 @@ from __future__ import annotations
 import dataclasses
 
 from topogym.generation.config import TopoGenConfig2D
+from topogym.generation.modes import spiral_side
 from topogym.generation.rooms import SHAPE_CODES
+
+#: EpicChase: actions between consecutive chambers along the spiral, and
+#: the basis of the family's episode budget.
+_EPIC_ARC = 120
+
+#: Chamber counts EpicChase is registered at.
+_EPIC_CHAMBERS = (4, 8)
+
+#: EpicChase corridor width. Wide enough to move around in -- a
+#: width-1 spiral is a queue, not a hallway -- and odd, so the arms
+#: stay centred on the path the spacing is measured along.
+_EPIC_WIDTH = 3
 
 #: Chamber/decoy outer side used across the v1 registry: fixed so world
 #: size (dilution) is never confounded with room size.
 _SIDE = 8
+
+#: EpicChase chambers are smaller: they hang inside the wall band
+#: between spiral arms, and every extra cell of chamber widens the
+#: whole spiral.
+_SIDE_EPIC = 5
 
 
 def _open_cfg(size: int, **kw) -> TopoGenConfig2D:
@@ -107,11 +125,32 @@ def _build_registry() -> dict:
         add(f"Maze-{size}", _open_cfg(
             size, style="maze", n_chambers=0,
         ))
+    # EpicChase: chambers an episode apart along one spiral corridor.
+    # Deliberately outside every benchmark roster (see benchmarks.json):
+    # it is a stress test for archive-based methods, not a graded task.
+    for k in _EPIC_CHAMBERS:
+        side = spiral_side(k, _EPIC_ARC, _SIDE_EPIC, _EPIC_WIDTH)
+        add(f"EpicChase{k}-{side}", _open_cfg(
+            side, style="spiral", n_chambers=k, n_decoys=0,
+            spiral_arc=_EPIC_ARC, spiral_width=_EPIC_WIDTH,
+            chamber_side=_SIDE_EPIC, start_placement="center",
+        ))
     return entries
 
 
 #: name -> frozen generator configuration (the registry itself).
 REGISTRY: dict = _build_registry()
+
+#: name -> extra ``gym.make`` kwargs. The horizon is normally derived
+#: from the layout (side length, or slack over the optimal path), but
+#: EpicChase inverts that: the budget is the *premise*, chosen so a
+#: single episode reaches exactly one chamber, and the world is sized
+#: to fit it.
+EXTRA_KWARGS: dict = {
+    name: {"max_steps": _EPIC_ARC + _EPIC_ARC // 2}
+    for name in REGISTRY
+    if name.startswith("EpicChase")
+}
 
 #: The Top slice of TopoGym-v1: registry name -> topology.
 TOP_TOPOLOGIES = {
@@ -197,6 +236,8 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
             extras += f"-ss{cfg.shell_spacing}"
     if cfg.style == "corridor":
         extras += f"-cl{cfg.corridor_len}-rm{cfg.rooms}"
+    if cfg.style == "spiral":
+        extras += f"-arc{cfg.spiral_arc}-sw{cfg.spiral_width}"
     if cfg.style == "maze" and getattr(cfg, "braid", 0):
         extras += f"-br{cfg.braid}"
 
@@ -227,7 +268,7 @@ def register_all() -> None:
         register(
             id=env_id,
             entry_point="topogym.envs:TopoGrid2DEnv",
-            kwargs={"config": cfg},
+            kwargs={"config": cfg, **EXTRA_KWARGS.get(name, {})},
         )
     for name, topology in TOP_TOPOLOGIES.items():
         env_id = f"TopoGym/{name}-50-v0"

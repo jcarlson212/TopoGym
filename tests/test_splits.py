@@ -120,11 +120,21 @@ def test_undeclared_family_is_in_no_benchmark():
     assert benchmarks.entry_for("Braid") is None
     # ...and it falls back to its own size rather than inventing a sweep.
     assert benchmarks.sizes_for("Braid", 50) == (50,)
-    # Every family the registry ships today *is* declared, so the roster
-    # and the registry are in sync as published.
+    # Every family the registry ships is either carried by a benchmark
+    # or declared standalone with a reason, so the roster and the
+    # registry stay in sync and a forgotten family still fails here.
     from topogym import registry
 
-    assert all(benchmarks.in_benchmark(n) for n in registry.REGISTRY)
+    stray = [n for n in registry.REGISTRY
+             if not benchmarks.in_benchmark(n)
+             and not benchmarks.is_standalone(n)]
+    assert not stray, (
+        f"{stray} is in no benchmark and not declared standalone -- add "
+        f"it to a roster version or to \"standalone\" in benchmarks.json"
+    )
+    assert benchmarks.is_standalone(
+        next(n for n in registry.REGISTRY if n.startswith("EpicChase")))
+    assert not benchmarks.is_standalone("Dilution-50")
 
 
 def test_difficulty_distributions_are_comparable():

@@ -377,13 +377,20 @@ def test_episode_length_is_predetermined():
 
 def test_every_registry_goal_is_reachable_with_buffer():
     """No environment may ship a goal the horizon cannot accommodate:
-    every layout leaves at least the slack factor of room."""
+    every layout leaves at least the slack factor of room.
+
+    EpicChase is the deliberate exception -- its goal is meant to sit
+    several episodes away -- and carries its own, stricter invariant in
+    ``test_epic_chase_*`` instead of an exemption on trust."""
     from topogym import registry
     from topogym.envs.core import HORIZON_SLACK
 
     for env_id in registry.registry_ids():
         env = gym.make(env_id, seed=0).unwrapped
         env.reset(seed=0)
+        if getattr(env.layout.metadata, "style", None) == "spiral":
+            env.close()
+            continue
         optimal = env.optimal_actions()
         if optimal is None:
             assert not env.goal_exists or env.layout.goal is None
@@ -546,3 +553,94 @@ def test_global_obs_observes_everything():
                    layout_seed=8).unwrapped
     _, info = env.reset(seed=0)
     assert info["known_components"] == 2
+
+
+# -- EpicChase (spiral style) -----------------------------------------
+
+def _epic_chambers(env):
+    """(chamber interior, arc distance in actions) outward from the
+    start, measured on the env rather than trusted from generation."""
+    rows = []
+    for f in env.layout.features:
+        if f.kind == "chamber":
+            door = f.meta["door_cells"][0]
+            rows.append((f.interior, env.actions_between(
+                env.layout.start, door)))
+    return sorted(rows, key=lambda r: r[1])
+
+
+def _epic_ids():
+    """Ids from the registry, not spelled out: the world size is derived
+    from the chamber count and spacing, so it moves when they do."""
+    from topogym import registry
+
+    return [f"TopoGym/{n}-v0" for n in sorted(registry.REGISTRY)
+            if n.startswith("EpicChase")]
+
+
+@pytest.mark.parametrize("env_id", _epic_ids())
+@pytest.mark.parametrize("seed", [0, 1, 7])
+def test_epic_chase_admits_exactly_one_new_chamber_per_episode(env_id, seed):
+    """The family's whole premise, checked in actions rather than cells.
+
+    One episode from the start must reach the first chamber and no
+    further; one episode resumed at chamber *i* must reach chamber
+    *i + 1* and no further. That is what makes the goal findable only
+    by chaining returns -- i.e. only with an archive."""
+    env = gym.make(env_id, seed=seed, teleport=True).unwrapped
+    env.reset(seed=seed)
+    budget = env._max_steps
+    chambers = _epic_chambers(env)
+    assert len(chambers) == int(env_id.split("EpicChase")[1].split("-")[0])
+
+    first = chambers[0][1]
+    assert first <= budget, f"chamber 1 unreachable: {first} > {budget}"
+    assert chambers[1][1] > budget, "a fresh episode reaches two chambers"
+
+    inside = [sorted(interior)[0] for interior, _ in chambers]
+    for here, nxt in zip(inside, inside[1:]):
+        hop = env.actions_between(here, nxt)
+        assert hop is not None and hop <= budget, (
+            f"cannot advance from one chamber to the next: {hop}")
+    for here, later in zip(inside, inside[2:]):
+        skip = env.actions_between(here, later)
+        assert skip is None or skip > budget, (
+            "one episode skips a chamber")
+    env.close()
+
+
+@pytest.mark.parametrize("seed", [0, 3, 11, 29])
+def test_epic_chase_is_a_forced_chain_not_a_dead_end(seed):
+    """Hard to reach is not the same as impossible: the goal always sits
+    in a chamber, and every chamber stays one hop from its neighbour."""
+    env = gym.make(_epic_ids()[0], seed=seed, teleport=True).unwrapped
+    env.reset(seed=seed)
+    interiors = {c for f in env.layout.features if f.kind == "chamber"
+                 for c in f.interior}
+    assert env.layout.goal in interiors
+    assert env.optimal_actions() is not None  # reachable, just not soon
+
+
+def test_epic_chase_is_not_in_any_benchmark():
+    """It is a stress test for archive methods, not a graded task, and
+    nothing may quietly fold it into a split."""
+    from topogym import benchmarks, registry
+
+    epic = [n for n in registry.REGISTRY if n.startswith("EpicChase")]
+    assert epic
+    for name in epic:
+        assert not benchmarks.in_benchmark(name), name
+
+
+def test_epic_chase_chambers_are_certified_pockets():
+    """The spiral is one simply-connected corridor; sealing the doors
+    is what splits the chambers off."""
+    from topogym import registry
+    from topogym.generation.generator import generate_2d
+
+    for seed in (0, 5):
+        name = _epic_ids()[0].split("/")[1].removesuffix("-v0")
+        layout = generate_2d(registry.REGISTRY[name], seed)
+        chambers = sum(f.kind == "chamber" for f in layout.features)
+        assert layout.metadata.betti_z2 == (1, 0, 0)
+        assert layout.metadata.betti_z2_sealed == (1 + chambers, 0, 0)

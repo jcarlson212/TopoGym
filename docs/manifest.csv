@@ -28,6 +28,8 @@ TopoGym/Bottleneck3-100-v0,GridWorld2D,Bottleneck,TG-GridWorld2D-S100-C0-D0-cs24
 TopoGym/Bottleneck6-100-v0,GridWorld2D,Bottleneck,TG-GridWorld2D-S100-C0-D0-cs24-ds8-sep2-shpSq-cl6-rm6-corridor-slip0-seed0,0,100,610,201,10000,3486,1 0 0,1 0 0,H0=Z; H1=0; H2=0
 TopoGym/Maze-50-v0,GridWorld2D,Maze,TG-GridWorld2D-S50-C0-D0-cs8-ds8-sep2-shpSq-maze-slip0-seed0,0,50,2030,674,2500,1151,1 0 0,1 0 0,H0=Z; H1=0; H2=0
 TopoGym/Maze-100-v0,GridWorld2D,Maze,TG-GridWorld2D-S100-C0-D0-cs8-ds8-sep2-shpSq-maze-slip0-seed0,0,100,6760,2251,10000,4801,1 0 0,1 0 0,H0=Z; H1=0; H2=0
+TopoGym/EpicChase4-90-v0,GridWorld2D,EpicChase,TG-GridWorld2D-S90-C4-D0-cs5-ds8-sep2-shpSq-arc120-sw3-sc-spiral-slip0-seed0,0,90,180,151,8100,2935,1 0 0,5 0 0,H0=Z; H1=0; H2=0
+TopoGym/EpicChase8-120-v0,GridWorld2D,EpicChase,TG-GridWorld2D-S120-C8-D0-cs5-ds8-sep2-shpSq-arc120-sw3-sc-spiral-slip0-seed0,0,120,180,937,14400,5468,1 0 0,9 0 0,H0=Z; H1=0; H2=0
 TopoGym/TopPlane-50-v0,Top,TopPlane,TG-Top-TopPlane-50-seed0,0,50,170,54,2500,2392,1 0 0,5 4 0,H0=Z; H1=0; H2=0
 TopoGym/TopCylinder-50-v0,Top,TopCylinder,TG-Top-TopCylinder-50-seed0,0,50,170,54,2500,2392,1 1 0,5 5 0,H0=Z; H1=Z; H2=0
 TopoGym/TopMobius-50-v0,Top,TopMobius,TG-Top-TopMobius-50-seed0,0,50,170,54,2500,2392,1 1 0,5 5 0,H0=Z; H1=Z; H2=0

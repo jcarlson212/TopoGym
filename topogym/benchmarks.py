@@ -79,6 +79,19 @@ BENCHMARKS: dict = _ROSTER["benchmarks"]
 #: The benchmark assumed when a caller names no version.
 DEFAULT_BENCHMARK: str = _ROSTER["default"]
 
+#: family -> why it is in no benchmark. The registry ships a few
+#: families that no roster carries; declaring them here separates "left
+#: out on purpose, for this stated reason" from "forgotten", which is
+#: the only way the sync check between roster and registry stays
+#: meaningful once deliberate omissions exist.
+STANDALONE: dict = _ROSTER.get("standalone", {})
+
+
+def is_standalone(name: str) -> bool:
+    """Whether ``name`` belongs to a family declared registry-only."""
+    family = family_of(name)
+    return any(family.startswith(k) for k in STANDALONE)
+
 
 def benchmark(version: str | None = None) -> dict:
     """The definition of a benchmark version."""

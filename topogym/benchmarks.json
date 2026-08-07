@@ -17,8 +17,17 @@
     "Family keys are matched against topogym.benchmarks.family_of by longest",
     "prefix, so 'Shape' covers ShapeSq/ShapeCi/... and 'ChamberCount' wins",
     "over 'Chambers' for ChamberCount4. A size of 0 means the family is not",
-    "size-parameterized: its builder fixes the geometry and it appears once."
+    "size-parameterized: its builder fixes the geometry and it appears once.",
+    "",
+    "\"standalone\" is the other half of that promise: families the",
+    "registry ships on purpose without any benchmark carrying them.",
+    "Listing one here is a deliberate act with a stated reason, so",
+    "that *forgetting* to declare a new family still fails loudly",
+    "while an intentional omission does not."
   ],
+  "standalone": {
+    "EpicChase": "Chambers sit a full episode apart along one spiral corridor, so no single episode can reach the goal. It grades archive-based methods rather than policies, and scores incomparably to the graded families -- a stress test, kept out of every roster on purpose."
+  },
   "default": "gridworld2d-v1",
   "benchmarks": {
     "gridworld2d-v1": {
@@ -26,35 +35,159 @@
       "frozen": true,
       "extrapolation_train_max": 100,
       "families": {
-        "Dilution":     {"slice": "GridWorld2D", "sizes": [50, 200]},
-        "Chambers":     {"slice": "GridWorld2D", "sizes": [50, 100, 200, 400]},
-        "ChamberCount": {"slice": "GridWorld2D", "sizes": [100, 200]},
-        "Decoys":       {"slice": "GridWorld2D", "sizes": [50, 100]},
-        "Shape":        {"slice": "GridWorld2D", "sizes": [50, 100]},
-        "Nested":       {"slice": "GridWorld2D", "sizes": [50, 100]},
-        "Maze":         {"slice": "GridWorld2D", "sizes": [50, 100]},
-        "GiveUp":       {"slice": "GridWorld2D", "sizes": [50, 100],
-                         "held_out": true},
-        "Bottleneck":   {"slice": "GridWorld2D", "sizes": [100, 200],
-                         "held_out": true},
-
-        "TopPlane":     {"slice": "Top", "sizes": [50]},
-        "TopCylinder":  {"slice": "Top", "sizes": [50]},
-        "TopMobius":    {"slice": "Top", "sizes": [50]},
-        "TopTorus":     {"slice": "Top", "sizes": [50]},
-        "TopKlein":     {"slice": "Top", "sizes": [50]},
-        "TopRP2":       {"slice": "Top", "sizes": [50]},
-
-        "IceShip":               {"slice": "Texture", "sizes": [0]},
-        "Ladders":               {"slice": "Texture", "sizes": [0]},
-        "BankRobber":            {"slice": "Texture", "sizes": [0]},
-        "DontFall":              {"slice": "Texture", "sizes": [0]},
-        "ClownChase":            {"slice": "Texture", "sizes": [0]},
-        "EnvironmentalIceShip":  {"slice": "Texture", "sizes": [0]},
-        "SpaceWarp":             {"slice": "Texture", "sizes": [0],
-                                  "held_out": true},
-        "SearchRescue":          {"slice": "Texture", "sizes": [0],
-                                  "held_out": true}
+        "Dilution": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            50,
+            200
+          ]
+        },
+        "Chambers": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            50,
+            100,
+            200,
+            400
+          ]
+        },
+        "ChamberCount": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            100,
+            200
+          ]
+        },
+        "Decoys": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            50,
+            100
+          ]
+        },
+        "Shape": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            50,
+            100
+          ]
+        },
+        "Nested": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            50,
+            100
+          ]
+        },
+        "Maze": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            50,
+            100
+          ]
+        },
+        "GiveUp": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            50,
+            100
+          ],
+          "held_out": true
+        },
+        "Bottleneck": {
+          "slice": "GridWorld2D",
+          "sizes": [
+            100,
+            200
+          ],
+          "held_out": true
+        },
+        "TopPlane": {
+          "slice": "Top",
+          "sizes": [
+            50
+          ]
+        },
+        "TopCylinder": {
+          "slice": "Top",
+          "sizes": [
+            50
+          ]
+        },
+        "TopMobius": {
+          "slice": "Top",
+          "sizes": [
+            50
+          ]
+        },
+        "TopTorus": {
+          "slice": "Top",
+          "sizes": [
+            50
+          ]
+        },
+        "TopKlein": {
+          "slice": "Top",
+          "sizes": [
+            50
+          ]
+        },
+        "TopRP2": {
+          "slice": "Top",
+          "sizes": [
+            50
+          ]
+        },
+        "IceShip": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ]
+        },
+        "Ladders": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ]
+        },
+        "BankRobber": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ]
+        },
+        "DontFall": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ]
+        },
+        "ClownChase": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ]
+        },
+        "EnvironmentalIceShip": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ]
+        },
+        "SpaceWarp": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ],
+          "held_out": true
+        },
+        "SearchRescue": {
+          "slice": "Texture",
+          "sizes": [
+            0
+          ],
+          "held_out": true
+        }
       }
     }
   }

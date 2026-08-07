@@ -27,7 +27,8 @@ class TopoGenConfig2D:
     #: "rooms" (the spec's "open" mode: features in a free field),
     #: "nested" (concentric shells), "corridor" (tree of rooms joined by
     #: width-1 corridors), "maze" (perfect maze, optionally braided),
-    #: "zigzag" (serpentine control).
+    #: "zigzag" (serpentine control), "spiral" (one long corridor with
+    #: chambers an episode apart).
     style: str = "rooms"
 
     # -- undirected features ------------------------------------------------
@@ -76,6 +77,13 @@ class TopoGenConfig2D:
     # -- corridor style --------------------------------------------------------
     rooms: int = 6  # rooms in the tree
     corridor_len: int = 3  # width-1 corridor length between rooms
+
+    # -- spiral style (EpicChase) -----------------------------------------
+    spiral_arc: int = 0  # actions between consecutive chambers along the
+    # corridor; also the episode budget the family is registered with, so
+    # one episode reaches exactly one chamber
+    spiral_width: int = 3  # corridor width in cells (odd; the arms widen
+    # about their centreline, and the arm pitch grows to match)
 
     # -- maze style ------------------------------------------------------------
     braid: float = 0.0  # fraction of loop-opening candidates to open; each

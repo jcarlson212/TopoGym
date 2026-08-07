@@ -221,6 +221,32 @@ class Baseline(abc.ABC):
     #: Short identifier used in filenames, plots, and result JSON.
     name: str = "baseline"
 
+    #: Whether the method adapts *within* a hold-out instance.
+    #:
+    #: Almost always ``False``: a policy is fitted on ``train`` and the
+    #: hold-out measures whether it transfers. Go-Explore's phase 2 is
+    #: the exception the paper describes -- it robustifies a trajectory
+    #: in the world that produced it, so it improves per world rather
+    #: than transferring a fixed policy.
+    #:
+    #: The rule is asymmetric by split, and that asymmetry is the whole
+    #: basis of the claim:
+    #:
+    #: - On ``train``, robustification updates the shared weights. One
+    #:   policy accumulates across every training world, and what it
+    #:   becomes is the checkpoint.
+    #: - On ``test``, every instance starts from that same frozen
+    #:   checkpoint and its adapted weights are discarded with it.
+    #:   Nothing learned on one hold-out world may reach another.
+    #:
+    #: So the hold-out still measures what the checkpoint transfers,
+    #: plus what the method can do online inside the stated episode
+    #: budget -- not what it could learn by training on the hold-out.
+    #: Declaring it puts the distinction in the result JSON and the
+    #: report rather than leaving a reader to infer it from a
+    #: suspiciously good number.
+    adapts_per_instance: bool = False
+
     #: Which splits feed hyperparameter selection. Only ``test`` is
     #: constrained, so a method that fits a selection strategy rather
     #: than a policy may pool everything else -- it declares that here
@@ -383,7 +409,8 @@ class Baseline(abc.ABC):
         return BaselineResult(
             algorithm=self.name,
             config={**self.config.to_dict(),
-                    "env_options": self.env_options()},
+                    "env_options": self.env_options(),
+                    "adapts_per_instance": self.adapts_per_instance},
             hyperparameters=hyperparameters.to_dict(),
             training=report.to_dict(),
             instances=instances,
