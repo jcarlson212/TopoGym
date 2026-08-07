@@ -144,9 +144,9 @@ family at once.
 
 ```bash
 pip install topogym[benchmarks]
-python scripts/run_baselines_gridworld_v1_benchmark.py \
+python scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py \
     --baselines random,ppo --group family --num-env-runners 16
-python scripts/run_baselines_gridworld_v1_benchmark.py --smoke   # pipeline check
+python scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py --smoke   # pipeline check
 ```
 
 Environment stepping is the bottleneck — the policy is a small MLP over
@@ -197,7 +197,7 @@ with open("docs/splits/train.csv") as f:
         # ... train; row["optimal_actions"] is the turn-aware optimum
 ```
 
-Regenerate with `python scripts/generate_splits.py`; browse any split
+Regenerate with `python scripts/benchmarks/generate_splits.py`; browse any split
 visually with `python scripts/browse.py --all --split test -n 4`.
 
 ## Play any environment yourself

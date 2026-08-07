@@ -1,0 +1,39 @@
+# A single Job on one spot node. Substituted by launch_gke.sh.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: topogym-benchmark
+spec:
+  # Spot nodes get preempted. A restart is cheap because the sweep
+  # publishes each baseline as it finishes and --only-missing resumes
+  # from what is already in the bucket, so a preemption costs at most
+  # the baseline in flight.
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: benchmark
+          image: IMAGE_PLACEHOLDER
+          args: ARGS_PLACEHOLDER
+          resources:
+            requests:
+              cpu: "60"        # leave headroom for the kubelet
+              memory: "200Gi"
+            limits:
+              cpu: "62"
+              memory: "230Gi"
+          volumeMounts:
+            - name: results
+              mountPath: /topogym/benchmarks
+      volumes:
+        # The bucket is mounted, so results survive preemption and are
+        # readable while the sweep is still running.
+        - name: results
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: BUCKET_PLACEHOLDER
+              mountOptions: "implicit-dirs"

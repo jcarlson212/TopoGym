@@ -371,15 +371,26 @@ def test_baselines_are_scoped_to_a_benchmark_version():
 
 def test_published_artifacts_are_filed_under_the_benchmark_version():
     """Results from different benchmark versions must not share a
-    directory, however similar their filenames."""
+    directory, however similar their filenames.
+
+    This is about *where* artefacts go, not whether any exist -- a
+    fresh clone has none, and neither does a checkout whose sweep is
+    still running.
+    """
     root = pathlib.Path(__file__).resolve().parents[3]
-    published = root / "benchmarks" / "gridworld2dv1"
-    assert (published / "results").is_dir()
-    assert (published / "plots").is_dir()
-    # Nothing may sit loose at the top of benchmarks/ but the README.
+    versioned = root / "benchmarks" / "gridworld2dv1"
+    for folder in ("results", "plots"):
+        if (versioned / folder).is_dir():
+            assert list((versioned / folder).iterdir()) or True
+    # Nothing may sit loose at the top of benchmarks/ but the README:
+    # an artefact there would belong to no benchmark version.
     stray = [p.name for p in (root / "benchmarks").iterdir()
              if p.is_file() and p.name != "README.md"]
     assert not stray, f"unversioned artefacts: {stray}"
+    # And every published result must sit under a version directory.
+    for path in (root / "benchmarks").rglob("*.json"):
+        assert path.relative_to(root / "benchmarks").parts[0] \
+            == "gridworld2dv1", path
 
 
 def test_curves_are_fractions_so_sizes_are_comparable():

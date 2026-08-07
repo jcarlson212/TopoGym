@@ -71,7 +71,7 @@ def load_split(split: str, path: pathlib.Path | None = None) -> list:
     manifest = (path or SPLIT_DIR) / f"{split}.csv"
     if not manifest.exists():
         raise FileNotFoundError(
-            f"{manifest} is missing; run scripts/generate_splits.py"
+            f"{manifest} is missing; run scripts/benchmarks/generate_splits.py"
         )
     with open(manifest, newline="") as f:
         return list(csv.DictReader(f))
