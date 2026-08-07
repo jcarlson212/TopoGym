@@ -121,6 +121,12 @@ def main() -> int:
                         help="cap instances per split")
     parser.add_argument("--episodes", type=int, default=50,
                         help="evaluation episodes per hold-out instance")
+    parser.add_argument("--tune-episodes", type=int, default=None,
+                        help="episodes per instance during "
+                             "hyperparameter search (default: the "
+                             "evaluation budget). Lower it when the "
+                             "grid is wide -- Go-Explore's successive "
+                             "halving runs 28 sweeps over every unit")
     parser.add_argument("--max-iterations", type=int, default=200)
     parser.add_argument("--record-gifs", action="store_true",
                         help="also record how the baseline explores a "
@@ -341,6 +347,7 @@ def _run_one(name: str, splits: dict, args, runners: int,
             seed=args.seed,
             max_iterations=args.max_iterations,
             eval_episodes=args.episodes,
+            tune_episodes=args.tune_episodes,
             val_every=1 if args.smoke else 5,
             patience=1 if args.smoke else 5,
             tune_iterations=1 if args.smoke else 2,

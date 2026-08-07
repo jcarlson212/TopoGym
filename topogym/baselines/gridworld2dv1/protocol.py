@@ -162,6 +162,50 @@ class BaselineResult:
         }
 
 
+#: What a tuning sweep may rank candidates by, best signal first.
+TUNING_SIGNALS = ("return", "coverage")
+
+
+def choose_tuning_signal(measurements: list) -> str:
+    """Which signal a sweep should rank by, decided once for all of it.
+
+    Return is the objective and is used whenever it carries
+    information. It often does not: with a sparse goal and batches
+    spread over many parallel environments, every candidate can score
+    zero -- or nothing at all, if no episode finished -- and picking a
+    winner from that is a coin flip dressed as a choice. Coverage is
+    the fallback, because a method that reached more of the world did
+    something a method that reached less did not.
+
+    Chosen once per sweep rather than per candidate: ranking one
+    candidate by return and another by coverage would compare
+    incomparable scales.
+    """
+    import math
+
+    informative = [
+        m.get("return") for m in measurements
+        if m.get("return") is not None
+        and not math.isnan(m.get("return"))
+        and m.get("return") != 0.0
+    ]
+    return "return" if informative else "coverage"
+
+
+def rank_candidates(measurements: list) -> tuple:
+    """``(ranked measurements, signal)``, best first."""
+    signal = choose_tuning_signal(measurements)
+    import math
+
+    def key(measurement):
+        value = measurement.get(signal)
+        if value is None or math.isnan(value):
+            return float("inf")
+        return -value
+
+    return sorted(measurements, key=key), signal
+
+
 class Baseline(abc.ABC):
     """A reference algorithm, learned or not.
 
