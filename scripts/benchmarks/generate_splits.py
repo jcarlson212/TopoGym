@@ -23,14 +23,14 @@ import dataclasses
 import pathlib
 import sys
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 import gymnasium as gym  # noqa: E402
 
 import topogym  # noqa: E402,F401
 from topogym import benchmarks, registry  # noqa: E402
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "docs" / "splits"
 
 FIELDS = (

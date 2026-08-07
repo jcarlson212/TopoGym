@@ -181,7 +181,7 @@ To change what a benchmark contains:
 ```bash
 # 1. edit the roster (a new version; do not edit a frozen one)
 # 2. regenerate the splits it defines -- deliberate work, run on demand
-python scripts/generate_splits.py
+python scripts/benchmarks/generate_splits.py
 # 3. republish the metadata over the new CSVs
 python scripts/generate_croissant.py
 ```

@@ -359,7 +359,7 @@ nothing.
 
 ```bash
 pip install topogym[benchmarks]
-python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
+python scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
 ```
 
 Actions are named constants rather than bare integers, so a policy can

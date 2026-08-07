@@ -32,7 +32,7 @@ repos:
         entry: python3 -m pytest tests/test_splits.py -q
         language: system
         pass_filenames: false
-        files: ^(topogym/benchmarks\.(json|py)|docs/splits/|scripts/generate_splits\.py)
+        files: ^(topogym/benchmarks\.(json|py)|docs/splits/|scripts/benchmarks/generate_splits.py)
       # Croissant metadata is generated from the registry, so it can
       # drift silently whenever generation or certification changes.
       # Scoped to the files that can actually change it -- it makes

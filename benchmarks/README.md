@@ -26,10 +26,13 @@ that, a Texture or Top result is only ever visible as one line in a
 breakdown table.
 
 The generated summary is [`../BENCHMARKS.md`](../BENCHMARKS.md), linked
-from the README. Regenerate everything with:
+from the README, and the scripts that produce all of it live in
+[`scripts/benchmarks/`](../scripts/benchmarks/README.md) — including
+`launch_gke.sh`, which runs the same sweep on a spot node. Regenerate
+everything with:
 
 ```bash
-python scripts/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
+python scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py --baselines random,ppo
 ```
 
 Run side effects — Ray logs, checkpoints, per-step traces — go to

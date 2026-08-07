@@ -24,7 +24,7 @@ import pathlib
 import shutil
 import sys
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 from topogym.baselines.gridworld2dv1 import (
     BASELINES,
@@ -44,7 +44,7 @@ from topogym.baselines.gridworld2dv1.report import (
     write_result,
 )
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 PUBLISHED = ROOT / "benchmarks"
 RUNS = ROOT / "runs"
 SPLITS = ("tune", "train", "val", "test")

@@ -108,7 +108,7 @@ def test_frozen_benchmark_roster_matches_published_splits():
         missing = declared - set(resolved.values())
         assert not missing, (
             f"{version} declares {sorted(missing)} but no split carries "
-            f"them -- run python scripts/generate_splits.py"
+            f"them -- run python scripts/benchmarks/generate_splits.py"
         )
 
 
