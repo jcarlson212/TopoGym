@@ -72,10 +72,30 @@ __all__ = ["TrajectoryArchive", "GoExplorePhase12Baseline"]
 #: start point moves further back. The paper's "a certain fraction".
 SUCCESS_THRESHOLD = 0.6
 
-#: Cells the start point retreats by when a stage succeeds. One cell at
-#: a time would be faithful and unaffordable; a stride keeps the number
-#: of stages proportional to the trajectory rather than equal to it.
+#: Cells the start point retreats by when a stage passes at exactly the
+#: threshold. One cell at a time would be faithful and unaffordable; a
+#: stride keeps the number of stages proportional to the trajectory
+#: rather than equal to it. The actual retreat scales with how easily
+#: the stage passed -- Salimans and Chen's success counter "used to
+#: decrease the central starting point at the right speed".
 BACKUP_STRIDE = 8
+
+#: The window ``{tau - D, ..., tau}`` each rollout samples its local
+#: start from. Sampling rather than fixing the restart cell is the
+#: diversity term of Algorithm 1; without it a stage learns one
+#: position rather than a stretch of the trajectory.
+LOCAL_START_WINDOW = 4
+
+#: Salimans and Chen also prime the policy by replaying K demonstration
+#: actions before each rollout, with those steps masked out of the
+#: gradient. That exists to initialise a *recurrent* policy's hidden
+#: state so the agent is not dropped mid-trajectory with no memory of
+#: how it got there. Every baseline here is feedforward over a Markov
+#: observation, so there is no hidden state to prime and the mechanism
+#: is a no-op by construction -- not an omission, but it stops being
+#: one the moment a recurrent module appears, which is why it is
+#: written down rather than left silent.
+DEMONSTRATION_PRIMING_STEPS = 0
 
 
 class TrajectoryArchive(LayoutArchive):
@@ -110,6 +130,13 @@ class TrajectoryArchive(LayoutArchive):
         if chosen_from is not None:
             entry = self.cells.get(tuple(chosen_from))
             prefix = tuple(entry.get("trajectory") or ()) if entry else ()
+            # The resumed episode starts *at* the cell the prefix ends
+            # on -- restoring to a point of a trajectory is being at
+            # that point, not stepping to it again -- so the join must
+            # not double the cell.
+            if (prefix and trajectory
+                    and prefix[-1] == tuple(trajectory[0])):
+                prefix = prefix[:-1]
         seen: set = set()
         for index, cell in enumerate(trajectory):
             cell = tuple(cell)
@@ -310,38 +337,54 @@ class GoExplorePhase12Baseline(PPOBaseline):
             indices.append(0)  # always finish from the true start
         return [demonstration[i] for i in indices]
 
+    def local_starts(self, demonstration: tuple, index: int) -> list:
+        """The window ``{tau - D, ..., tau}`` a stage samples from.
+
+        Every cell in it is part of the demonstration, so every one is
+        a legal reset target; the window only ever reaches backward, so
+        it never leaks a position the curriculum has not got to yet.
+        """
+        low = max(0, index - LOCAL_START_WINDOW)
+        return list(demonstration[low:index + 1])
+
     def robustify(self, rows: list, demonstration: tuple, values: dict,
                   iterations: int, seed: int = 0) -> dict:
         """Train PPO backward along ``demonstration``.
 
-        One stage per restart point. A stage ends when the agent
-        reaches the goal in :data:`SUCCESS_THRESHOLD` of its rollouts
-        -- the paper's "same or better reward than the example
-        trajectory" under a sparse goal -- or when its iteration budget
-        runs out, which is recorded rather than hidden.
+        One stage per central restart point ``tau``, each sampling its
+        local start from :meth:`local_starts`. A stage ends when the
+        agent reaches the goal in :data:`SUCCESS_THRESHOLD` of its
+        rollouts -- the paper's "same or better reward than the example
+        trajectory", which under a sparse goal is simply reaching it --
+        and ``tau`` then retreats at a speed set by how easily it
+        passed. A stage that exhausts its iteration budget stops the
+        curriculum and says so, rather than backing up to a position
+        the agent has not earned.
         """
         from topogym.baselines.gridworld2dv1.concrete_baselines.ppo import (
             mean_return,
         )
 
-        stages = self.backward_stages(demonstration)
-        if not stages:
+        if not demonstration:
             return {"stages": [], "reached_start": False,
                     "why": "no goal trajectory to robustify"}
 
-        per_stage = max(1, iterations // len(stages))
+        planned = max(1, len(self.backward_stages(demonstration)))
+        per_stage = max(1, iterations // planned)
         log: list = []
+        tau = len(demonstration) - 1
         reached_start = False
-        for index, start_cell in enumerate(stages):
-            config = self.algorithm_config(rows, values, seed)
-            config.env_config["start_cell"] = tuple(start_cell)
+        stage = 0
+        while tau >= 0:
+            window = self.local_starts(demonstration, tau)
+            config = self.algorithm_config(rows, values, seed + stage)
+            config.env_config["start_cells"] = [tuple(c) for c in window]
             config.env_config["demonstration"] = tuple(demonstration)
             algorithm = config.build_algo()
             success, iteration = 0.0, 0
             try:
                 for iteration in range(1, per_stage + 1):
-                    result = algorithm.train()
-                    success = mean_return(result)
+                    success = mean_return(algorithm.train())
                     if success >= SUCCESS_THRESHOLD:
                         break
                 self._algorithm = algorithm
@@ -351,23 +394,36 @@ class GoExplorePhase12Baseline(PPOBaseline):
                     algorithm.stop()
             passed = success >= SUCCESS_THRESHOLD
             log.append({
-                "stage": index, "start_cell": list(start_cell),
-                "cells_from_goal": len(demonstration) - 1
-                - (len(demonstration) - 1 - index * BACKUP_STRIDE),
+                "stage": stage, "tau": tau,
+                "start_window": [list(c) for c in window],
+                "cells_from_goal": len(demonstration) - 1 - tau,
                 "iterations": iteration, "success_rate": success,
                 "passed": passed,
             })
             logger.info(
-                "[%s] phase 2 stage %d/%d from %s: %.2f after %d "
-                "iterations (%s)", self.name, index + 1, len(stages),
-                start_cell, success, iteration,
+                "[%s] phase 2 stage %d at tau=%d (%d from the goal), "
+                "window of %d: %.2f after %d iterations (%s)",
+                self.name, stage + 1, tau, len(demonstration) - 1 - tau,
+                len(window), success, iteration,
                 "passed" if passed else "budget exhausted",
             )
-            reached_start = passed and index == len(stages) - 1
+            if not passed:
+                # Backing up to a position the agent has not earned
+                # would report a curriculum it never completed.
+                break
+            if tau == 0:
+                reached_start = True
+                break
+            # "Decrease the central starting point at the right speed":
+            # an easy pass earns a longer retreat, a bare one a shorter.
+            retreat = max(1, round(BACKUP_STRIDE * success
+                                   / max(SUCCESS_THRESHOLD, 1e-9)))
+            tau = max(0, tau - min(retreat, 4 * BACKUP_STRIDE))
+            stage += 1
         return {"stages": log, "reached_start": reached_start,
                 "why": ("robustified all the way to the start"
                         if reached_start else
-                        "curriculum did not reach the layout's start")}
+                        "curriculum stopped before the layout's start")}
 
     # -- the protocol -------------------------------------------------
 

@@ -49,7 +49,15 @@ class SplitEnv(gym.Env):
         #: as the agent succeeds, one training stage per position, so
         #: it is fixed for the life of an env and a new stage builds a
         #: new config.
-        self.start_cell = config.get("start_cell")
+        #: One cell, or the window Salimans and Chen sample a local
+        #: start from. Sampling per episode is what keeps a stage from
+        #: overfitting to a single restart position.
+        self.start_cells = [
+            tuple(int(v) for v in cell)
+            for cell in (config.get("start_cells")
+                         or ([config["start_cell"]]
+                             if config.get("start_cell") else []))
+        ]
         if config.get("demonstration"):
             self.env_options["demonstration"] = tuple(
                 tuple(c) for c in config["demonstration"]
@@ -75,8 +83,9 @@ class SplitEnv(gym.Env):
         return self.rows[int(self._rng.integers(len(self.rows)))]
 
     def reset(self, *, seed=None, options=None):
-        if self.start_cell is not None and not options:
-            options = {"teleport": tuple(int(v) for v in self.start_cell)}
+        if self.start_cells and not options:
+            options = {"teleport": self.start_cells[
+                int(self._rng.integers(len(self.start_cells)))]}
         row = self._next_row()
         if self.env is not None and row is self.row:
             # Same world: keep the instance so its archive, lifetime
