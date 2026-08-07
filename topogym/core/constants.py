@@ -89,6 +89,15 @@ OBS_WORMHOLE = 9  # a teleporter ("all wormholes are purple"): visibly a
 
 OBS_MAX = 9
 
+#: How many distinct observation codes exist, library-wide and
+#: constant across every slice. Size an embedding to *this*, never to
+#: the codes a particular training slice happened to contain: hazards
+#: (8) and wormholes (9) occur only in Texture worlds, so a policy
+#: trained on GridWorld2D meets them for the first time at evaluation.
+#: Every environment declares ``Box(0, OBS_MAX, ...)`` regardless of
+#: slice, so sizing from the observation space is also safe.
+OBS_CODE_COUNT = OBS_MAX + 1
+
 # Universal observation vector (obs_mode="vector"): the agent's integer
 # cell coordinates (x, y) followed by a texture block t in [0, 1]^16.
 # Slots 0-3 are reserved library-wide for directional blocker adjacency
