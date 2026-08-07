@@ -270,6 +270,12 @@ class Baseline(abc.ABC):
     #: that want the universal (x, y) + texture vector set "vector".
     obs_mode: str | None = None
 
+    #: Candidate hyperparameter settings, searched by
+    #: :meth:`select_hyperparameters`. Empty for methods with nothing
+    #: to tune; the first entry is the declared default (see
+    #: :meth:`defaults`).
+    tune_grid: tuple = ()
+
     #: Reward mode, or None for the environment default (``sparse``:
     #: +1 on reaching the goal). Declared here so a method that wants a
     #: denser signal has to say so, and the choice is recorded with the
@@ -289,6 +295,39 @@ class Baseline(abc.ABC):
         its choice, and never including the hold-out.
         """
         return Hyperparameters()
+
+    def default_hyperparameters(self) -> dict:
+        """Values to use when no tuning sweep is available.
+
+        A single-layout study has no hold-out to tune against, so it
+        needs a stated starting point rather than an implicit one. The
+        first entry of :attr:`tune_grid` is that point by convention;
+        override to declare something else.
+
+        (Not ``defaults`` -- concrete baselines already use that name
+        for their fixed, un-searched settings.)
+        """
+        return dict(self.tune_grid[0]) if self.tune_grid else {}
+
+    def single_layout_train_test_run(self, row: dict, **kwargs):
+        """Learn on one layout for a step budget, then evaluate frozen.
+
+        The benchmark's question is whether a policy *transfers*; this
+        one is how much of a single world a method uncovers given a
+        long budget in it. Both matter, and they are not the same
+        question -- Go-Explore is a single-game algorithm that the
+        transfer protocol flatters least.
+
+        The default implementation runs the protocol's own pieces
+        (:meth:`fit`, then a frozen evaluation) and suits every method
+        that learns one policy. Override when the method's shape
+        differs -- Go-Explore's phase 1 and phase 2 do.
+        """
+        from topogym.baselines.gridworld2dv1.single_layout import (
+            run_single_layout,
+        )
+
+        return run_single_layout(self, row, **kwargs)
 
     @abc.abstractmethod
     def fit(self, train_rows: list, val_rows: list,

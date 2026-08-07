@@ -2,6 +2,7 @@
 # Run the TopoGym benchmark on one 64-vCPU spot node in GKE.
 #
 #   ./scripts/benchmarks/launch_gke.sh --project my-proj --bucket my-bkt
+#   ./scripts/benchmarks/launch_gke.sh ... --single-layout my-bkt
 #   ./scripts/benchmarks/launch_gke.sh ... --dry-run     # print, run nothing
 #
 # It reuses the same entry point as a local run, so the cloud result is
@@ -13,7 +14,9 @@ set -euo pipefail
 
 PROJECT=""; BUCKET=""; ZONE="us-central1-a"; CLUSTER="topogym-bench"
 MACHINE="n2-standard-64"; DRY_RUN=0; TEARDOWN=0
-BENCH_ARGS='["--baselines","all","--only-missing","--keep-going","--group","all","--episodes","100","--tune-episodes","25","--max-iterations","150","--num-env-runners","56","--envs-per-runner","4","--eval-workers","56","--record-gifs"]'
+SWEEP='scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py'
+SINGLE='scripts/benchmarks/run_single_layout.py'
+BENCH_ARGS='["'"$SWEEP"'","--baselines","all","--only-missing","--keep-going","--group","all","--episodes","100","--tune-episodes","25","--max-iterations","150","--num-env-runners","56","--envs-per-runner","4","--eval-workers","56","--record-gifs"]'
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -23,13 +26,20 @@ while [[ $# -gt 0 ]]; do
     --cluster) CLUSTER="$2"; shift 2 ;;
     --machine) MACHINE="$2"; shift 2 ;;
     --args) BENCH_ARGS="$2"; shift 2 ;;
+    # The single-layout study: one world, a million steps per method.
+    # Everything -- results, plots, telemetry -- goes straight to the
+    # bucket, because a pod's disk does not outlive the pod.
+    --single-layout)
+      BENCH_ARGS='["'"$SINGLE"'","--baselines","all","--only-missing","--keep-going","--steps","1000000","--eval-episodes","100","--num-env-runners","56","--envs-per-runner","4","--artifacts","gs://'"$2"'/single_layout"]'
+      shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --teardown) TEARDOWN=1; shift ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
 [[ -n "$PROJECT" && -n "$BUCKET" ]] || {
-  echo "usage: $0 --project PROJECT --bucket BUCKET [--dry-run]" >&2
+  echo "usage: $0 --project PROJECT --bucket BUCKET" \
+       "[--single-layout BUCKET] [--dry-run]" >&2
   exit 2
 }
 

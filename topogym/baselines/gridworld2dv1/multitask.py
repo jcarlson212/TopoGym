@@ -43,6 +43,18 @@ class SplitEnv(gym.Env):
         #: Applied to every instance, so training and evaluation agree
         #: on the action and observation spaces.
         self.env_options = dict(config.get("env_options") or {})
+        #: Go-Explore phase 2: every episode restarts partway along a
+        #: demonstration trajectory rather than at the layout's start.
+        #: The Backward Algorithm walks this cell back toward the start
+        #: as the agent succeeds, one training stage per position, so
+        #: it is fixed for the life of an env and a new stage builds a
+        #: new config.
+        self.start_cell = config.get("start_cell")
+        if config.get("demonstration"):
+            self.env_options["demonstration"] = tuple(
+                tuple(c) for c in config["demonstration"]
+            )
+            self.env_options["teleport"] = True
         probe = make_instance(self.rows[0], **self.env_options)
         self.observation_space = probe.observation_space
         self.action_space = probe.action_space
@@ -63,6 +75,8 @@ class SplitEnv(gym.Env):
         return self.rows[int(self._rng.integers(len(self.rows)))]
 
     def reset(self, *, seed=None, options=None):
+        if self.start_cell is not None and not options:
+            options = {"teleport": tuple(int(v) for v in self.start_cell)}
         row = self._next_row()
         if self.env is not None and row is self.row:
             # Same world: keep the instance so its archive, lifetime

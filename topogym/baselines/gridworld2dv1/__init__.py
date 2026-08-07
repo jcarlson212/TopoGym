@@ -43,6 +43,9 @@ BASELINES = {
         ":RNDBaseline",
     "go-explore-phase1":
         "topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1:GoExplorePhase1Baseline",
+    "go-explore-phase1and2":
+        "topogym.baselines.gridworld2dv1.concrete_baselines"
+        ".goexplore_phase1_and_phase2:GoExplorePhase12Baseline",
 }
 
 __all__ = [

@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from collections.abc import Callable
 
 import numpy as np
 
+from topogym.baselines.gridworld2dv1 import telemetry
 from topogym.baselines.gridworld2dv1.instances import instance_key, make_instance
 from topogym.stats import StatsRecorder
 
@@ -63,7 +65,9 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                       trace: bool = True, seed: int = 0,
                       track_topology: bool = False,
                       choose_reset: Callable | None = None,
-                      env_options: dict | None = None) -> dict:
+                      env_options: dict | None = None,
+                      telemetry=None, step_stride: int = 1,
+                      split: str | None = None) -> dict:
     """Run ``policy`` on one hold-out instance.
 
     ``policy(observation, env) -> action``. Returns the instance's
@@ -76,6 +80,13 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     (``steps_to_h0_holes`` / ``steps_to_h1_holes``). They run GUDHI on
     every step, so they are off by default and belong to focused
     studies rather than a full sweep.
+
+    ``telemetry`` is a :mod:`~topogym.baselines.gridworld2dv1.telemetry`
+    writer. Given one, the run also emits a row per environment step
+    (every ``step_stride``th) and a row per episode, which is what
+    makes questions nobody asked in advance answerable afterwards
+    without re-running. Off by default: the summary record below is
+    what the published result needs.
 
     Evaluation is single-process by construction: Ray parallelises
     training rollouts, but every reported number is produced here, in
@@ -92,6 +103,17 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
 
     interactions, chambers_seen, archive_resets = 0, set(), 0
     total_return = 0.0
+    keys = {
+        # The caller's label wins: a row knows which manifest split it
+        # came from, but only the caller knows which *phase* of a run
+        # this is, and the three tables have to agree on one answer or
+        # they cannot be joined.
+        "split": split or row.get("split") or "test",
+        "instance": instance_key(row), "family": row["family"],
+        "size": int(row["size"]), "seed": int(row["seed"]),
+    }
+    step_rows: list = []
+    episode_rows: list = []
     n_free = max(1, len(core.layout.free_cells) if core.layout else 1)
     n_chambers = 0
     info: dict = {}
@@ -112,13 +134,34 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
             n_chambers = sum(1 for f in core.layout.features
                              if f.kind == "chamber")
         reached, step = None, 0
+        episode_return = 0.0
         while True:
-            obs, reward, terminated, truncated, info = env.step(
-                policy(obs, core)
-            )
+            action = policy(obs, core)
+            obs, reward, terminated, truncated, info = env.step(action)
             step += 1
             interactions += 1
             total_return += float(reward)
+            episode_return += float(reward)
+            if telemetry is not None and step % step_stride == 0:
+                cell = info["position"]
+                # Everything here is already computed by the step: the
+                # per-step table must not cost more than the stepping
+                # it records, or it changes what it measures.
+                step_rows.append({
+                    "episode": episode, "step": step,
+                    "interaction": interactions,
+                    "action": int(action),
+                    "x": int(cell[0]), "y": int(cell[1]),
+                    "facing": str(core._state.frame),
+                    "reward": float(reward),
+                    "terminated": bool(terminated),
+                    "truncated": bool(truncated),
+                    "new_cell": core.visit_counts.get(cell, 0) <= 1,
+                    "visit_count": core.visit_counts.get(cell, 0),
+                    "unique_states": len(core._ever_visited
+                                         | core._visited),
+                    "h0_components": info["known_components"],
+                })
             if reached is None and info.get("goal_reached"):
                 reached = step
             if trace and interactions % CURVE_STRIDE == 0:
@@ -144,6 +187,36 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                 break
         chambers_seen |= set(core.chamber_entry_steps)
         steps_to_goal.append(reached)
+        if telemetry is not None:
+            lifetime = core._ever_visited | core._visited
+            # One homology call per episode: what the agent has
+            # actually discovered by now, certified the same way the
+            # environment certifies itself.
+            observed = core.homology_stats("observed")
+            episode_rows.append({
+                "episode": episode, "length": step,
+                "interactions": interactions,
+                "episode_return": episode_return,
+                "steps_to_goal": reached,
+                "reached_goal": reached is not None,
+                "episode_coverage": len(core._visited) / n_free,
+                "lifetime_coverage": len(lifetime) / n_free,
+                "unique_states": len(lifetime),
+                "visit_entropy": info.get("visitation_entropy"),
+                "chambers_entered": len(chambers_seen),
+                "chambers_total": n_chambers,
+                "decoys_entered": _decoys_found(core, lifetime),
+                "decoys_total": sum(1 for f in core.layout.features
+                                    if f.kind == "decoy"),
+                "observed_h0": observed.h0,
+                "observed_h1": observed.h1,
+                "observed_frac": info.get("observed_frac"),
+                "archive_reset": target is not None,
+                "reset_cell": str(target) if target else None,
+            })
+            telemetry.add_steps(step_rows, **keys)
+            telemetry.add_episodes(episode_rows, **keys)
+            step_rows, episode_rows = [], []
 
     import dataclasses
 
@@ -200,6 +273,24 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     return record
 
 
+def _decoys_found(core, lifetime: set) -> int:
+    """Decoys the agent has been adjacent to.
+
+    A decoy is solid -- there is nothing to enter -- so "found" can
+    only mean having stood next to it and seen that it encloses
+    nothing. That is exactly the moment a topological explorer should
+    stop being interested, which makes the count worth recording.
+    """
+    found = 0
+    for feature in core.layout.features:
+        if feature.kind != "decoy":
+            continue
+        if any(nb in lifetime for cell in feature.cells
+               for nb in core.layout.base.neighbors(cell)):
+            found += 1
+    return found
+
+
 def _mean_curve(points: list) -> list:
     """Average repeated (step, value) samples into one curve."""
     grouped: dict = {}
@@ -239,7 +330,10 @@ class InstanceTask:
     def __init__(self, policy_factory: Callable, episodes: int,
                  seed: int, track_topology: bool = False,
                  choose_reset_factory: Callable | None = None,
-                 env_options: dict | None = None, trace: bool = True):
+                 env_options: dict | None = None, trace: bool = True,
+                 telemetry_root: str | None = None,
+                 algorithm: str = "unknown", step_stride: int = 1,
+                 split: str | None = None):
         self.policy_factory = policy_factory
         self.episodes = episodes
         self.seed = seed
@@ -247,6 +341,12 @@ class InstanceTask:
         self.choose_reset_factory = choose_reset_factory
         self.env_options = env_options or {}
         self.trace = trace
+        # The *root*, not a writer: a writer holds a filesystem handle
+        # and does not survive pickling. Each worker opens its own.
+        self.telemetry_root = telemetry_root
+        self.algorithm = algorithm
+        self.step_stride = step_stride
+        self.split = split
 
     def __call__(self, row: dict) -> dict:
         # Rebuilt per instance, seeded from the instance: see
@@ -256,11 +356,26 @@ class InstanceTask:
         policy = _build(self.policy_factory, derived)
         choose_reset = (_build(self.choose_reset_factory, derived)
                         if self.choose_reset_factory else None)
-        return evaluate_instance(
-            row, policy, episodes=self.episodes, seed=self.seed,
-            trace=self.trace, track_topology=self.track_topology,
-            choose_reset=choose_reset, env_options=self.env_options,
-        )
+        key = instance_key(row)
+        with telemetry.open_writer(
+            self.telemetry_root, self.algorithm,
+            part_prefix=f"{re.sub(r'[^A-Za-z0-9_.-]', '_', key)}-",
+        ) as writer:  # noqa: E501
+            record = evaluate_instance(
+                row, policy, episodes=self.episodes, seed=self.seed,
+                trace=self.trace, track_topology=self.track_topology,
+                choose_reset=choose_reset, env_options=self.env_options,
+                telemetry=(writer if self.telemetry_root else None),
+                step_stride=self.step_stride, split=self.split,
+            )
+            if self.telemetry_root:
+                writer.add_instance(
+                    record,
+                    split=self.split or row.get("split") or "test",
+                    instance=key, family=row["family"],
+                    size=int(row["size"]), seed=int(row["seed"]),
+                )
+        return record
 
 
 def _build(factory: Callable, seed: int):
@@ -278,7 +393,10 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                    choose_reset_factory: Callable | None = None,
                    policy_factory: Callable | None = None,
                    workers: int = 1,
-                   env_options: dict | None = None) -> list:
+                   env_options: dict | None = None,
+                   telemetry_root: str | None = None,
+                   algorithm: str = "unknown", step_stride: int = 1,
+                   split: str | None = None) -> list:
     """Evaluate every hold-out instance, in manifest order.
 
     Instances are independent and separately seeded, so the loop
@@ -293,16 +411,33 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
 
         task = InstanceTask(policy_factory, episodes, seed,
                             track_topology, choose_reset_factory,
-                            env_options, trace)
+                            env_options, trace,
+                            telemetry_root=telemetry_root,
+                            algorithm=algorithm,
+                            step_stride=step_stride, split=split)
         return map_instances(task, rows, workers=workers)
 
     records = []
     for i, row in enumerate(rows):
-        records.append(evaluate_instance(
-            row, policy, episodes=episodes, seed=seed, trace=trace,
-            track_topology=track_topology, choose_reset=choose_reset,
-            env_options=env_options,
-        ))
+        key = instance_key(row)
+        with telemetry.open_writer(
+            telemetry_root, algorithm,
+            part_prefix=f"{re.sub(r'[^A-Za-z0-9_.-]', '_', key)}-",
+        ) as writer:
+            record = evaluate_instance(
+                row, policy, episodes=episodes, seed=seed, trace=trace,
+                track_topology=track_topology, choose_reset=choose_reset,
+                env_options=env_options,
+                telemetry=(writer if telemetry_root else None),
+                step_stride=step_stride, split=split,
+            )
+            if telemetry_root:
+                writer.add_instance(
+                    record, split=split or row.get("split") or "test",
+                    instance=key, family=row["family"],
+                    size=int(row["size"]), seed=int(row["seed"]),
+                )
+        records.append(record)
         if (i + 1) % 25 == 0:
             logger.info("evaluated %d/%d instances", i + 1, len(rows))
     return records

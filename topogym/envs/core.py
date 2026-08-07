@@ -93,7 +93,8 @@ class TopoEnvCore(gym.Env):
                  reward_mode: str = "sparse", goal: bool = True,
                  p_slip: float = 0.0,
                  complex: str = "cubical", max_steps: int | None = None,
-                 teleport: bool = False, procedural: bool = False,
+                 teleport: bool = False, demonstration=(),
+                 procedural: bool = False,
                  render_mode: str | None = None, reveal_hidden: bool = False,
                  **overrides):
         # The registry interface spells the layout seed simply "seed":
@@ -136,6 +137,22 @@ class TopoEnvCore(gym.Env):
         self.complex_backend = complex
         self._max_steps_cfg = max_steps
         self.teleport = teleport
+        #: Cells a reset may teleport to *without* the agent having
+        #: visited them. Empty by default, and deliberately awkward to
+        #: supply: the ordinary rule is that an archive can only return
+        #: you somewhere you have been, which is what stops teleport
+        #: resets from being free exploration.
+        #:
+        #: The exception the literature actually needs is Go-Explore's
+        #: phase 2, whose Backward Algorithm (Salimans and Chen)
+        #: restarts along a *demonstration* trajectory recorded in
+        #: phase 1 -- possibly in another process, so `_ever_visited`
+        #: knows nothing about it. These cells are not marked visited
+        #: and do not count toward coverage; they only become legal
+        #: reset targets.
+        self.demonstration = frozenset(
+            tuple(int(v) for v in cell) for cell in (demonstration or ())
+        )
         # Cells visited in earlier episodes on the current layout — the
         # only legal teleport-reset targets (archive methods restore to
         # states they have reached before).
@@ -200,7 +217,8 @@ class TopoEnvCore(gym.Env):
 
     def _resolve_start(self, options: dict | None) -> tuple:
         """The episode's start cell: the layout's, or a teleport target
-        (``reset(options={"teleport": (x, y)})``, previously visited)."""
+        (``reset(options={"teleport": (x, y)})``, previously visited or
+        named in :attr:`demonstration`)."""
         target = (options or {}).get("teleport")
         if target is None:
             return self.layout.start
@@ -210,10 +228,12 @@ class TopoEnvCore(gym.Env):
                 "teleport=True"
             )
         target = tuple(int(v) for v in target)
-        if target not in self._ever_visited:
+        if target not in self._ever_visited \
+                and target not in self.demonstration:
             raise ValueError(
                 f"teleport target {target} has not been visited in any "
-                "previous episode on this layout"
+                "previous episode on this layout, and is not part of "
+                "the supplied demonstration"
             )
         self._teleport_start = True
         return target

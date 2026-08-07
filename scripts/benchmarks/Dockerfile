@@ -23,5 +23,9 @@ RUN pip install --no-cache-dir --no-deps -e ".[benchmarks]" \
 # The splits are committed, so the container needs no generation step
 # and every task sees byte-identical instances.
 ENV PYTHONUNBUFFERED=1
-ENTRYPOINT ["python", \
-    "scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py"]
+# The script is the first argument rather than baked in, so the same
+# image runs the benchmark sweep and a single-layout study. Two images
+# would be two chances for them to drift apart.
+ENTRYPOINT ["python"]
+CMD ["scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py", \
+     "--baselines", "all", "--only-missing", "--keep-going"]
