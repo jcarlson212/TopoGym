@@ -309,6 +309,20 @@ from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
 from topogym import MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT  # fourway
 ```
 
+**Archives are keyed by world, not by process.** An archive belongs to
+a layout, so `topogym.baselines.gridworld2dv1.archive` identifies one
+by `layout_fingerprint(layout)` — a hash of the cell types, doors,
+start, goal and dynamics — rather than by object reference (which does
+not survive a process boundary) or registry id (which several
+instances share). `ArchiveService` holds one `LayoutArchive` per
+fingerprint and answers `update_and_select` in a single call, so the
+cost is one round trip per *episode*, not per step;
+`remote_archive(ServiceClass)` turns it into a Ray actor, which is how
+several workers on the same world contribute to one archive. Both
+classes are plain Python and subclassable — phase 2 of Go-Explore
+needs entries that carry the trajectory to each cell, which is an
+overridden `new_entry` and an `archive_class`, not a fork.
+
 **Observation codes are a fixed contract.** There are
 `topogym.OBS_CODE_COUNT` (= `OBS_MAX + 1` = 10) of them, and every
 environment declares `Box(0, OBS_MAX, ...)` whatever slice it belongs

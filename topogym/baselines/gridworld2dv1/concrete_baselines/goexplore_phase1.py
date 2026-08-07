@@ -47,6 +47,13 @@ from collections.abc import Callable
 
 import numpy as np
 
+from topogym.baselines.gridworld2dv1.archive import (
+    ATTRIBUTES,
+    DEFAULTS,
+)
+from topogym.baselines.gridworld2dv1.archive import (
+    LayoutArchive as Archive,
+)
 from topogym.baselines.gridworld2dv1.protocol import (
     Baseline,
     Hyperparameters,
@@ -55,97 +62,8 @@ from topogym.baselines.gridworld2dv1.protocol import (
 
 logger = logging.getLogger("topogym")
 
-#: The three counted attributes of equation 1, in the paper's words:
-#: "the number of times a cell has already been chosen", "the number
-#: of times a cell was visited at any point during the exploration
-#: phase", and "the number of times a cell has been chosen since
-#: exploration from it last produced the discovery of a new or better
-#: cell".
-ATTRIBUTES = ("chosen", "seen", "chosen_since_new")
-
-#: Starting values. ``eps1`` and ``eps2`` are the paper's own
-#: (arXiv:1901.10995, A.5: "In our implementation, eps1 = 0.001 and
-#: eps2 = 0.00001, which we chose after preliminary experiments showed
-#: that they worked well"). The weights and power are *not* the
-#: paper's -- theirs were grid-searched per Atari game and are
-#: tabulated in A.6 -- so these are neutral starting points that the
-#: tuning sweep replaces.
-DEFAULTS = {
-    "eps1": 0.001,     # A.5: prevents division by zero
-    "eps2": 0.00001,   # A.5: keeps every cell reachable by selection
-    "w_a": 1.0,        # per-attribute weight, searched here
-    "p_a": 0.5,        # per-attribute power, searched here
-    "w_n": 1.0,        # neighbour weight, searched here
-}
-
-
-class Archive:
-    """Cells the agent has stood on, with the counts A.5 scores on.
-
-    ``neighbors`` is the *world's* geometry -- ``base.neighbors``, which
-    honours seam identifications, so a cell on a Klein bottle's edge
-    has the neighbours the surface says it has. It is a property of the
-    world rather than of a query, hence a constructor argument: what
-    equation 2 asks is whether each of those adjacent positions is in
-    the archive, not what the archive contains near them.
-    """
-
-    def __init__(self, params: dict, seed: int = 0,
-                 neighbors: Callable | None = None):
-        self.params = {**DEFAULTS, **params}
-        self.rng = np.random.default_rng(seed)
-        self.neighbors = neighbors or (lambda cell: ())
-        self.cells: dict = {}
-
-    def observe(self, visited, chosen_from=None) -> int:
-        """Fold a finished episode into the archive.
-
-        Returns how many cells were new. Exploring from ``chosen_from``
-        having produced something new resets that cell's
-        ``chosen_since_new``, which is what the attribute means.
-        """
-        fresh = 0
-        for cell in visited:
-            entry = self.cells.get(cell)
-            if entry is None:
-                self.cells[cell] = {"chosen": 0, "seen": 1,
-                                    "chosen_since_new": 0}
-                fresh += 1
-            else:
-                entry["seen"] += 1
-        if fresh and chosen_from in self.cells:
-            self.cells[chosen_from]["chosen_since_new"] = 0
-        return fresh
-
-    def score(self, cell: tuple) -> float:
-        """CellScore(c) -- equations 1, 2 and 4 with LevelWeight = 1."""
-        entry = self.cells[cell]
-        params = self.params
-        total = 0.0
-        for attribute in ATTRIBUTES:
-            value = entry[attribute]
-            total += params["w_a"] * (
-                1.0 / (value + params["eps1"])
-            ) ** params["p_a"] + params["eps2"]
-        for neighbor in self.neighbors(cell):
-            # HasNeighbor(c, n): is that adjacent position archived?
-            if neighbor not in self.cells:
-                total += params["w_n"]  # equation 2
-        return total + 1.0  # equation 4; strictly positive
-
-    def select(self):
-        """Draw a cell with probability proportional to its score."""
-        if not self.cells:
-            return None
-        cells = list(self.cells)
-        scores = np.array([self.score(c) for c in cells], dtype=float)
-        probabilities = scores / scores.sum()  # equation 5
-        chosen = cells[int(self.rng.choice(len(cells),
-                                           p=probabilities))]
-        entry = self.cells[chosen]
-        entry["chosen"] += 1
-        entry["chosen_since_new"] += 1
-        return chosen
+__all__ = ["ATTRIBUTES", "DEFAULTS", "Archive", "GoExploreReset",
+           "GoExploreResetFactory", "GoExplorePhase1Baseline"]
 
 
 class GoExploreReset:
@@ -167,7 +85,7 @@ class GoExploreReset:
         layout = getattr(env, "layout", None)
         if layout is not self._layout:
             self.archive = Archive(self.params, self.seed,
-                                   layout.base.neighbors)
+                                   neighbors=layout.base.neighbors)
             self._layout = layout
             self._chosen_from = None
         # The archive updates at the end of the episode, before the
