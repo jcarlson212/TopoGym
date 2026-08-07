@@ -226,6 +226,22 @@ class Baseline(abc.ABC):
     def policy(self) -> Callable:
         """``policy(observation, env) -> action`` after fitting."""
 
+    @staticmethod
+    def observation_codes() -> int:
+        """How many distinct observation codes exist -- the size an
+        embedding over symbolic observations must have.
+
+        Constant across every slice, and deliberately *not* derived
+        from what a run has seen. Hazard (8) and wormhole (9) codes
+        occur only in Texture worlds, so a policy trained on
+        GridWorld2D meets them for the first time on the hold-out; a
+        table sized to the training codes would error there or, worse,
+        alias them onto something familiar.
+        """
+        from topogym.core.constants import OBS_CODE_COUNT
+
+        return OBS_CODE_COUNT
+
     def env_options(self) -> dict:
         """Keyword arguments applied to every instance this baseline
         sees, in training and in evaluation alike.

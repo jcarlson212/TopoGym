@@ -24,6 +24,12 @@ class FlatObservation(gym.ObservationWrapper):
     patch, and a vanilla MLP policy is the point of a reference
     baseline. Applied identically in training and evaluation, so a
     policy always sees one observation format.
+
+    Scaling by :data:`~topogym.core.constants.OBS_MAX` -- the largest
+    code, not the largest code *seen* -- is what keeps this safe across
+    slices: hazards and wormholes appear only in Texture worlds, and a
+    divisor fitted to a GridWorld2D training run would push them above
+    1 at evaluation.
     """
 
     def __init__(self, env):
@@ -36,6 +42,11 @@ class FlatObservation(gym.ObservationWrapper):
     def observation(self, observation):
         return (np.asarray(observation, dtype=np.float32).reshape(-1)
                 / float(C.OBS_MAX))
+
+    @property
+    def observation_codes(self) -> int:
+        """Distinct symbolic codes this observation can contain."""
+        return C.OBS_CODE_COUNT
 
 def _split_dir() -> pathlib.Path:
     """Locate ``docs/splits`` by walking up from this file.

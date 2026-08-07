@@ -440,3 +440,31 @@ def test_action_enums_are_usable_as_actions():
     env.step(EgocentricAction.FORWARD)  # an IntEnum *is* the action
     assert env._steps == 1
     assert env.action_space.contains(int(EgocentricAction.TURN_LEFT))
+
+
+def test_observation_code_contract_is_slice_independent():
+    """Hazards (8) and wormholes (9) appear only in Texture worlds, so
+    a policy trained on GridWorld2D meets them first at evaluation. The
+    declared space and the advertised code count must already account
+    for that, or an embedding sized from training data aliases them."""
+    import gymnasium as gym
+
+    from topogym import OBS_CODE_COUNT, OBS_MAX
+    from topogym.baselines.gridworld2dv1.protocol import Baseline
+
+    assert OBS_CODE_COUNT == OBS_MAX + 1 == 10
+    assert Baseline.observation_codes() == OBS_CODE_COUNT
+
+    for env_id in ("TopoGym/Dilution-50-v0", "TopoGym/SpaceWarp-v0",
+                   "TopoGym/TopKlein-50-v0"):
+        env = gym.make(env_id).unwrapped
+        env.reset(seed=0)
+        # Same declared bound on every slice, whatever codes occur.
+        assert env.observation_space.high.max() == OBS_MAX
+        env.close()
+
+    # And the baseline wrapper normalises by the largest code, not the
+    # largest seen, so Texture codes stay inside [0, 1].
+    wrapped = make_instance(load_split("test")[0])
+    assert wrapped.observation_codes == OBS_CODE_COUNT
+    assert wrapped.observation_space.high.max() == pytest.approx(1.0)

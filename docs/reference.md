@@ -234,6 +234,16 @@ from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
 from topogym import MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT  # fourway
 ```
 
+**Observation codes are a fixed contract.** There are
+`topogym.OBS_CODE_COUNT` (= `OBS_MAX + 1` = 10) of them, and every
+environment declares `Box(0, OBS_MAX, ...)` whatever slice it belongs
+to. This matters because hazards (8) and wormholes (9) occur only in
+Texture worlds: a policy trained on GridWorld2D meets them for the
+first time on the hold-out, and an embedding sized to the codes
+training happened to contain would error there or silently alias them
+onto something familiar. Size from `Baseline.observation_codes()` or
+from the observation space, never from observed data.
+
 Every published curve is a **fraction**, never a raw count: hold-out
 worlds span ~1,000 to ~160,000 free cells, so a mean of counts would
 mostly report which worlds are large. Coverage is the fraction of
