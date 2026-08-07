@@ -26,6 +26,7 @@ from topogym.baselines.gridworld2dv1.protocol import (
     Baseline,
     Hyperparameters,
     TrainingReport,
+    rank_candidates,
 )
 
 logger = logging.getLogger("topogym")
@@ -151,33 +152,74 @@ class PPOBaseline(Baseline):
 
     def select_hyperparameters(self, tuning: dict) -> Hyperparameters:
         tune_rows = tuning.get("tune", [])
-        best, best_score, searched = None, -float("inf"), []
+        measurements = []
         for candidate in self.tune_grid:
-            score = self._score_candidate(tune_rows, candidate)
-            searched.append({**candidate, "score": None
-                             if np.isnan(score) else score})
-            logger.info("[%s] tune %s -> %.4f", self.name, candidate,
-                        score)
-            if np.isfinite(score) and score > best_score:
-                best, best_score = dict(candidate), score
-        if best is None:  # no candidate completed an episode
-            logger.warning("[%s] tuning inconclusive; using defaults",
-                           self.name)
-            return Hyperparameters(values=dict(self.tune_grid[0]),
-                                   searched=searched)
-        return Hyperparameters(values=best, tuning_score=best_score,
-                               searched=searched)
+            measurement = self._measure_candidate(tune_rows, candidate)
+            measurements.append(measurement)
+            logger.info("[%s] tune %s -> return %.4f, coverage %.4f",
+                        self.name, candidate, measurement["return"],
+                        measurement["coverage"])
+        ranked, signal = rank_candidates(measurements)
+        best = {k: v for k, v in ranked[0].items()
+                if k not in ("return", "coverage")}
+        score = ranked[0].get(signal)
+        logger.info("[%s] ranked on %s; chose %s (%.4f)", self.name,
+                    signal, best, score)
+        return Hyperparameters(
+            values=best,
+            tuning_score=None if score is None or np.isnan(score)
+            else score,
+            searched=[{**m, "signal": signal} for m in measurements],
+        )
 
-    def _score_candidate(self, rows: list, candidate: dict) -> float:
+    #: Instances and episodes used when return carries no signal.
+    fallback_instances = 8
+    fallback_episodes = 2
+
+    def _measure_candidate(self, rows: list, candidate: dict) -> dict:
+        """Score a candidate, returning ``(score, which signal)``.
+
+        Mean episode return is the objective -- it is what PPO
+        optimises, and substituting anything else would hand it an
+        exploration criterion it does not have. But a tuning batch
+        spread over many parallel environments may contain no
+        *completed* episode, and RLlib then reports nothing at all. A
+        run of ``nan`` scores does not mean the candidates tied; it
+        means nothing was measured, and picking the first one is a coin
+        flip dressed as a choice.
+
+        So when return is undefined, fall back to how much of the world
+        the policy actually reached. Coverage rather than a raw count
+        of unique states: hold-out worlds differ in size by two orders
+        of magnitude, and a mean of counts would rank candidates by
+        which worlds they happened to see.
+        """
         algorithm = self.algorithm_config(
             rows, candidate, self.config.seed).build_algo()
-        score = float("nan")
+        returned = float("nan")
         try:
             for _ in range(self.config.tune_iterations):
-                score = mean_return(algorithm.train())
+                returned = mean_return(algorithm.train())
+            self._algorithm = algorithm
+            coverage = self._exploration_score(rows)
         finally:
+            self._algorithm = None
             algorithm.stop()
-        return score
+        return {**candidate, "return": returned, "coverage": coverage}
+
+    def _exploration_score(self, rows: list) -> float:
+        """Mean coverage reached by the current policy on tune rows."""
+        from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
+
+        sample = rows[:self.fallback_instances]
+        records = evaluate_split(
+            sample, self.policy(), episodes=self.fallback_episodes,
+            seed=self.config.seed, trace=False,
+            env_options=self.env_options(),
+        )
+        if not records:
+            return float("nan")
+        return float(np.mean([r["lifetime_coverage"] for r in records]))
 
     def fit(self, train_rows: list, val_rows: list,
             hyperparameters: Hyperparameters) -> TrainingReport:

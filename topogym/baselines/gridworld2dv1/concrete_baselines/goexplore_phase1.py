@@ -58,6 +58,7 @@ from topogym.baselines.gridworld2dv1.protocol import (
     Baseline,
     Hyperparameters,
     TrainingReport,
+    rank_candidates,
 )
 
 logger = logging.getLogger("topogym")
@@ -164,21 +165,29 @@ class GoExplorePhase1Baseline(Baseline):
             logger.info("[%s] rung %s: %d candidates over %d units",
                         self.name, split_name, len(survivors),
                         len(units))
-            scored = []
+            measurements = []
             for candidate in survivors:
-                value = self._score(candidate, units)
-                scored.append((value, candidate))
-                searched.append({**candidate, "split": split_name,
-                                 "score": value})
-                logger.info("[%s]   %s -> %.4f", self.name, candidate,
-                            value)
-            # Best first; a candidate that scored nan sorts last.
-            scored.sort(key=lambda pair: (-pair[0] if
-                                          np.isfinite(pair[0])
-                                          else float("inf")))
-            survivors = [candidate for _value, candidate
-                         in scored[:max(1, keep)]]
-            best_score = scored[0][0] if scored else None
+                measurement = self._measure(candidate, units)
+                measurements.append(measurement)
+                logger.info("[%s]   %s -> return %.4f, coverage %.4f",
+                            self.name, candidate,
+                            measurement["return"],
+                            measurement["coverage"])
+            # One signal for the whole rung: return when any candidate
+            # earned something, coverage when none did. Ranking one
+            # candidate by return and another by coverage would compare
+            # incomparable scales.
+            ranked, signal = rank_candidates(measurements)
+            searched.extend({**m, "split": split_name, "signal": signal}
+                            for m in measurements)
+            logger.info("[%s] rung %s ranked on %s", self.name,
+                        split_name, signal)
+            survivors = [
+                {k: v for k, v in m.items()
+                 if k not in ("return", "coverage")}
+                for m in ranked[:max(1, keep)]
+            ]
+            best_score = ranked[0].get(signal) if ranked else None
         best = survivors[0] if survivors else dict(self.tune_grid[0])
         self._params = {**DEFAULTS, **best}
         return Hyperparameters(
@@ -188,8 +197,14 @@ class GoExplorePhase1Baseline(Baseline):
             searched=searched,
         )
 
-    def _score(self, candidate: dict, units: list) -> float:
-        """Mean accumulated reward across units for one candidate."""
+    def _measure(self, candidate: dict, units: list) -> dict:
+        """Both tuning signals for one candidate, across the units.
+
+        Reward is the objective the archive exists to improve, but with
+        a sparse goal every candidate can earn exactly nothing; then
+        how much of each world was reached is the only thing that
+        distinguishes them.
+        """
         from topogym.baselines.gridworld2dv1.concrete_baselines.random_walk import (
             RandomPolicyFactory,
         )
@@ -208,10 +223,15 @@ class GoExplorePhase1Baseline(Baseline):
             env_options=self.env_options(),
         )
         if not records:
-            return float("nan")
-        return float(np.mean(
-            [r.get("cumulative_return", 0.0) for r in records]
-        ))
+            return {**candidate, "return": float("nan"),
+                    "coverage": float("nan")}
+        return {
+            **candidate,
+            "return": float(np.mean(
+                [r.get("cumulative_return", 0.0) for r in records])),
+            "coverage": float(np.mean(
+                [r.get("lifetime_coverage", 0.0) for r in records])),
+        }
 
     def fit(self, train_rows: list, val_rows: list,
             hyperparameters: Hyperparameters) -> TrainingReport:

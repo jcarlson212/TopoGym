@@ -468,3 +468,58 @@ def test_observation_code_contract_is_slice_independent():
     wrapped = make_instance(load_split("test")[0])
     assert wrapped.observation_codes == OBS_CODE_COUNT
     assert wrapped.observation_space.high.max() == pytest.approx(1.0)
+
+
+# -- tuning signal ---------------------------------------------------
+
+def test_return_is_used_whenever_it_carries_information():
+    from topogym.baselines.gridworld2dv1.protocol import (
+        choose_tuning_signal,
+        rank_candidates,
+    )
+
+    measurements = [
+        {"lr": 1, "return": 0.0, "coverage": 0.9},
+        {"lr": 2, "return": 0.5, "coverage": 0.1},
+    ]
+    assert choose_tuning_signal(measurements) == "return"
+    ranked, signal = rank_candidates(measurements)
+    assert signal == "return"
+    assert ranked[0]["lr"] == 2  # the one that actually earned reward
+
+
+def test_coverage_takes_over_when_no_candidate_earned_anything():
+    """All-zero returns are not a tie -- they are no measurement, and
+    picking the first candidate would be a coin flip."""
+    from topogym.baselines.gridworld2dv1.protocol import rank_candidates
+
+    ranked, signal = rank_candidates([
+        {"lr": 1, "return": 0.0, "coverage": 0.2},
+        {"lr": 2, "return": 0.0, "coverage": 0.7},
+    ])
+    assert signal == "coverage"
+    assert ranked[0]["lr"] == 2
+
+
+def test_undefined_returns_also_fall_back():
+    from topogym.baselines.gridworld2dv1.protocol import rank_candidates
+
+    ranked, signal = rank_candidates([
+        {"lr": 1, "return": float("nan"), "coverage": 0.3},
+        {"lr": 2, "return": float("nan"), "coverage": 0.8},
+    ])
+    assert signal == "coverage"
+    assert ranked[0]["lr"] == 2
+
+
+def test_one_signal_for_the_whole_sweep():
+    """Mixing signals across candidates would compare incomparable
+    scales -- a return of 0.5 against a coverage of 0.9."""
+    from topogym.baselines.gridworld2dv1.protocol import rank_candidates
+
+    ranked, signal = rank_candidates([
+        {"lr": 1, "return": 0.5, "coverage": 0.1},
+        {"lr": 2, "return": 0.0, "coverage": 0.99},
+    ])
+    assert signal == "return"
+    assert ranked[0]["lr"] == 1  # not the high-coverage one
