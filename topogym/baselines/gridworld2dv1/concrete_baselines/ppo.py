@@ -51,6 +51,13 @@ class PPOBaseline(Baseline):
 
     name = "ppo"
 
+    #: The ``dict`` observation, encoded by
+    #: :class:`~topogym.baselines.encoders.CellEncoder`. Its three
+    #: channels are nominal, sparse, and continuous respectively, and
+    #: keeping them apart is what lets each be encoded on its own
+    #: terms; flattening them into one Box is what the older path did.
+    obs_mode = "dict"
+
     #: Searched on the tuning split. Deliberately small and legible:
     #: this is a documented reference point, not a tuned entry.
     tune_grid = (
@@ -67,6 +74,37 @@ class PPOBaseline(Baseline):
 
     # -- the hook variants override -----------------------------------
 
+    def encoder_config(self) -> dict:
+        """Knobs for :class:`~topogym.baselines.encoders.CellEncoder`.
+
+        Deliberately small: the reference point is the protocol, not a
+        tuned architecture. Widths are named here rather than in the
+        module so a variant can change them without subclassing it.
+        """
+        return {"embed_dim": 16, "encoder_out_dim": 256,
+                "head_hidden": 256}
+
+    def policy_module_spec(self):
+        """The acting module's spec.
+
+        On the ``dict`` observation this is
+        :class:`~.cell_module.CellPPOModule`; otherwise RLlib's default
+        module over the flat Box. Variants that assemble a
+        ``MultiRLModuleSpec`` -- the intrinsic-reward ones -- must reuse
+        this for their policy slot rather than writing ``RLModuleSpec()``
+        by hand, or the encoder silently reverts to RLlib's default and
+        the observation mode stops meaning anything.
+        """
+        from ray.rllib.core.rl_module.rl_module import RLModuleSpec
+
+        if self.obs_mode != "dict":
+            return RLModuleSpec()
+
+        from topogym.baselines.gridworld2dv1.concrete_baselines.cell_module import CellPPOModule
+
+        return RLModuleSpec(module_class=CellPPOModule,
+                            model_config=self.encoder_config())
+
     def algorithm_config(self, rows: list, values: dict, seed: int):
         """The RLlib config for one training run.
 
@@ -82,6 +120,7 @@ class PPOBaseline(Baseline):
         params = {**self.defaults, **values}
         return (
             PPOConfig()
+            .rl_module(rl_module_spec=self.policy_module_spec())
             .environment(
                 "topogym_split",
                 env_config={
@@ -147,8 +186,12 @@ class PPOBaseline(Baseline):
         self._algorithm = self.algorithm_config(
             train_rows, hyperparameters.values, self.config.seed
         ).build_algo()
+        # env_options must match training: the validator feeds the same
+        # policy, so a validator built on the default observation would
+        # hand a dict-encoder policy a flat patch.
         validator = SplitEnv({"rows": val_rows, "seed": self.config.seed,
-                              "sequential": True})
+                              "sequential": True,
+                              "env_options": self.env_options()})
         report = TrainingReport()
         best, stale, baseline_value, moved = -float("inf"), 0, None, False
         try:
@@ -230,8 +273,17 @@ class PPOBaseline(Baseline):
         module = self._algorithm.get_module()
 
         def act(observation, env):
-            batch = {"obs": torch.as_tensor(
-                np.asarray(observation, dtype=np.float32)[None, ...])}
+            # The dict observation stays a dict all the way to the
+            # encoder: each channel keeps its own dtype, so batching
+            # them through one np.asarray would upcast the patch codes
+            # and lose the distinction the encoder relies on.
+            if isinstance(observation, dict):
+                obs = {key: torch.as_tensor(np.asarray(value)[None, ...])
+                       for key, value in observation.items()}
+            else:
+                obs = torch.as_tensor(
+                    np.asarray(observation, dtype=np.float32)[None, ...])
+            batch = {"obs": obs}
             with torch.no_grad():
                 out = module.forward_inference(batch)
             logits = out.get("action_dist_inputs")

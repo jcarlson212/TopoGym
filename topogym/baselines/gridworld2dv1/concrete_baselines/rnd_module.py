@@ -38,29 +38,46 @@ def _mlp(input_dim: int, hiddens, output_dim: int) -> nn.Module:
     return nn.Sequential(*layers)
 
 
+
+
 class RandomNetworkDistillation(TorchRLModule, SelfSupervisedLossAPI):
     """Novelty as the error of predicting a fixed random embedding."""
 
     def setup(self):
+        import gymnasium as gym
+
+        from topogym.baselines.encoders import CellFeatureNet
+
         config = self.model_config or {}
         feature_dim = config.get("feature_dim", 64)
         hiddens = tuple(config.get("net_hiddens", (128,)))
-        obs_dim = int(self.observation_space.shape[0])
+        space = self.observation_space
+
+        def build():
+            if isinstance(space, gym.spaces.Dict):
+                return CellFeatureNet(
+                    space, feature_dim,
+                    embed_dim=int(config.get("embed_dim", 16)),
+                    out_dim=int(config.get("encoder_out_dim", 256)),
+                )
+            return _mlp(int(space.shape[0]), hiddens, feature_dim)
 
         # The target is random and frozen: never trained, never
         # updated. Training it would chase a moving goalpost and the
         # error would stop meaning novelty.
-        self._target = _mlp(obs_dim, hiddens, feature_dim)
+        self._target = build()
         for parameter in self._target.parameters():
             parameter.requires_grad = False
-        self._predictor = _mlp(obs_dim, hiddens, feature_dim)
+        self._predictor = build()
 
     def _forward(self, batch, **kwargs):
         # Never used to act; the policy module does that.
         return {}
 
     def _forward_train(self, batch, **kwargs):
-        observations = batch[Columns.NEXT_OBS].float()
+        observations = batch[Columns.NEXT_OBS]
+        if not isinstance(observations, dict):
+            observations = observations.float()
         with torch.no_grad():
             target = self._target(observations)
         predicted = self._predictor(observations)

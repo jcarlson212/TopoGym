@@ -97,7 +97,6 @@ class IntrinsicRewardBaseline(PPOBaseline):
         from ray.rllib.core.rl_module.multi_rl_module import (
             MultiRLModuleSpec,
         )
-        from ray.rllib.core.rl_module.rl_module import RLModuleSpec
 
         from topogym.baselines.gridworld2dv1.instances import make_instance
 
@@ -115,7 +114,10 @@ class IntrinsicRewardBaseline(PPOBaseline):
             .rl_module(
                 rl_module_spec=MultiRLModuleSpec(
                     rl_module_specs={
-                        DEFAULT_MODULE_ID: RLModuleSpec(),
+                        # Reuse PPOBaseline's spec: writing
+                        # RLModuleSpec() here would drop CellPPOModule
+                        # and silently put RLlib's default encoder back.
+                        DEFAULT_MODULE_ID: self.policy_module_spec(),
                         INTRINSIC_MODULE_ID: self.intrinsic_module_spec(
                             observation_space, action_space),
                     },
@@ -161,24 +163,25 @@ class ICMBaseline(IntrinsicRewardBaseline):
 
     def intrinsic_module_spec(self, observation_space, action_space):
         from ray.rllib.core.rl_module.rl_module import RLModuleSpec
-        from ray.rllib.examples.rl_modules.classes.\
-            intrinsic_curiosity_model_rlm import (
-                IntrinsicCuriosityModel,
+
+        from topogym.baselines.gridworld2dv1.concrete_baselines.\
+            icm_module import (
+                IntrinsicCuriosityModule,
             )
 
         return RLModuleSpec(
-            module_class=IntrinsicCuriosityModel,
+            module_class=IntrinsicCuriosityModule,
             observation_space=observation_space,
             action_space=action_space,
             learner_only=True,  # never used to act, only to learn
             model_config={
                 "feature_dim": self.intrinsic_defaults["feature_dim"],
+                # phi over the dict observation, so surprise is measured
+                # in cell embeddings rather than in raw code values.
+                **self.encoder_config(),
                 "feature_net_hiddens": (128,),
-                "feature_net_activation": "relu",
                 "inverse_net_hiddens": (128,),
-                "inverse_net_activation": "relu",
                 "forward_net_hiddens": (128,),
-                "forward_net_activation": "relu",
             },
         )
 

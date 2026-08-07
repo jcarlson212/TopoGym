@@ -13,12 +13,38 @@ Actions (``actions=``):
   directions. The frame is re-canonicalized every step, so actions
   always mean screen directions, even after crossing a flip seam.
 
-Observations (``obs_mode=``): ``"local"`` (default for egocentric) —
-occluded egocentric ``(2r+1, 2r+1)`` patches (agent at the center,
-facing up); ``"vector"`` (default for fourway, the spec's universal
-observation) — the agent's ``(x, y)`` plus the 16-slot texture block,
-identically zero outside the Texture variants; ``"global"`` — the full
-symbolic grid plus an agent mask.
+Observations (``obs_mode=``), independent of the action space — every
+combination is legal, and the defaults below are paired by convention
+only:
+
+- ``"dict"`` — **preferred.** A mapping with three channels kept
+  deliberately apart, because they have three different natures:
+  ``position`` (absolute ``(x, y)``, continuous), ``patch`` (one
+  symbolic code per cell, nominal, occluded, aligned with the agent's
+  heading), and ``textures`` (the semantic block *per visible cell*,
+  sparse multi-hot, zeroed where occluded). Encode it with
+  :class:`topogym.baselines.encoders.CellEncoder`, which embeds each
+  cell as ``embed(code) + sum(embed(active slots))``.
+- ``"local"`` (default for egocentric) — .. warning:: prefer ``"dict"``.
+  Occluded egocentric ``(2r+1, 2r+1)`` patches (agent at the center,
+  facing up). Terrain and visibility only: it carries no semantics, so
+  on the Texture slice a ladder and a plain floor are indistinguishable.
+- ``"vector"`` (default for fourway, the spec's universal observation)
+  — .. warning:: prefer ``"dict"``. The agent's ``(x, y)`` plus the
+  texture block *of the current cell only*, identically zero outside
+  the Texture variants. It carries **nothing about the field of view**,
+  so on GridWorld2D and Top it reduces to ``(x, y)`` alone and the
+  agent navigates blind.
+- ``"global"`` — .. warning:: prefer ``"dict"``. The full symbolic grid
+  plus an agent mask, entirely unoccluded. An oracle view for debugging,
+  not a partial-observability setting, and far slower to step.
+
+Terrain and visibility live in the code channel, semantics in the
+texture block; no texture slot ever means "out of map" or "unseen"
+(those are :data:`~topogym.core.constants.OBS_OUT_OF_WORLD` and
+:data:`~topogym.core.constants.OBS_UNSEEN`). See
+:class:`~topogym.core.constants.TextureSlotMap` for the slot
+assignment and the rule for adding one.
 """
 
 from __future__ import annotations
@@ -79,10 +105,34 @@ class TopoGrid2DEnv(TopoEnvCore):
             4 if self.actions == "fourway" else 3
         )
         r = self.view_radius
-        if self.obs_mode == "vector":
+        if self.obs_mode == "dict":
+            w, h = self._probe_layout().base.layout_size()
+            n = 2 * r + 1
+            self.observation_space = spaces.Dict({
+                # Absolute cell coordinates. Bounds scale with the
+                # world, so normalise by ``high`` before feeding a
+                # network -- see CellEncoder.
+                "position": spaces.Box(
+                    np.zeros(2, np.float32),
+                    np.array([w - 1, h - 1], np.float32),
+                    dtype=np.float32,
+                ),
+                # Terrain and visibility, one symbolic code per cell.
+                "patch": spaces.Box(
+                    0, C.OBS_MAX, shape=(n, n), dtype=np.uint8
+                ),
+                # Semantic overlay, multi-hot per cell, zero where the
+                # cell is occluded or the slice carries no textures.
+                "textures": spaces.Box(
+                    0.0, 1.0, shape=(n, n, C.TEXTURE_SLOTS.dim),
+                    dtype=np.float32,
+                ),
+            })
+        elif self.obs_mode == "vector":
             w, h = self._probe_layout().base.layout_size()
             high = np.array(
-                [w - 1, h - 1] + [1.0] * C.TEXTURE_DIM, dtype=np.float32
+                [w - 1, h - 1] + [1.0] * C.TEXTURE_SLOTS.dim,
+                dtype=np.float32,
             )
             self.observation_space = spaces.Box(
                 np.zeros_like(high), high, dtype=np.float32
@@ -211,18 +261,43 @@ class TopoGrid2DEnv(TopoEnvCore):
     # -- observations -----------------------------------------------------------
 
     def _texture_block(self, cell: tuple) -> np.ndarray:
-        """The 16-slot texture block of the universal observation.
+        """One cell's texture block, sized from the slot map.
         Identically zero outside the Texture variants, which override it."""
-        return np.zeros(C.TEXTURE_DIM, dtype=np.float32)
+        return np.zeros(C.TEXTURE_SLOTS.dim, dtype=np.float32)
 
-    def _obs(self) -> np.ndarray:
+    def _texture_patch(self) -> np.ndarray:
+        """Texture blocks for the field of view, aligned with the patch.
+
+        Indexed exactly like the sight patch, so entry ``[i, j]``
+        annotates the cell whose code is ``patch[i, j]`` -- including
+        under egocentric actions, where both rotate with the heading.
+
+        Only *visible* cells are filled. An occluded cell keeps an
+        all-zero block, matching its ``OBS_UNSEEN`` code: the agent
+        cannot see a cell's semantics through a wall any more than it
+        can see its terrain. Without that mask this channel would leak
+        ground truth the other observation modes withhold.
+
+        Must be called after :meth:`_sight_patch`, which computes the
+        index -> cell mapping this reads.
+        """
+        n = 2 * self.view_radius + 1
+        return np.zeros((n, n, C.TEXTURE_SLOTS.dim), dtype=np.float32)
+
+    def _obs(self):
         if self.obs_mode == "global":
             return self._global_obs()
         patch = self._sight_patch()
         if self.obs_mode == "local":
             return patch
         x, y = self.layout.base.layout_coords(self._state.cell)
-        vec = np.empty(2 + C.TEXTURE_DIM, dtype=np.float32)
+        if self.obs_mode == "dict":
+            return {
+                "position": np.array([x, y], dtype=np.float32),
+                "patch": patch,
+                "textures": self._texture_patch(),
+            }
+        vec = np.empty(2 + C.TEXTURE_SLOTS.dim, dtype=np.float32)
         vec[0], vec[1] = x, y
         vec[2:] = self._texture_block(self._state.cell)
         return vec
@@ -252,10 +327,12 @@ class TopoGrid2DEnv(TopoEnvCore):
         hit = self._sight_cache.get(key)
         if hit is None:
             hit = self._sight_cache[key] = self._compute_sight_patch()
-        out, visible_codes = hit
+        out, visible_codes, cell_at = hit
         for cell, code in visible_codes.items():
             self._note_observed(cell, code)
         self._visible = set(visible_codes)
+        #: patch index -> world cell, for the "dict" mode texture channel.
+        self._cell_at = cell_at
         return out.copy()  # callers may write into the observation
 
     def _compute_sight_patch(self) -> tuple:
@@ -279,7 +356,11 @@ class TopoGrid2DEnv(TopoEnvCore):
             cell: int(out[idx]) for idx, cell in cell_at.items()
             if out[idx] != C.OBS_UNSEEN
         }
-        return out, visible_codes
+        # ``cell_at`` is the patch-index -> world-cell mapping. It is
+        # what lets the texture channel line up with the patch under
+        # egocentric actions, where the patch rotates with the heading
+        # and a world-coordinate window would be silently misaligned.
+        return out, visible_codes, cell_at
 
     def _global_obs(self) -> np.ndarray:
         base = self.layout.base

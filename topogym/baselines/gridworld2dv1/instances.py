@@ -80,8 +80,11 @@ def load_split(split: str, path: pathlib.Path | None = None) -> list:
 def make_instance(row: dict, flatten: bool = True, **overrides):
     """The environment a split row names.
 
-    ``flatten`` applies :class:`FlatObservation`, which every baseline
-    uses; pass ``False`` to inspect the raw patch.
+    ``flatten`` applies :class:`FlatObservation`; pass ``False`` to
+    inspect the raw patch. It is ignored for the ``dict`` observation,
+    whose whole point is to keep its three channels apart -- flattening
+    one would undo it. Baselines on that mode encode the channels with
+    :class:`~topogym.baselines.encoders.CellEncoder` instead.
 
     Archive resets are enabled on every instance. They are inert unless
     a baseline asks for one -- a policy that never calls the
@@ -96,7 +99,9 @@ def make_instance(row: dict, flatten: bool = True, **overrides):
         kwargs["size"] = int(row["size"])
     kwargs.update(overrides)
     env = gym.make(row["template_id"], **kwargs)
-    return FlatObservation(env) if flatten else env
+    if flatten and isinstance(env.observation_space, gym.spaces.Box):
+        return FlatObservation(env)
+    return env
 
 
 def instance_key(row: dict) -> str:
