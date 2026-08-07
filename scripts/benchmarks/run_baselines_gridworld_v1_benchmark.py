@@ -58,23 +58,26 @@ BENCHMARK = "gridworld2dv1"
 logger = logging.getLogger("topogym")
 
 
-def _record_gifs(name: str, test_rows: list, benchmark: str) -> None:
-    """Record the baseline exploring a few hold-out worlds.
+def _record_gifs(name: str, baseline, test_rows: list,
+                 benchmark: str) -> None:
+    """Record the *trained* baseline exploring a few hold-out worlds.
 
-    Done here rather than in a separate pass so the recordings come
-    from the same split, seed and policy as the reported numbers.
+    Takes the fitted baseline rather than constructing one: a fresh
+    instance has no policy, so recording a learned algorithm this way
+    raises -- which is exactly what happened the first time, and it
+    took three completed evaluations with it.
+
+    Done in the run rather than in a separate pass so the recordings
+    come from the same split, seed and policy as the reported numbers.
     """
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
     from record_baseline_gifs import DEFAULT_ENVS, record
-
-    from topogym.baselines.gridworld2dv1 import get_baseline
 
     for unit in DEFAULT_ENVS:
         rows = [row for row in test_rows if row["unit"] == unit]
         if not rows:
             continue
         row = rows[0]
-        baseline = get_baseline(name)(BaselineConfig(seed=0))
         # Once at the top level, once under the world's own slice, so
         # a slice folder is self-contained.
         for folder in (PUBLISHED / benchmark / "gifs" / name,
@@ -334,6 +337,9 @@ def _run_one(name: str, splits: dict, args, runners: int,
     merged = BaselineResult(algorithm=name)
     merged.training = {"grouping": args.group, "groups": {}}
     merged.hyperparameters = {"grouping": args.group, "groups": {}}
+    #: The fitted baseline is kept open for the recording phase; a
+    #: closed one has released its policy.
+    fitted = None
     for group_index, (key, group_splits) in enumerate(
         sorted(grouped.items()), start=1
     ):
@@ -366,7 +372,12 @@ def _run_one(name: str, splits: dict, args, runners: int,
         baseline.group = key
         try:
             result = baseline.run(group_splits)
-        finally:
+        except Exception:
+            baseline.close()
+            raise
+        if fitted is None:
+            fitted = baseline      # keep one, still fitted, for GIFs
+        else:
             baseline.close()
         for record in result.instances:
             record["group"] = key
@@ -375,9 +386,6 @@ def _run_one(name: str, splits: dict, args, runners: int,
         merged.hyperparameters["groups"][key] = result.hyperparameters
         merged.config = result.config
 
-    if args.record_gifs and not provisional:
-        _record_gifs(name, splits["test"], args.benchmark)
-
     merged.aggregates = aggregate(merged.instances, seed=args.seed)
     merged.curves = mean_curves(merged.instances)
     # The averaged curves are what the figures need. Keeping every
@@ -385,7 +393,21 @@ def _run_one(name: str, splits: dict, args, runners: int,
     # numbers in a committed file.
     for record in merged.instances:
         record.pop("curves", None)
+    # Published *before* the recordings. They are a nicety; hours of
+    # training and evaluation are the product, and a failure drawing a
+    # GIF must never discard them.
     write_result(merged, results_dir)
+
+    if fitted is not None:
+        try:
+            if args.record_gifs and not provisional:
+                _record_gifs(name, fitted, splits["test"], args.benchmark)
+        except Exception:  # noqa: BLE001 - reported, never fatal
+            logger.exception("[%s] recording failed; results are "
+                             "already published", name)
+        finally:
+            fitted.close()
+
     headline = merged.aggregates
     logger.info(
         "%s: success %.3f | median steps to goal %s %s",

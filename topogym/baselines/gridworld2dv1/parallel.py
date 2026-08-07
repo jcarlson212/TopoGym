@@ -56,11 +56,22 @@ def map_instances(work: Callable, arguments: list,
         return [work(argument) for argument in arguments]
 
     from concurrent.futures import ProcessPoolExecutor
+    from concurrent.futures.process import BrokenProcessPool
 
     workers = min(workers, len(arguments))
     logger.info("running %d tasks across %d processes", len(arguments),
                 workers)
-    with ProcessPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(_run_one,
-                             [(work, a) for a in arguments],
-                             chunksize=chunksize))
+    try:
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(_run_one,
+                                 [(work, a) for a in arguments],
+                                 chunksize=chunksize))
+    except (BrokenProcessPool, OSError, ValueError) as exc:
+        # A pool can fail to start for reasons that have nothing to do
+        # with the work -- exhausted descriptors, a closed handle left
+        # by an earlier subprocess-heavy stage. Results are identical
+        # either way (a test pins that), so losing the pool should cost
+        # time, not the evaluation.
+        logger.warning("process pool unusable (%s); running serially",
+                       exc)
+        return [work(argument) for argument in arguments]
