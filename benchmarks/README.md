@@ -8,14 +8,22 @@ their filenames, and must not share a directory.
 
 ```
 benchmarks/
-  gridworld2dv1/
-    results/<algorithm>.json   every evaluated hold-out instance with the
-                               complete native metric set, the rliable
-                               aggregates, the chosen hyperparameters,
-                               and how training stopped
-    plots/<metric>.{pdf,png}   the published figures — PDF for the
-                               paper, PNG for the repository
+  gridworld2dv1/                     pooled: every slice together
+    results/<algorithm>.json         every evaluated hold-out instance
+                                     with the complete native metric
+                                     set, the rliable aggregates, the
+                                     chosen hyperparameters, and how
+                                     training stopped
+    plots/<metric>.{pdf,png}         PDF for the paper, PNG for here
+    gifs/<algorithm>/<world>.gif     how it explores, from the hold-out
+    GridWorld2D/  Texture/  Top/     the same three, per slice
 ```
+
+The pooled folder is the headline, but GridWorld2D dominates it by
+instance count — 147 hold-out instances against 24 and 18 — so each
+slice also carries its own results, figures and recordings. Without
+that, a Texture or Top result is only ever visible as one line in a
+breakdown table.
 
 The generated summary is [`../BENCHMARKS.md`](../BENCHMARKS.md), linked
 from the README. Regenerate everything with:

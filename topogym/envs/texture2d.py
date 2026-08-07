@@ -282,6 +282,21 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
             vec[C.TEX_TREASURE] = 1.0
         return vec
 
+    def _texture_patch(self) -> np.ndarray:
+        """Per-cell blocks over the field of view.
+
+        Only visible cells are annotated: the blocker slots read
+        ``layout.cell_types`` directly, so filling occluded cells would
+        hand the agent wall structure it has not seen -- information no
+        other observation mode grants.
+        """
+        n = 2 * self.view_radius + 1
+        out = np.zeros((n, n, C.TEXTURE_SLOTS.dim), dtype=np.float32)
+        for index, cell in self._cell_at.items():
+            if cell in self._visible:
+                out[index] = self._texture_block(cell)
+        return out
+
     # -- rendering -------------------------------------------------------------
 
     #: semantic texture slot -> floor tile, in display priority order

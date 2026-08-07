@@ -18,7 +18,10 @@ from topogym.baselines.gridworld2dv1.concrete_baselines.intrinsic import (  # no
 from topogym.baselines.gridworld2dv1.concrete_baselines.ppo import (  # noqa: E402
     PPOBaseline,
 )
-from topogym.baselines.gridworld2dv1.instances import load_split  # noqa: E402
+from topogym.baselines.gridworld2dv1.instances import (  # noqa: E402
+    load_split,
+    make_instance,
+)
 
 
 def test_variants_inherit_ppo_rather_than_fork_it():
@@ -112,13 +115,41 @@ def test_icm_and_rnd_use_different_models():
                                if not p.requires_grad))
             algo.stop()
         icm, rnd = built["icm-ppo"], built["rnd-ppo"]
-        assert icm[0] == "IntrinsicCuriosityModel"
+        assert icm[0] == "IntrinsicCuriosityModule"
         assert rnd[0] == "RandomNetworkDistillation"
         assert icm[0] != rnd[0] and icm[1] != rnd[1]
         assert icm[2] == 0   # ICM trains every part
         assert rnd[2] > 0    # RND's target is frozen by design
     finally:
         ray.shutdown()
+
+
+def test_both_intrinsic_models_measure_in_the_cell_feature_space():
+    """ICM's phi and RND's embedding are both CellFeatureNet over the
+    dict observation, so surprise and novelty are measured in
+    comparably-built spaces rather than in raw code values."""
+    from topogym.baselines.encoders import CellFeatureNet
+    from topogym.baselines.gridworld2dv1.concrete_baselines.icm_module import (
+        IntrinsicCuriosityModule,
+    )
+    from topogym.baselines.gridworld2dv1.concrete_baselines.rnd_module import (
+        RandomNetworkDistillation,
+    )
+
+    rows = load_split("train")[:1]
+    for name, cls in (("icm-ppo", IntrinsicCuriosityModule),
+                      ("rnd-ppo", RandomNetworkDistillation)):
+        baseline = get_baseline(name)(BaselineConfig(num_env_runners=0))
+        assert baseline.obs_mode == "dict"
+        probe = make_instance(rows[0], **baseline.env_options())
+        spec = baseline.intrinsic_module_spec(probe.observation_space,
+                                              probe.action_space)
+        assert spec.module_class is cls
+        module = spec.build()
+        nets = [m for m in module.modules()
+                if isinstance(m, CellFeatureNet)]
+        assert nets, f"{name} does not encode the dict observation"
+        probe.close()
 
 
 def test_icm_keeps_the_inverse_dynamics_term():

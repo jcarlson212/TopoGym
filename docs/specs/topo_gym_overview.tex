@@ -478,7 +478,24 @@ semantic features documented with each family. The texture block is
 identically zero in GridWorld2D and GridWorld2D-Top; only
 GridWorld2D-Texture populates it. \texttt{obs\_mode="global"} (the
 flattened symbolic grid with an agent mask) completes the set; all
-three are available on every variant. Snapshot save/restore is exact (deep copy), and the
+are available on every variant.
+
+The \emph{preferred} observation is \texttt{obs\_mode="dict"}, which
+supersedes the three above for new work: a mapping of
+\texttt{position} $(x, y)$, the \texttt{patch} of symbolic codes, and
+\texttt{textures} --- the texture block \emph{per visible cell},
+aligned index-for-index with the patch and zeroed where a cell is
+occluded. The earlier modes are each a projection of it, and each
+drops something: \texttt{local} has no semantics, \texttt{vector} has
+no field of view (on GridWorld2D and Top it reduces to $(x, y)$
+alone), and \texttt{global} is unoccluded and therefore not a
+partial-observability setting at all. Terrain and visibility are
+carried by the codes, semantics by the block; no slot encodes ``out of
+map'' or ``unseen''. Reference encoder:
+\texttt{topogym.baselines.encoders.CellEncoder}, which embeds a cell
+as $\mathrm{embed}(\text{code}) + \sum \mathrm{embed}(\text{active
+slots})$ rather than flattening and rescaling nominal codes.
+Snapshot save/restore is exact (deep copy), and the
 environment is deterministic given (configuration, seed, action
 sequence) when \texttt{p\_slip} $= 0$.
 

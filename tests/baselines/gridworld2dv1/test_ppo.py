@@ -82,7 +82,10 @@ def test_ppo_trains_and_produces_a_policy():
         ).Hyperparameters({"lr": 3e-4, "entropy_coeff": 0.01}))
         assert report.iterations >= 1
         act = baseline.policy()
-        env = SplitEnv({"rows": rows, "seed": 0})
+        # Same env_options as training: the policy encodes the `dict`
+        # observation, so an env built on the default would not match.
+        env = SplitEnv({"rows": rows, "seed": 0,
+                        "env_options": baseline.env_options()})
         obs, _ = env.reset(seed=0)
         action = act(obs, env)
         assert action in range(env.action_space.n)

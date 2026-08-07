@@ -1,5 +1,6 @@
 """Cell-type, action, and observation codes shared across TopoGym."""
 
+from dataclasses import dataclass, fields
 from enum import Enum, IntEnum
 
 # Actions. Both spaces are part of the public interface, so name them
@@ -98,36 +99,138 @@ OBS_MAX = 9
 #: slice, so sizing from the observation space is also safe.
 OBS_CODE_COUNT = OBS_MAX + 1
 
-# Universal observation vector (obs_mode="vector"): the agent's integer
-# cell coordinates (x, y) followed by a texture block t in [0, 1]^16.
-# Slots 0-3 are reserved library-wide for directional blocker adjacency
-# (left, right, above, below); slots 4-15 carry per-environment semantic
-# features. The block is identically zero outside the Texture variants.
-TEXTURE_DIM = 16
-TEX_BLOCK_LEFT, TEX_BLOCK_RIGHT, TEX_BLOCK_ABOVE, TEX_BLOCK_BELOW = 0, 1, 2, 3
+# The texture block. This dataclass is the *definition* of the block --
+# its width, its slot order, and what each slot means. Everything below
+# it (TEXTURE_DIM, the bare TEX_* integers, TEX_SLOT_NAMES) is derived,
+# and every producer and consumer of a texture block sizes itself from
+# TextureSlotMap.dim rather than from a literal, so the width is stated
+# in exactly one place.
 
-# Semantic texture slots (4-15), assigned library-wide so agents transfer
-# between Texture scenarios. Each scenario documents which slots it uses.
-TEX_WATER = 4  # navigable open water (IceShip)
-TEX_PLATFORM = 5  # platform / room floor (Ladders)
-TEX_LADDER = 6  # vertical corridor (Ladders)
-TEX_BRIDGE = 7  # horizontal corridor (Ladders)
-TEX_DOOR = 8  # a doorway cell
-TEX_HALLWAY = 9  # between-shell hallway (BankRobber)
-TEX_DROP_ADJ = 10  # adjacent to the drop (DontFall)
-TEX_DIRT = 11  # plain ground
-TEX_INTERIOR = 12  # room interior
-TEX_WORMHOLE = 13  # standing on a wormhole (SpaceWarp)
-TEX_CLOWN_NEAR = 14  # the clown is within one cell (ClownChase)
-TEX_TREASURE = 15  # standing on the treasure cell
+
+@dataclass(frozen=True)
+class TextureSlotMap:
+    """Slot name -> slot index for the texture block.
+
+    The block is a *semantic overlay*, not a terrain map. What a cell
+    physically is -- wall, goal, hazard, and crucially "out of world"
+    and "not currently visible" -- is carried by the symbolic
+    observation codes (:data:`OBS_EMPTY` ... :data:`OBS_WORMHOLE`), one
+    per cell, in a separate channel. Nothing here encodes terrain or
+    visibility, so no slot is ever spent on "out of map" or "unseen":
+    those are codes 5 and 6, and a texture block of all zeros means
+    "this cell carries no semantic annotation", never "this cell is
+    absent".
+
+    That separation is what keeps the two channels independently
+    meaningful. A cell can be simultaneously ``OBS_EMPTY`` and
+    ``water``; an occluded cell has code ``OBS_UNSEEN`` and an all-zero
+    block, because the agent cannot know its semantics either.
+
+    Slots 0-3 are directional blocker adjacency for the cell in
+    question; slots 4 onward are per-scenario semantics, assigned
+    library-wide so an agent transfers between Texture scenarios. The
+    whole block is identically zero in GridWorld2D and Top -- those
+    slices carry no textures at all.
+
+    **Adding a slot.** Append a field with the next free index and an
+    entry in :attr:`descriptions`; never renumber an existing one.
+    Indices are the wire format: a policy, a recorded observation, and
+    a scenario's documented slots all refer to them by number, so
+    reordering silently reinterprets data that already exists, while
+    appending leaves every existing slot meaning exactly what it did.
+    ``tests/envs/test_observations.py`` pins the current assignment
+    against exactly that mistake. Appending does widen the block, which
+    changes observation shape and so retires trained checkpoints -- it
+    is source-compatible, not weight-compatible.
+    """
+
+    blocked_left: int = 0
+    blocked_right: int = 1
+    blocked_above: int = 2
+    blocked_below: int = 3
+    water: int = 4
+    platform: int = 5
+    ladder: int = 6
+    bridge: int = 7
+    door: int = 8
+    hallway: int = 9
+    drop_adjacent: int = 10
+    ground: int = 11
+    room_interior: int = 12
+    on_wormhole: int = 13
+    clown_near: int = 14
+    on_treasure: int = 15
+
+    #: What each slot means, and which scenarios populate it.
+    descriptions = {
+        "blocked_left": "obstacle immediately left of this cell",
+        "blocked_right": "obstacle immediately right of this cell",
+        "blocked_above": "obstacle immediately above this cell",
+        "blocked_below": "obstacle immediately below this cell",
+        "water": "navigable open water (IceShip)",
+        "platform": "platform / room floor (Ladders)",
+        "ladder": "vertical corridor (Ladders)",
+        "bridge": "horizontal corridor (Ladders)",
+        "door": "a doorway cell",
+        "hallway": "between-shell hallway (BankRobber)",
+        "drop_adjacent": "adjacent to the drop (DontFall)",
+        "ground": "plain ground",
+        "room_interior": "room interior",
+        "on_wormhole": "this cell is a wormhole (SpaceWarp)",
+        "clown_near": "the clown is within one cell (ClownChase)",
+        "on_treasure": "this cell holds the treasure",
+    }
+
+    @property
+    def dim(self) -> int:
+        """The block's width -- the one place it is defined.
+
+        Size observation spaces, encoders, and buffers from this, never
+        from a literal, so appending a slot propagates everywhere at
+        once instead of leaving a 16 behind in some forgotten shape.
+        """
+        return len(fields(self))
+
+    def as_dict(self) -> dict:
+        """``{slot name: index}``, in slot order."""
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
+    def names(self) -> tuple:
+        """Slot names, indexed by slot number."""
+        ordered = sorted(self.as_dict().items(), key=lambda kv: kv[1])
+        return tuple(name for name, _ in ordered)
+
+    def describe(self, slot: int) -> str:
+        """``"6 ladder -- vertical corridor (Ladders)"``."""
+        name = self.names()[slot]
+        return f"{slot} {name} -- {self.descriptions[name]}"
+
+
+#: The canonical slot map. Prefer this to the bare ``TEX_*`` integers
+#: when writing an encoder: it names what it indexes.
+TEXTURE_SLOTS = TextureSlotMap()
+
+#: Width of the texture block, derived from the slot map.
+TEXTURE_DIM = TEXTURE_SLOTS.dim
+
+# Bare aliases, for callers who prefer names to attribute access.
+# Derived, so there is one source of truth for every index.
+TEX_BLOCK_LEFT = TEXTURE_SLOTS.blocked_left
+TEX_BLOCK_RIGHT = TEXTURE_SLOTS.blocked_right
+TEX_BLOCK_ABOVE = TEXTURE_SLOTS.blocked_above
+TEX_BLOCK_BELOW = TEXTURE_SLOTS.blocked_below
+TEX_WATER = TEXTURE_SLOTS.water
+TEX_PLATFORM = TEXTURE_SLOTS.platform
+TEX_LADDER = TEXTURE_SLOTS.ladder
+TEX_BRIDGE = TEXTURE_SLOTS.bridge
+TEX_DOOR = TEXTURE_SLOTS.door
+TEX_HALLWAY = TEXTURE_SLOTS.hallway
+TEX_DROP_ADJ = TEXTURE_SLOTS.drop_adjacent
+TEX_DIRT = TEXTURE_SLOTS.ground
+TEX_INTERIOR = TEXTURE_SLOTS.room_interior
+TEX_WORMHOLE = TEXTURE_SLOTS.on_wormhole
+TEX_CLOWN_NEAR = TEXTURE_SLOTS.clown_near
+TEX_TREASURE = TEXTURE_SLOTS.on_treasure
 
 #: slot index -> human-readable name (TOPOGYM_DEBUG observation lines)
-TEX_SLOT_NAMES = {
-    TEX_BLOCK_LEFT: "blocked_left", TEX_BLOCK_RIGHT: "blocked_right",
-    TEX_BLOCK_ABOVE: "blocked_above", TEX_BLOCK_BELOW: "blocked_below",
-    TEX_WATER: "water", TEX_PLATFORM: "platform", TEX_LADDER: "ladder",
-    TEX_BRIDGE: "bridge", TEX_DOOR: "door", TEX_HALLWAY: "hallway",
-    TEX_DROP_ADJ: "drop_adjacent", TEX_DIRT: "ground",
-    TEX_INTERIOR: "room_interior", TEX_WORMHOLE: "on_wormhole",
-    TEX_CLOWN_NEAR: "clown_near", TEX_TREASURE: "on_treasure",
-}
+TEX_SLOT_NAMES = dict(enumerate(TEXTURE_SLOTS.names()))

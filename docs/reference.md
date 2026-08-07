@@ -10,6 +10,7 @@ substrate, the generator, certified metadata, and trajectory TDA.
 - [Complex backends](#complex-backends)
 - [Doors, chambers, and decoys](#doors-chambers-and-decoys)
 - [The generator](#the-generator)
+- [Observation modes](#observation-modes)
 - [Certified metadata](#certified-metadata)
 - [Topology of experience (TDA)](#topology-of-experience-tda)
 - [Debugging the topology live](#debugging-the-topology-live)
@@ -155,6 +156,80 @@ python scripts/browse.py --all --split test -n 4      # every family
 python scripts/browse.py TopoGym/Maze-50-v0 --play    # interactive
 ```
 
+## Observation modes
+
+`obs_mode=` selects what the agent sees. It is independent of
+`actions=`; all combinations are legal, and the defaults are merely
+paired by convention (`egocentric` → `local`, `fourway` → `vector`).
+
+| mode | shape | dtype | contents |
+|---|---|---|---|
+| **`dict`** ✅ **preferred** | `{position (2,), patch (2r+1, 2r+1), textures (2r+1, 2r+1, 16)}` | mixed | position, terrain+visibility, and per-cell semantics, kept apart |
+| `local` | `(2r+1, 2r+1)` → `(7,7)` | `uint8 [0,9]` | ⚠️ terrain only — no semantics, no position |
+| `vector` | `(18,)` | `float32` | ⚠️ position + textures **of the current cell only** — no field of view |
+| `global` | `(2, h, w)` | `uint8 [0,9]` | ⚠️ the whole map, unoccluded — not a partial-observability setting |
+
+**Prefer `dict`.** The other three are each a projection of it, and
+each drops something a general agent needs:
+
+- `local` carries terrain and occlusion but no semantics, so on the
+  Texture slice a ladder and a plain floor tile are the same cell.
+- `vector` carries semantics for the cell underfoot and *nothing about
+  the field of view*. On GridWorld2D and Top, whose texture blocks are
+  identically zero, the observation reduces to `(x, y)` alone — the
+  agent navigates blind. Its coordinates are also world-scaled
+  (`high` = 49 at size 50, 199 at size 200), so on the
+  size-extrapolation split every test coordinate is out of the
+  training range.
+- `global` reveals the entire map from step one. It is an oracle view
+  for debugging, not an exploration setting: measuring "how well does
+  it explore" against it answers a different question. It is also ~38×
+  slower to step.
+
+### What the three channels are, and why they stay apart
+
+- **`patch`** — one symbolic code per cell, egocentric and occluded
+  exactly as in `local`. Under `egocentric` actions it rotates with the
+  heading (agent centered, facing up); under `fourway` it is
+  screen-aligned. `OBS_UNSEEN` (6) marks cells occluded by walls and
+  `OBS_OUT_OF_WORLD` (5) marks cells beyond the map's boundary — the
+  agent can tell "hidden" from "absent", which is the exploration
+  signal.
+- **`textures`** — the 16-slot semantic block *per visible cell*,
+  aligned index-for-index with `patch`. Occluded cells keep an all-zero
+  block: the agent cannot see a cell's semantics through a wall any
+  more than its terrain. Identically zero on GridWorld2D and Top.
+- **`position`** — absolute cell coordinates, for mapping and memory.
+
+Terrain and visibility live in `patch`, semantics in `textures`. No
+texture slot ever encodes "out of map" or "unseen"; those are codes 5
+and 6, and an all-zero block means "no semantic annotation", never
+"this cell is absent". The slot assignment is defined by
+`topogym.core.constants.TextureSlotMap`, whose `dim` is the single
+source of truth for the block's width.
+
+### Building on it
+
+Encode the channels on their own terms —
+`topogym.baselines.encoders.CellEncoder` is the reference for how, and
+what the PPO baselines use:
+
+```python
+from topogym.baselines.encoders import CellEncoder
+
+encoder = CellEncoder(env.observation_space)   # sizes itself from the space
+features = encoder({"patch": ..., "textures": ..., "position": ...})
+```
+
+It embeds each cell as `embed(code) + sum(embed(active slots))`, so a
+cell is both what it is and what it means; an unannotated cell
+contributes exactly its code embedding, which is why the all-zero
+texture channel on GridWorld2D costs nothing. What it deliberately does
+*not* do is flatten the patch and scale it by `OBS_MAX` — that imposes
+a false ordinal scale on nominal codes, telling the network that
+`goal` (4/9) is four times `wall` (1/9). Position is normalised by the
+space's own bounds so a 50- and a 400-cell world both land in `[0,1]`.
+
 ## Episode horizons
 
 `horizon = max(1.2 * max(W, H), 10 * ceil(3 * optimal / 10))`, where
@@ -250,9 +325,17 @@ mostly report which worlds are large. Coverage is the fraction of
 reachable space visited, chambers the fraction of chambers entered,
 curvature the fraction of negatively curved cells reached. The band is
 one standard error across instances; the headline aggregates in
-`BENCHMARKS.md` use bootstrap confidence intervals. The algorithms are
+`BENCHMARKS.md` use bootstrap confidence intervals. The optimisation is
 Ray RLlib's — TopoGym does not reimplement PPO — so what lives here is
-the protocol they share. `Baseline.run()` enforces it: hyperparameters
+the protocol they share, plus the pieces that have to know what a
+TopoGym observation *is*: the policy module and the two intrinsic-reward
+world models (ICM and RND), whose feature spaces are built by
+`CellEncoder` over the `dict` observation rather than by an MLP over a
+flattened patch. Choosing φ is a choice ICM and RND both leave open —
+Pathak et al. use a convolutional φ over pixels — so this is an encoder
+decision, not a change to either algorithm; the forward and inverse
+models, the losses, and β are the papers'. `Baseline.run()` enforces
+the protocol: hyperparameters
 on `tune`, gradients on `train`, early stopping on `val`, `test` read
 once at the end. Subclasses supply `fit()` and `policy()`; everything
 else is inherited, which is why an intrinsic-reward variant is
