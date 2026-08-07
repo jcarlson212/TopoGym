@@ -69,8 +69,8 @@ def test_variants_subclass_rather_than_copy():
 
 @pytest.mark.slow
 def test_ppo_trains_and_produces_a_policy():
-    ray.init(num_cpus=2, log_to_driver=False, include_dashboard=False,
-             ignore_reinit_error=True)
+    ray.init(address="local", num_cpus=2, log_to_driver=False,
+             include_dashboard=False, ignore_reinit_error=True)
     try:
         rows = load_split("train")[:2]
         baseline = PPOBaseline(BaselineConfig(
@@ -93,3 +93,80 @@ def test_ppo_trains_and_produces_a_policy():
         baseline.close()
     finally:
         ray.shutdown()
+
+
+def test_validation_measures_both_return_and_coverage():
+    """Either signal alone stops too early: return is mostly noise on a
+    sparse goal, and coverage is not what PPO optimises."""
+    import inspect
+
+    source = inspect.getsource(PPOBaseline._validate)
+    assert '"return"' in source and '"coverage"' in source
+    fit = inspect.getsource(PPOBaseline.fit)
+    # Staleness advances only when neither improved.
+    assert "if improved:" in fit and "elif moved:" in fit
+    assert "neither validation return nor coverage improved" in fit
+
+
+def test_training_report_carries_both_bests():
+    from topogym.baselines.gridworld2dv1.protocol import TrainingReport
+
+    report = TrainingReport()
+    payload = report.to_dict()
+    assert "best_val_return" in payload
+    assert "best_val_coverage" in payload
+
+
+@pytest.mark.slow
+def test_early_stopping_needs_both_signals_to_stall():
+    """A policy still finding new states has not converged, whatever
+    its return is doing."""
+    from topogym.baselines.gridworld2dv1.protocol import Hyperparameters
+
+    ray.init(address="local", num_cpus=2, log_to_driver=False,
+             include_dashboard=False, ignore_reinit_error=True)
+    try:
+        rows = load_split("train")[:2]
+        baseline = PPOBaseline(BaselineConfig(
+            num_env_runners=0, train_batch_size=300, max_iterations=6,
+            val_every=1, patience=2, val_episodes=1,
+        ))
+        # Return is pinned flat while coverage keeps climbing: the run
+        # must not stop.
+        climbing = iter([0.1 * i for i in range(1, 20)])
+        baseline._validate = lambda _v: {"return": 0.0,
+                                         "coverage": next(climbing)}
+        report = baseline.fit(rows, rows, Hyperparameters({"lr": 3e-4}))
+        assert report.iterations == 6          # ran the full budget
+        assert not report.stopped_early
+        baseline.close()
+    finally:
+        ray.shutdown()
+
+
+def test_ray_tests_never_attach_to_a_running_cluster():
+    """``ray.init()`` attaches to a local cluster if one is running,
+    and ``ray.shutdown()`` then tears it down -- which once killed a
+    benchmark sweep mid-flight. Every Ray test must start its own."""
+    import ast
+    import pathlib
+
+    folder = pathlib.Path(__file__).resolve().parent
+    for path in sorted(folder.glob("test_*.py")):
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            # An AST walk, not a text scan: prose that mentions
+            # ray.init is not a call to it.
+            if not isinstance(node, ast.Call):
+                continue
+            target = node.func
+            if not (isinstance(target, ast.Attribute)
+                    and target.attr == "init"
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "ray"):
+                continue
+            keywords = {kw.arg for kw in node.keywords}
+            assert "address" in keywords, (
+                f"{path.name}:{node.lineno} ray.init() without "
+                "address= attaches to a running cluster"
+            )

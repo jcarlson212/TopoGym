@@ -130,6 +130,9 @@ class TrainingReport:
     #: had.
     stopped_because: str = "budget exhausted"
     best_val_return: float | None = None
+    #: Best validation coverage. Training stops only when neither this
+    #: nor the return has improved for ``patience`` checks.
+    best_val_coverage: float | None = None
     best_checkpoint: str | None = None
     history: list = field(default_factory=list)
 

@@ -235,38 +235,51 @@ class PPOBaseline(Baseline):
                               "sequential": True,
                               "env_options": self.env_options()})
         report = TrainingReport()
-        best, stale, baseline_value, moved = -float("inf"), 0, None, False
+        best = {"return": -float("inf"), "coverage": -float("inf")}
+        first, stale, moved = None, 0, False
         try:
             for iteration in range(1, self.config.max_iterations + 1):
                 entry = {"iteration": iteration,
                          "train_return":
                              mean_return(self._algorithm.train())}
                 if iteration % self.config.val_every == 0:
-                    score = self._validate(validator)
-                    entry["val_return"] = score
-                    if baseline_value is None:
-                        baseline_value = score
-                    elif score != baseline_value:
-                        # The objective has moved at least once, so a
-                        # plateau from here is a real plateau.
+                    scores = self._validate(validator)
+                    entry["val_return"] = scores["return"]
+                    entry["val_coverage"] = scores["coverage"]
+                    if first is None:
+                        first = dict(scores)
+                    elif any(scores[k] != first[k] for k in scores):
+                        # Something has moved, so a plateau from here
+                        # is a real plateau rather than a flat signal.
                         moved = True
-                    if score > best:
-                        best, stale = score, 0
+                    # Stop only when *neither* signal is improving: a
+                    # policy still finding new states has not converged,
+                    # whatever its (mostly noise) return is doing.
+                    improved = False
+                    for key, value in scores.items():
+                        if value > best[key]:
+                            best[key] = value
+                            improved = True
+                    if improved:
+                        stale = 0
                         report.best_checkpoint = self._checkpoint()
                     elif moved:
                         stale += 1
                     logger.info(
-                        "[%s] iter %d train %.3f val %.3f "
-                        "(stale %d/%d%s)",
+                        "[%s] iter %d train %.3f val return %.3f "
+                        "coverage %.4f (stale %d/%d%s)",
                         self.name, iteration, entry["train_return"],
-                        score, stale, self.config.patience,
+                        scores["return"], scores["coverage"], stale,
+                        self.config.patience,
                         "" if moved else ", signal flat",
                     )
                 report.history.append(entry)
                 report.iterations = iteration
                 if moved and stale >= self.config.patience:
                     report.stopped_early = True
-                    report.stopped_because = "validation plateaued"
+                    report.stopped_because = (
+                        "neither validation return nor coverage improved"
+                    )
                     logger.info("[%s] early stop at iteration %d",
                                 self.name, iteration)
                     break
@@ -279,7 +292,12 @@ class PPOBaseline(Baseline):
             # halting on a plateau that was never a plateau.
             report.stopped_because = ("budget exhausted" if moved
                                       else "no learning signal")
-        report.best_val_return = best if np.isfinite(best) else None
+        report.best_val_return = (best["return"]
+                                  if np.isfinite(best["return"])
+                                  else None)
+        report.best_val_coverage = (best["coverage"]
+                                    if np.isfinite(best["coverage"])
+                                    else None)
         return report
 
     def _checkpoint(self) -> str | None:
@@ -289,13 +307,19 @@ class PPOBaseline(Baseline):
         directory.mkdir(parents=True, exist_ok=True)
         return str(self._algorithm.save(str(directory)).checkpoint.path)
 
-    def _validate(self, validator) -> float:
-        """Mean greedy return over validation instances.
+    def _validate(self, validator) -> dict:
+        """Mean greedy return *and* coverage over validation instances.
 
         ``val`` decides only *when to stop*: no gradient is taken here.
+        Both are measured because either alone stops too early. Return
+        is the objective, but on a sparse goal it is mostly noise --
+        a run of 0.000 broken by a 0.003 of shaped reward -- and
+        stopping on that halts a policy whose exploration is still
+        improving. Coverage alone would be the wrong criterion for the
+        opposite reason: it is not what PPO optimises.
         """
         act = self.policy()
-        returns = []
+        returns, coverages = [], []
         for episode in range(self.config.val_episodes):
             observation, _ = validator.reset(seed=episode)
             total, done = 0.0, False
@@ -305,7 +329,13 @@ class PPOBaseline(Baseline):
                 total += reward
                 done = terminated or truncated
             returns.append(total)
-        return float(np.mean(returns)) if returns else float("nan")
+            core = validator.env.unwrapped
+            free = max(1, len(core.layout.free_cells))
+            coverages.append(len(core._visited) / free)
+        if not returns:
+            return {"return": float("nan"), "coverage": float("nan")}
+        return {"return": float(np.mean(returns)),
+                "coverage": float(np.mean(coverages))}
 
     def policy(self) -> Callable:
         import torch

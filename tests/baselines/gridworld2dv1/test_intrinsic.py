@@ -61,8 +61,8 @@ def test_intrinsic_weight_is_searched():
 def test_curiosity_model_lives_in_the_learner_and_trains(name):
     """A wrapper would give every env runner its own copy; the papers
     train one model on the same batches as the policy."""
-    ray.init(num_cpus=2, log_to_driver=False, include_dashboard=False,
-             ignore_reinit_error=True)
+    ray.init(address="local", num_cpus=2, log_to_driver=False,
+             include_dashboard=False, ignore_reinit_error=True)
     try:
         rows = load_split("train")[:2]
         baseline = get_baseline(name)(BaselineConfig(
@@ -97,8 +97,8 @@ def test_icm_and_rnd_use_different_models():
     """The shared constant names a slot in the MultiRLModule, not an
     architecture: ICM puts feature/inverse/forward nets in it, RND a
     predictor against a frozen random target."""
-    ray.init(num_cpus=2, log_to_driver=False, include_dashboard=False,
-             ignore_reinit_error=True)
+    ray.init(address="local", num_cpus=2, log_to_driver=False,
+             include_dashboard=False, ignore_reinit_error=True)
     try:
         rows = load_split("train")[:2]
         built = {}

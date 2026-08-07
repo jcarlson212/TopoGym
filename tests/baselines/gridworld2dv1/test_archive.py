@@ -108,8 +108,8 @@ def test_archive_is_shared_across_processes_as_an_actor():
     """The point of the actor: two callers, one archive per world."""
     ray = pytest.importorskip("ray")
 
-    ray.init(num_cpus=2, log_to_driver=False, include_dashboard=False,
-             ignore_reinit_error=True)
+    ray.init(address="local", num_cpus=2, log_to_driver=False,
+             include_dashboard=False, ignore_reinit_error=True)
     try:
         env = _world(0)
         key = layout_fingerprint(env.layout)
