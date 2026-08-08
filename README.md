@@ -311,6 +311,29 @@ Use `witness` to hold a large point cloud at a fixed landmark budget.
 `torsion()` runs an integer Smith normal form and is an offline
 diagnostic, not an online signal.
 
+## Env Step Profile
+
+How fast the environment steps under random actions, and how that
+scales across `gymnasium.vector.AsyncVectorEnv`:
+
+![Step throughput vs parallelism](docs/env_step_profile.png)
+
+A 50×50 world with `actions="egocentric"`. `obs_mode` is the
+observation — a separate axis from the action space:
+
+| `obs_mode` | what the agent sees |
+|---|---|
+| `local` (default) | the occluded 7×7 egocentric patch of symbolic codes |
+| `dict` | that patch, plus per-cell textures and absolute position |
+| `vector` | position plus the texture block of the current cell |
+| `global` | the whole grid, unoccluded |
+
+Measured on an M5 Mac (18 cores) with 2–10% user/system usage.
+
+```bash
+python scripts/benchmarks/profiles/step_throughput.py
+```
+
 ## Documentation
 
 - **[`docs/specs/topo_gym_overview.pdf`](docs/specs/topo_gym_overview.pdf)**
