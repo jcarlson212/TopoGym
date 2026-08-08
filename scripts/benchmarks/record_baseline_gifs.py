@@ -76,37 +76,62 @@ def _label(frame: np.ndarray, text: str) -> np.ndarray:
 
 
 def record(row: dict, baseline, path: pathlib.Path,
-           episodes: int) -> int:
+           episodes: int, archive: bool = True,
+           max_steps: int | None = None,
+           phases: list | None = None) -> int:
     """Drive one baseline through an instance and write the GIF.
 
-    Every step is rendered, then frames are sampled evenly so the
-    result plays in about :data:`TARGET_SECONDS`. Each frame carries
-    the step and episode it came from.
+    Frames are sampled evenly so the result plays in about
+    :data:`TARGET_SECONDS`, and only sampled frames are *rendered* --
+    an unpinned evaluation horizon makes a phase 2,820 steps long, and
+    drawing every one of them to keep a hundred spends minutes on
+    pictures that are thrown away.
+
+    ``phases`` shows a study end to end: a list of
+    ``(name, episodes, archive, max_steps)`` run in order with one
+    continuous step counter, so training runs into evaluation without
+    the clock resetting. That shape -- an archive filling up, then a
+    policy turned loose on what it learned -- is not visible in either
+    half alone.
     """
     import imageio.v3 as iio
 
-    env = make_instance(row, reveal_hidden=True,
-                        **baseline.env_options())
+    overrides = dict(baseline.env_options())
+    if max_steps:
+        overrides["max_steps"] = int(max_steps)
+    env = make_instance(row, reveal_hidden=True, **overrides)
     core = env.unwrapped
     policy = baseline.policy()
     tile = max(1, GIF_PX // max(core._probe_layout().base.layout_size()))
     frames, labels, info, tick = [], [], {}, 0
+    plan = phases or [("", episodes, archive, max_steps)]
+    expected = sum(int(count) * int(horizon or max_steps or 1)
+                   for _n, count, _a, horizon in plan)
+    stride = max(1, expected // max(1, MAX_FRAMES))
 
-    for episode in range(episodes):
-        target = (baseline.choose_reset(core, info) if episode else None)
-        options = ({"teleport": tuple(int(v) for v in target)}
-                   if target is not None else None)
-        obs, info = env.reset(seed=episode, options=options)
-        frames.append(render_rgb_2d(core, tile=tile))
-        labels.append(f"{episode}-{tick}")
-        while True:
-            obs, _reward, terminated, truncated, info = env.step(
-                policy(obs, core))
-            tick += 1
+    for name, count, use_archive, horizon in plan:
+        if horizon:
+            # Each phase runs at its own episode length; the step
+            # counter does not restart between them.
+            core._max_steps_cfg = int(horizon)
+        for episode in range(int(count)):
+            target = (baseline.choose_reset(core, info)
+                      if use_archive and tick else None)
+            options = ({"teleport": tuple(int(v) for v in target)}
+                       if target is not None else None)
+            obs, info = env.reset(seed=tick, options=options)
+            tag = f"{name} " if name else ""
             frames.append(render_rgb_2d(core, tile=tile))
-            labels.append(f"{episode}-{tick}")
-            if terminated or truncated:
-                break
+            labels.append(f"{tag}{episode}-{tick}")
+            while True:
+                obs, _reward, terminated, truncated, info = env.step(
+                    policy(obs, core))
+                tick += 1
+                if tick % stride == 0 or terminated or truncated:
+                    frames.append(render_rgb_2d(core, tile=tile))
+                    labels.append(f"{tag}{episode}-{tick}")
+                if terminated or truncated:
+                    break
 
     # Space the kept frames evenly over the whole run rather than
     # truncating it, so the GIF shows the shape of the exploration.

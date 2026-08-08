@@ -5,6 +5,8 @@ import pytest
 ray = pytest.importorskip("ray", reason="needs topogym[benchmarks]")
 pytest.importorskip("torch", reason="needs topogym[benchmarks]")
 
+import numpy as np  # noqa: E402
+
 from topogym.baselines.gridworld2dv1 import BaselineConfig  # noqa: E402
 from topogym.baselines.gridworld2dv1.concrete_baselines.ppo import (  # noqa: E402
     PPOBaseline,
@@ -170,3 +172,83 @@ def test_ray_tests_never_attach_to_a_running_cluster():
                 f"{path.name}:{node.lineno} ray.init() without "
                 "address= attaches to a running cluster"
             )
+
+
+# -- evaluating a stochastic policy -----------------------------------
+
+class _FlatLogits:
+    """A module whose logits are uniform -- an untrained policy."""
+
+    @staticmethod
+    def forward_inference(batch):
+        import torch
+
+        return {"action_dist_inputs": torch.zeros((1, 3))}
+
+
+class _Stub(PPOBaseline):
+    name = "stub"
+
+    def __init__(self, module, **kw):
+        super().__init__(**kw)
+
+        class _Algo:
+            @staticmethod
+            def get_module():
+                return module
+
+        self._algorithm = _Algo()
+
+
+def test_evaluation_samples_rather_than_taking_the_mode():
+    """PPO optimises an entropy-regularised stochastic policy: the
+    distribution *is* the policy. Taking its mode reports a different
+    object than the one that was trained."""
+    act = _Stub(_FlatLogits()).policy()
+    chosen = {act(np.zeros(49, dtype=np.float32), None)
+              for _ in range(200)}
+    assert chosen == {0, 1, 2}, chosen
+
+
+def test_taking_the_mode_of_a_flat_policy_is_a_constant_action():
+    """The failure this guards against. An untrained policy has
+    near-uniform logits and the start cell's observation barely
+    changes, so the mode is one action forever -- an agent that turns
+    left for 9,000 steps and visits a single cell of 5,468."""
+    baseline = _Stub(_FlatLogits())
+    baseline.stochastic_evaluation = False
+    act = baseline.policy()
+    assert len({act(np.zeros(49, dtype=np.float32), None)
+                for _ in range(50)}) == 1
+
+
+def test_sampling_is_seeded_and_therefore_reproducible():
+    """Determinism is the property the whole benchmark rests on."""
+    obs = np.zeros(49, dtype=np.float32)
+    first = _Stub(_FlatLogits(), config=BaselineConfig(seed=7)).policy()
+    second = _Stub(_FlatLogits(), config=BaselineConfig(seed=7)).policy()
+    assert [first(obs, None) for _ in range(50)] == \
+           [second(obs, None) for _ in range(50)]
+
+
+def test_a_confident_policy_still_follows_its_preference():
+    """Sampling must not turn a trained policy into a random walk."""
+    import torch
+
+    class _Confident:
+        @staticmethod
+        def forward_inference(batch):
+            return {"action_dist_inputs": torch.tensor([[0.0, 0.0, 12.0]])}
+
+    act = _Stub(_Confident()).policy()
+    chosen = [act(np.zeros(49, dtype=np.float32), None)
+              for _ in range(200)]
+    assert chosen.count(2) > 195
+
+
+def test_every_gradient_baseline_evaluates_stochastically():
+    from topogym.baselines.gridworld2dv1 import get_baseline
+
+    for name in ("ppo", "icm-ppo", "rnd-ppo"):
+        assert get_baseline(name)().stochastic_evaluation is True
+        assert get_baseline(name)().steps_per_iteration() == 4000

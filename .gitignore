@@ -28,3 +28,19 @@ seeds-*.png
 
 # Baseline run side effects: logs, checkpoints, per-step traces.
 runs/
+
+# Unpublished methods. A baseline under review lives outside the
+# repository but still has to face the same harness as a published one,
+# or its numbers are not comparable. The package imports any
+# `_private_*.py` under concrete_baselines when present and ignores it
+# when absent (see baselines/gridworld2dv1/__init__.py), so a clone
+# without these files is a working library with fewer baselines.
+#
+# Deliberately generic: naming the method here would put it in a
+# tracked file, which is the thing these patterns exist to prevent.
+topogym/baselines/gridworld2dv1/concrete_baselines/_private_*.py
+tests/**/test_private_*.py
+benchmarks/**/private/
+benchmarks/private/
+runs/**/private/
+runs/private/

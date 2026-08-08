@@ -106,6 +106,24 @@ class PPOBaseline(Baseline):
         return RLModuleSpec(module_class=CellPPOModule,
                             model_config=self.encoder_config())
 
+    #: Whether evaluation samples from the policy or takes its mode.
+    #:
+    #: Sampling, and it is not a detail. PPO optimises an
+    #: entropy-regularised *stochastic* policy: the distribution is the
+    #: policy, and its exploration lives in the sampling. Evaluating
+    #: the mode reports a different object than the one that was
+    #: trained -- and on a policy that has learned little, whose logits
+    #: are near-uniform and whose observation at the start cell barely
+    #: changes, the mode is a *constant action*. An agent that turns
+    #: left forever visits one cell, which is what this harness
+    #: measured before: 1 cell of 5,468, fifty times worse than a
+    #: random walk, for every gradient method at once.
+    stochastic_evaluation = True
+
+    def steps_per_iteration(self) -> int | None:
+        """RLlib trains in iterations of ``train_batch_size`` steps."""
+        return int(self.config.train_batch_size)
+
     def algorithm_config(self, rows: list, values: dict, seed: int):
         """The RLlib config for one training run.
 
@@ -343,6 +361,8 @@ class PPOBaseline(Baseline):
         if self._algorithm is None:
             raise RuntimeError("fit() must run before policy()")
         module = self._algorithm.get_module()
+        stochastic = self.stochastic_evaluation
+        rng = np.random.default_rng(self.config.seed)
 
         def act(observation, env):
             # The dict observation stays a dict all the way to the
@@ -361,7 +381,14 @@ class PPOBaseline(Baseline):
             logits = out.get("action_dist_inputs")
             if logits is None:
                 return int(np.asarray(out["actions"]).reshape(-1)[0])
-            return int(torch.argmax(logits, dim=-1).item())
+            if not stochastic:
+                return int(torch.argmax(logits, dim=-1).item())
+            flat = logits.reshape(-1).double()
+            probs = torch.softmax(flat, dim=-1).numpy()
+            total = float(probs.sum())
+            if not np.isfinite(total) or total <= 0:
+                return int(torch.argmax(logits, dim=-1).item())
+            return int(rng.choice(len(probs), p=probs / total))
 
         return act
 

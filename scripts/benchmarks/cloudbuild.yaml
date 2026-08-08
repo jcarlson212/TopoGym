@@ -1,0 +1,28 @@
+# Build the benchmark image from a Dockerfile that is not at the repo
+# root.
+#
+# `gcloud builds submit --tag` only ever builds `./Dockerfile` -- it
+# rejects `-f`, which is why the tag form cannot be used here. A build
+# config can pass the flag through to docker, so the Dockerfile stays
+# with the other benchmark scripts instead of being moved to the root
+# to satisfy a CLI limitation.
+#
+# Invoked as:
+#   gcloud builds submit --config scripts/benchmarks/cloudbuild.yaml \
+#       --substitutions=_IMAGE=<region>-docker.pkg.dev/<proj>/topogym/...
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - scripts/benchmarks/Dockerfile
+      - -t
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+options:
+  # The image install (torch, ray) is heavy; the default machine spends
+  # most of the build swapping.
+  machineType: E2_HIGHCPU_8
+timeout: 2400s

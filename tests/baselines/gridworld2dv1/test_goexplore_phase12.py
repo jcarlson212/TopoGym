@@ -407,3 +407,82 @@ def test_the_recurrent_priming_step_is_declared_inapplicable():
     model_config = getattr(spec, "model_config", None) or {}
     assert not model_config.get("use_lstm")
     assert not model_config.get("use_attention")
+
+
+# -- the budget when phase 1 finds nothing ----------------------------
+
+def test_an_unused_phase_two_budget_returns_to_phase_one():
+    """Phase 2 exists only once phase 1 has something to robustify.
+    With no route, discarding its half makes this method phase 1 with
+    half the exploration -- worse by construction, and any comparison
+    between them measures the split rather than the algorithms."""
+    from topogym.baselines.gridworld2dv1.single_layout import (
+        episodes_for,
+        layout_row,
+    )
+
+    row = layout_row("TopoGym/EpicChase8-120-v0", 0)
+    baseline = get_baseline("go-explore-phase1and2")(
+        BaselineConfig(seed=0, max_iterations=1))
+    spent = []
+    baseline.explore = lambda rows, episodes, seed: (
+        spent.append(episodes), ([], ()))[1]
+
+    result = baseline.single_layout_train_test_run(
+        row, step_budget=3600, eval_episodes=2)
+
+    total = episodes_for(3600, int(row["horizon"]))
+    assert sum(spent) == total, (
+        f"explored {sum(spent)} of {total} episodes; the rest was lost")
+    assert result.training["phase1_episodes"] == total
+
+
+def test_a_found_route_still_leaves_phase_two_its_budget():
+    from topogym.baselines.gridworld2dv1.single_layout import (
+        episodes_for,
+        layout_row,
+    )
+
+    row = layout_row("TopoGym/EpicChase8-120-v0", 0)
+    baseline = get_baseline("go-explore-phase1and2")(
+        BaselineConfig(seed=0, max_iterations=1))
+    route = ((1, 1), (1, 2), (1, 3))
+    spent = []
+    baseline.explore = lambda rows, episodes, seed: (
+        spent.append(episodes), ([], route))[1]
+    baseline.robustify = lambda *a, **k: {
+        "stages": [], "reached_start": False, "why": "stubbed"}
+
+    result = baseline.single_layout_train_test_run(
+        row, step_budget=3600, eval_episodes=2)
+    assert sum(spent) < episodes_for(3600, int(row["horizon"]))
+    assert result.training["demonstration_cells"] == len(route)
+
+
+def test_it_tunes_the_archive_grid_not_ppos():
+    """Inheriting PPOBaseline's grid would search a learning rate that
+    only matters once phase 1 has found a route, while leaving the
+    cell-selection weights that decide whether it ever does at their
+    defaults."""
+    from topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1 import (  # noqa: E501
+        GoExplorePhase1Baseline,
+    )
+
+    both = get_baseline("go-explore-phase1and2")()
+    assert both.tune_grid == GoExplorePhase1Baseline.tune_grid
+    assert "w_topo" not in both.tune_grid[0]
+    assert "w_a" in both.tune_grid[0]
+
+
+def test_the_evaluation_measures_the_policy_not_the_archive():
+    row_seed = 0
+    from topogym.baselines.gridworld2dv1.single_layout import layout_row
+
+    row = layout_row("TopoGym/Decoys1-50-v0", row_seed)
+    baseline = get_baseline("go-explore-phase1and2")(
+        BaselineConfig(seed=0, max_iterations=1))
+    baseline.explore = lambda rows, episodes, seed: ([], ())
+    result = baseline.single_layout_train_test_run(
+        row, step_budget=1800, eval_episodes=2)
+    assert result.config["eval_archive"] is False
+    assert result.eval_horizon >= int(row["horizon"])

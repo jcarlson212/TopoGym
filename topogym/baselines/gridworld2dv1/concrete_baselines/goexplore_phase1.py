@@ -50,6 +50,7 @@ import numpy as np
 from topogym.baselines.gridworld2dv1.archive import (
     ATTRIBUTES,
     DEFAULTS,
+    layout_fingerprint,
 )
 from topogym.baselines.gridworld2dv1.archive import (
     LayoutArchive as Archive,
@@ -84,10 +85,18 @@ class GoExploreReset:
 
     def __call__(self, env, info: dict):
         layout = getattr(env, "layout", None)
-        if layout is not self._layout:
+        # Keyed by *fingerprint*, not object identity. The harness
+        # rebuilds the environment between training, evaluation and GIF
+        # recording, and the layout cache hands out a fresh copy each
+        # time -- so an identity check discards the archive three times
+        # over and an archive method arrives at evaluation having
+        # learned nothing. The fingerprint says what matters: same
+        # world, same archive.
+        fingerprint = layout_fingerprint(layout)
+        if fingerprint != self._layout:
             self.archive = Archive(self.params, self.seed,
                                    neighbors=layout.base.neighbors)
-            self._layout = layout
+            self._layout = fingerprint
             self._chosen_from = None
         # The archive updates at the end of the episode, before the
         # next cell is selected -- the order the algorithm requires.
@@ -142,6 +151,17 @@ class GoExplorePhase1Baseline(Baseline):
     def __init__(self, config=None):
         super().__init__(config)
         self._params = dict(DEFAULTS)
+        self._env = None
+
+    def bind_env(self, env) -> None:
+        """Keep the study's world, so exploring and being evaluated
+        happen in one continuous life rather than two."""
+        self._env = env
+
+    def restorable_cells(self) -> tuple:
+        hook = getattr(self, "_reset_hook", None)
+        archive = getattr(hook, "archive", None) if hook else None
+        return tuple(archive.cells) if archive else ()
 
     # -- the protocol -------------------------------------------------
 
@@ -235,12 +255,52 @@ class GoExplorePhase1Baseline(Baseline):
 
     def fit(self, train_rows: list, val_rows: list,
             hyperparameters: Hyperparameters) -> TrainingReport:
-        """No gradients: the sweep already chose the strategy."""
+        """No gradients -- but an archive is still something to build.
+
+        In the benchmark there is nothing to do here: the strategy came
+        from the tuning sweep, and each hold-out world is new, so its
+        archive can only be built while that world is evaluated.
+
+        Under a step budget (a single-layout study) the situation is
+        the opposite. Training and evaluation are the *same* world, and
+        the archive is precisely what this method learns, so spending
+        the training budget exploring is not an optional extra -- it is
+        the training. Without it the method arrives at evaluation with
+        an empty archive and is measured on the last few percent of its
+        budget.
+        """
         self._params = {**DEFAULTS, **(hyperparameters.values or {})}
+        if not self.config.train_steps or not train_rows:
+            return TrainingReport(
+                iterations=0, stopped_early=False,
+                stopped_because="nothing is trained; the archive "
+                                "strategy is chosen by the tuning sweep",
+            )
+        episodes = self.config.eval_episodes
+        self.explore_rows(train_rows, episodes)
         return TrainingReport(
-            iterations=0, stopped_early=False,
-            stopped_because="nothing is trained; the archive strategy "
-                            "is chosen by the tuning sweep",
+            iterations=episodes, stopped_early=False,
+            stopped_because=f"explored {episodes} episodes to build the "
+                            f"archive the evaluation inherits",
+        )
+
+    def explore_rows(self, rows: list, episodes: int) -> list:
+        """Run the archive out over ``rows`` and keep what it learned.
+
+        Uses this baseline's own reset hook rather than a fresh one, so
+        the archive survives into whatever runs next.
+        """
+        from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
+
+        root, stride = getattr(self, "_telemetry", None) or (None, 1)
+        return evaluate_split(
+            rows, self.policy(), episodes=episodes,
+            seed=self.config.seed, trace=False,
+            choose_reset=self.choose_reset,
+            env_options=self.env_options(),
+            env=self._env if len(rows) == 1 else None,
+            telemetry_root=root, algorithm=self.name,
+            step_stride=stride, split="single-train",
         )
 
     def policy(self) -> Callable:

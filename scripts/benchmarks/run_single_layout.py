@@ -47,12 +47,16 @@ import topogym  # noqa: E402,F401  (registers the ids)
 from topogym.baselines.gridworld2dv1 import (  # noqa: E402
     BASELINES,
     get_baseline,
+    is_public,
 )
 from topogym.baselines.gridworld2dv1.protocol import BaselineConfig  # noqa: E402
 from topogym.baselines.gridworld2dv1.single_layout import (  # noqa: E402
     DEFAULT_EVAL_EPISODES,
     DEFAULT_STEP_BUDGET,
+    TUNING_LAYOUT,
+    TUNING_SEED,
     layout_row,
+    tune_on_layout,
 )
 
 logger = logging.getLogger("topogym")
@@ -116,10 +120,54 @@ def _join(root, *parts: str) -> str:
     return "/".join([str(root).rstrip("/"), *parts])
 
 
-def run_one(name: str, env_id: str, seed: int, args) -> dict:
-    """One (algorithm, layout) study, start to finish."""
-    row = layout_row(env_id, seed)
-    config = BaselineConfig(
+def artifact_root(name: str, artifacts) -> str:
+    """Where ``name``'s artefacts go.
+
+    Every artefact path carries the algorithm's name, so running an
+    unpublished method writes that name into the working tree whatever
+    .gitignore says about its source file. Anything outside the shipped
+    registry is routed under ``private/``, which is ignored wholesale.
+    """
+    return (str(artifacts) if is_public(name)
+            else _join(artifacts, "private"))
+
+
+def tuned_hyperparameters(name: str, args) -> dict | None:
+    """Grid-search ``name`` on the tuning world, once, and cache it.
+
+    On a *different* layout from the one under study: a search scored
+    on the target would pick the values that suit it, and the study
+    would report a fit rather than a method. Cached on disk keyed by
+    (algorithm, layout, seed, budget), so studying five target layouts
+    tunes once rather than five times.
+    """
+    if args.no_tune:
+        return None
+    unit = args.tune_layout.split("/")[-1].removesuffix("-v0")
+    stem = f"{unit}-seed{args.tune_seed}-{args.tune_steps}"
+    cache = (pathlib.Path(artifact_root(name, args.artifacts))
+             / "tuning" / stem / f"{name}.json")
+    if cache.exists():
+        with open(cache, encoding="utf-8") as handle:
+            payload = json.load(handle)
+        logger.info("[%s] reusing tuning from %s: %s", name, cache,
+                    payload.get("values"))
+        return payload.get("values") or None
+
+    outcome = tune_on_layout(
+        get_baseline(name), _config(args),
+        layout=args.tune_layout, seed=args.tune_seed,
+        step_budget=args.tune_steps, eval_episodes=args.tune_episodes,
+    )
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    with open(cache, "w", encoding="utf-8") as handle:
+        json.dump(outcome, handle, indent=2, default=str)
+    logger.info("wrote %s", cache)
+    return outcome.get("values") or None
+
+
+def _config(args) -> BaselineConfig:
+    return BaselineConfig(
         seed=args.seed,
         num_env_runners=args.num_env_runners,
         num_envs_per_runner=args.envs_per_runner,
@@ -130,17 +178,31 @@ def run_one(name: str, env_id: str, seed: int, args) -> dict:
         # accumulate.
         train_episodes_per_instance=args.train_chunk,
     )
-    baseline = get_baseline(name)(config)
-    telemetry_root = (args.telemetry
-                      or _join(args.artifacts, "telemetry", row["unit"]))
+
+
+def run_one(name: str, env_id: str, seed: int, args) -> dict:
+    """One (algorithm, layout) study, start to finish."""
+    row = layout_row(env_id, seed)
+    baseline = get_baseline(name)(_config(args))
+    root = artifact_root(name, args.artifacts)
+    if root != str(args.artifacts):
+        logger.info("[%s] is not a shipped baseline; artefacts go to %s",
+                    name, root)
+    # Layout first, then artefact kind: one environment's results,
+    # figures, GIFs and telemetry sit together, so a study can be read,
+    # copied or thrown away as a unit.
+    telemetry_root = args.telemetry or _join(root, row["unit"],
+                                             "telemetry")
     result = baseline.single_layout_train_test_run(
         row,
         step_budget=args.steps,
         eval_episodes=args.eval_episodes,
         telemetry_root=telemetry_root,
         step_stride=args.step_stride,
-        hyperparameters=(None if args.no_carry
-                         else carried_hyperparameters(name)),
+        eval_archive=args.eval_archive,
+        hyperparameters=(tuned_hyperparameters(name, args)
+                         or (None if args.no_carry
+                             else carried_hyperparameters(name))),
     )
     _publish(result, args, baseline)
     return result.to_dict()
@@ -149,7 +211,8 @@ def run_one(name: str, env_id: str, seed: int, args) -> dict:
 def _publish(result, args, baseline) -> None:
     """Write the JSON summary, then the GIF, under the artifact root."""
     payload = json.dumps(result.to_dict(), indent=2, default=str)
-    target = _join(args.artifacts, "results", result.layout,
+    root = artifact_root(result.algorithm, args.artifacts)
+    target = _join(root, result.layout, "results",
                    f"{result.algorithm}.json")
     if _is_uri(args.artifacts):
         import pyarrow.fs as pafs
@@ -166,25 +229,106 @@ def _publish(result, args, baseline) -> None:
     logger.info("wrote %s", target)
 
     if args.record_gifs and not _is_uri(args.artifacts):
-        _record_gif(result, args, baseline)
+        _record_gif(result, args, baseline, root)
 
 
-def _record_gif(result, args, baseline) -> None:
+def _record_gif(result, args, baseline, root) -> None:
     """One episode of the fitted policy, in the layout it was fitted on."""
     from record_baseline_gifs import record
 
-    folder = (pathlib.Path(args.artifacts) / "gifs" / result.layout)
+    folder = (pathlib.Path(root) / result.layout / "gifs")
     folder.mkdir(parents=True, exist_ok=True)
     try:
         # The *fitted* baseline, not a fresh one: a GIF of an unfitted
         # policy is a picture of nothing, and rebuilding here once cost
         # a sweep three evaluations.
+        # Training then evaluation, one continuous step counter: the
+        # archive filling up, then the policy turned loose on what it
+        # learned. Neither half shows that shape on its own.
         record(layout_row(result.env_id, result.seed), baseline,
                folder / f"{result.algorithm}.gif",
-               episodes=args.gif_episodes)
+               episodes=args.gif_episodes,
+               phases=[
+                   ("train", args.gif_episodes, True, result.horizon),
+                   ("eval", args.gif_episodes, args.eval_archive,
+                    result.eval_horizon or result.horizon),
+               ])
     except Exception as exc:  # a missing GIF must not fail a study
         logger.warning("[%s] gif recording failed: %s",
                        result.algorithm, exc)
+
+
+def _write_run_manifest(args, names: list) -> None:
+    """Record what produced these artefacts, beside them.
+
+    A result nobody can reproduce is an anecdote. The seeds are the
+    part most easily lost -- the layout seed decides which world this
+    is, the algorithm seed the run inside it, the tuning seed the
+    values it ran with -- so all of them, the commit, and the literal
+    argv go in the artefact root.
+    """
+    import datetime
+    import subprocess
+    import sys as _sys
+
+    if _is_uri(args.artifacts):
+        return
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT,
+            capture_output=True, text=True).stdout.strip()
+    except Exception:
+        commit = None
+    manifest = {
+        "argv": _sys.argv, "commit": commit,
+        "started": datetime.datetime.now().astimezone().isoformat(),
+        "algorithms": names, "layouts": args.layouts,
+        "layout_seeds": args.layout_seeds,
+        "algorithm_seed": args.seed, "steps": args.steps,
+        "eval_episodes": args.eval_episodes,
+        "eval_archive": args.eval_archive,
+        "tuning": None if args.no_tune else {
+            "layout": args.tune_layout, "seed": args.tune_seed,
+            "steps": args.tune_steps, "episodes": args.tune_episodes,
+        },
+        "shard": {"index": args.shard_index, "count": args.shard_count},
+    }
+    folder = pathlib.Path(args.artifacts)
+    folder.mkdir(parents=True, exist_ok=True)
+    name = (f"run-shard{args.shard_index}.json" if args.shard_count > 1
+            else "run.json")
+    with open(folder / name, "w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2, default=str)
+    logger.info("wrote %s", folder / name)
+
+
+def _publish_layouts(args) -> None:
+    """Figures and a summary per layout, from whatever has landed.
+
+    Separate runs -- archive methods on one machine, gradient methods
+    on another -- merge by writing into the same root, so this reads
+    what is there rather than what one run produced.
+    """
+    if _is_uri(args.artifacts):
+        logger.info("artefacts are remote; skipping local publishing")
+        return
+    from topogym.baselines.gridworld2dv1.single_layout import (
+        plot_single_layout,
+        write_single_layout_md,
+    )
+
+    units = [
+        env_id.split("/")[-1].removesuffix("-v0")
+        + ("" if seed == 0 else f"@{seed}")
+        for env_id in args.layouts for seed in args.layout_seeds
+    ]
+    for unit in units:
+        for step, label in ((plot_single_layout, "plots"),
+                            (write_single_layout_md, "summary")):
+            try:
+                step(args.artifacts, unit)
+            except Exception as exc:
+                logger.warning("%s for %s failed: %s", label, unit, exc)
 
 
 def main() -> int:
@@ -193,8 +337,33 @@ def main() -> int:
                         help="algorithm names, or 'all'")
     parser.add_argument("--layouts", nargs="+", default=list(ROSTER),
                         help="registry ids; the roster by default")
-    parser.add_argument("--layout-seed", type=int, default=0,
-                        help="seed of the layout under study")
+    parser.add_argument("--layout-seeds", type=int, nargs="+",
+                        default=[0],
+                        help="seeds of the layout under study; each is "
+                             "a separate study")
+    parser.add_argument("--shard-index", type=int, default=0,
+                        help="this worker's slice of the study list")
+    parser.add_argument("--shard-count", type=int, default=1,
+                        help="how many workers split it. Each study is "
+                             "independent, so sharding is exact and no "
+                             "worker waits on another")
+    parser.add_argument("--tune-layout", default=TUNING_LAYOUT,
+                        help="world hyperparameters are chosen on; not "
+                             "the one under study")
+    parser.add_argument("--tune-seed", type=int, default=TUNING_SEED)
+    parser.add_argument("--tune-steps", type=int, default=100_000,
+                        help="budget per grid candidate; smaller than "
+                             "the study's, since the grid is wide")
+    parser.add_argument("--tune-episodes", type=int, default=25)
+    parser.add_argument("--no-tune", action="store_true")
+    parser.add_argument("--eval-archive", action="store_true",
+                        help="let evaluation take archive resets. Off "
+                             "by default: the archive is a training "
+                             "artefact, and evaluation measures the "
+                             "policy training produced")
+    parser.add_argument("--publish-only", action="store_true",
+                        help="run no studies; redraw figures and "
+                             "summaries from the results already there")
     parser.add_argument("--steps", type=int, default=DEFAULT_STEP_BUDGET,
                         help="environment steps of learning per study")
     parser.add_argument("--eval-episodes", type=int,
@@ -238,18 +407,31 @@ def main() -> int:
         parser.error(f"unknown baselines {unknown}; "
                      f"choose from {sorted(BASELINES)}")
 
-    studies = [(name, env_id) for env_id in args.layouts
-               for name in names]
-    logger.info("=== %d studies: %d algorithms x %d layouts, "
-                "%d steps each ===",
-                len(studies), len(names), len(args.layouts), args.steps)
+    _write_run_manifest(args, names)
+    if args.publish_only:
+        _publish_layouts(args)
+        return 0
+
+    studies = [(name, env_id, seed) for env_id in args.layouts
+               for seed in args.layout_seeds for name in names]
+    total = len(studies)
+    if args.shard_count > 1:
+        studies = studies[args.shard_index::args.shard_count]
+        logger.info("=== shard %d/%d: %d of %d studies ===",
+                    args.shard_index, args.shard_count, len(studies),
+                    total)
+    logger.info("=== %d studies: %d algorithms x %d layouts x %d seeds, "
+                "%d steps each ===", total, len(names),
+                len(args.layouts), len(args.layout_seeds), args.steps)
 
     failures = []
-    for index, (name, env_id) in enumerate(studies, 1):
+    for index, (name, env_id, layout_seed) in enumerate(studies, 1):
         unit = env_id.split("/")[-1].removesuffix("-v0")
+        if layout_seed != 0:
+            unit = f"{unit}@{layout_seed}"
         if args.only_missing and not _is_uri(args.artifacts):
-            existing = (pathlib.Path(args.artifacts) / "results" / unit
-                        / f"{name}.json")
+            existing = (pathlib.Path(artifact_root(name, args.artifacts))
+                        / unit / "results" / f"{name}.json")
             if existing.exists():
                 logger.info("[%d/%d] %s on %s already done; skipping",
                             index, len(studies), name, unit)
@@ -257,25 +439,14 @@ def main() -> int:
         logger.info("=== [%d/%d] %s on %s ===",
                     index, len(studies), name, unit)
         try:
-            run_one(name, env_id, args.layout_seed, args)
+            run_one(name, env_id, layout_seed, args)
         except Exception as exc:
             failures.append((name, unit, str(exc)))
             logger.exception("[%s] on %s failed", name, unit)
             if not args.keep_going:
                 return 1
     # One figure set per layout, drawn once every algorithm on it is
-    # done -- the point of these plots is the comparison.
-    if not _is_uri(args.artifacts):
-        from topogym.baselines.gridworld2dv1.single_layout import (
-            plot_single_layout,
-        )
-
-        for env_id in args.layouts:
-            unit = env_id.split("/")[-1].removesuffix("-v0")
-            try:
-                plot_single_layout(args.artifacts, unit)
-            except Exception as exc:
-                logger.warning("plotting %s failed: %s", unit, exc)
+    _publish_layouts(args)
 
     if failures:
         for name, unit, message in failures:

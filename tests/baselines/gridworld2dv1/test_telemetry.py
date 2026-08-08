@@ -162,3 +162,82 @@ def test_step_stride_thins_the_largest_table_only(tmp_path):
     assert len(steps) == pytest.approx(records[0]["interactions"] / 10,
                                        abs=2)
     assert len(episodes) == 2  # unthinned
+
+
+def test_a_column_null_in_one_part_merges_with_a_typed_one(tmp_path):
+    """Inference is per file, and a column can be legitimately all-null
+    in one part and populated in another -- reset_cell is null for every
+    row of an evaluation taking no archive resets, and a string during
+    training. Arrow then infers null for one and string for the other
+    and refuses to merge, so the whole dataset becomes unreadable
+    because of a column nobody was querying."""
+    with telemetry.open_writer(str(tmp_path), "ge") as writer:
+        writer.add_episodes(
+            [{"episode": 0, "length": 5, "archive_reset": True,
+              "reset_cell": "(3, 4)"}],
+            split="single-train", instance="A@0", family="X",
+            size=50, seed=0)
+        writer.add_episodes(
+            [{"episode": 0, "length": 5, "archive_reset": False,
+              "reset_cell": None}],
+            split="single-eval", instance="A@0", family="X",
+            size=50, seed=0)
+    frame = pd.read_parquet(tmp_path / "episodes")   # must not raise
+    assert len(frame) == 2
+    assert set(frame["split"]) == {"single-train", "single-eval"}
+
+
+def test_fractions_stay_fractions_when_tracing_is_off(tmp_path):
+    """The denominators are not a tracing feature. Leaving them at 1
+    does not disable the fraction fields, it turns them into raw counts
+    -- and a coverage column reading 111.0 will be plotted against one
+    reading 0.11 without complaint."""
+    from topogym.baselines.gridworld2dv1.concrete_baselines.random_walk import (
+        RandomPolicyFactory,
+    )
+    from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
+    from topogym.baselines.gridworld2dv1.instances import load_split
+
+    rows = load_split("val")[:1]
+    for trace in (True, False):
+        folder = tmp_path / f"trace-{trace}"
+        evaluate_split(rows, None, episodes=2, seed=0, trace=trace,
+                       policy_factory=RandomPolicyFactory(0), workers=1,
+                       telemetry_root=str(folder), algorithm="random",
+                       split="val")
+        episodes = pd.read_parquet(folder / "episodes")
+        for column in ("episode_coverage", "lifetime_coverage",
+                       "observed_frac"):
+            values = episodes[column].dropna()
+            assert (values <= 1.0).all(), (column, trace, list(values))
+
+
+def test_chambers_entered_is_lifetime_like_coverage(tmp_path):
+    """The environment clears its per-episode chamber record on every
+    reset, so counting only what one evaluation loop saw reports "1
+    chamber" beside a coverage figure including the six found during
+    training."""
+    from topogym.baselines.gridworld2dv1.concrete_baselines.random_walk import (
+        RandomPolicyFactory,
+    )
+    from topogym.baselines.gridworld2dv1.evaluate import evaluate_instance
+    from topogym.baselines.gridworld2dv1.instances import make_instance
+    from topogym.baselines.gridworld2dv1.single_layout import layout_row
+    from topogym.stats import StatsRecorder
+
+    row = layout_row("TopoGym/Decoys0-50-v0", 0)
+    env = StatsRecorder(make_instance(row, teleport=True))
+    core = env.unwrapped
+    policy = RandomPolicyFactory(0)()
+
+    evaluate_instance(row, policy, episodes=6, seed=0, trace=False,
+                      env=env)
+    first = {i for c, i in core._chamber_of.items()
+             if c in core.lifetime_visit_counts}
+    record = evaluate_instance(row, policy, episodes=2, seed=99,
+                               trace=False, env=env)
+    env.close()
+    assert record["chambers_entered"] >= len(first)
+    assert record["chambers_entered"] == len(
+        {i for c, i in core._chamber_of.items()
+         if c in core.lifetime_visit_counts})

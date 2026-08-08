@@ -1,0 +1,84 @@
+# One pod per shard of the study list, all running at once.
+#
+# Every (algorithm, layout, seed) study is independent -- separate
+# archive, separate result file -- so the work shards exactly and no
+# pod waits on another. An Indexed Job hands each pod its slice through
+# JOB_COMPLETION_INDEX, and the cluster autoscaler adds nodes to run
+# them in parallel rather than queueing them onto one machine.
+#
+# Substituted by launch_gke.sh. Three independent stops on runaway
+# compute, because a cluster nobody remembers is the expensive failure:
+#   - activeDeadlineSeconds kills the Job outright, whatever it is doing
+#   - ttlSecondsAfterFinished deletes it once it ends
+#   - backoffLimit bounds retries, so a crash-looping pod cannot spin
+# and the launcher tears the whole cluster down afterwards.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: topogym-single-layout
+spec:
+  completionMode: Indexed
+  completions: SHARDS_PLACEHOLDER
+  parallelism: SHARDS_PLACEHOLDER
+  # A pod that fails twice is a bug, not bad luck on a spot node.
+  backoffLimit: BACKOFF_PLACEHOLDER
+  # Hard ceiling on the whole Job, in seconds. Nothing runs past it.
+  activeDeadlineSeconds: DEADLINE_PLACEHOLDER
+  # Clean the Job up on its own so a forgotten kubectl does not keep
+  # pods (and their nodes) alive.
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      annotations:
+        # The GCS FUSE driver mounts through a sidecar container that it
+        # injects, and it injects it only when a pod asks. Without this
+        # the mount fails with "failed to find the sidecar container in
+        # Pod spec" -- which reads like a driver bug rather than a
+        # missing opt-in, and burns the Job's backoff limit while it
+        # retries.
+        gke-gcsfuse/volumes: "true"
+        # The sidecar buffers writes on local disk before they reach
+        # the bucket; the parquet telemetry is the largest thing it
+        # handles. This caps that buffer rather than letting it compete
+        # with the node's own disk.
+        gke-gcsfuse/ephemeral-storage-limit: "10Gi"
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: study
+          image: IMAGE_PLACEHOLDER
+          command: ["/bin/sh", "-c"]
+          # The shard index comes from the Job, so every pod runs the
+          # same command and takes a different slice.
+          args:
+            - >-
+              python scripts/benchmarks/run_single_layout.py
+              --shard-index "$JOB_COMPLETION_INDEX"
+              --shard-count SHARDS_PLACEHOLDER
+              ARGS_PLACEHOLDER
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              cpu: CPU_PLACEHOLDER
+              memory: MEM_PLACEHOLDER
+            limits:
+              cpu: CPU_PLACEHOLDER
+              memory: MEM_PLACEHOLDER
+          volumeMounts:
+            - name: results
+              mountPath: /topogym/benchmarks
+      volumes:
+        # Results land in the bucket as they are produced, so a
+        # preempted pod loses only the study in flight, and the studies
+        # that finished are readable while the rest are still running.
+        - name: results
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            volumeAttributes:
+              bucketName: BUCKET_PLACEHOLDER
+              mountOptions: "implicit-dirs"

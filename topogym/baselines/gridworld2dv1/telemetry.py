@@ -73,6 +73,52 @@ EPISODE_FIELDS = (
 )
 
 
+#: Column types, declared rather than inferred.
+#:
+#: Inference is per *file*, and a column can be legitimately all-null in
+#: one part and populated in another -- ``reset_cell`` is null for every
+#: row of an evaluation that takes no archive resets, and a string
+#: during training. Arrow then infers ``null`` for one part and
+#: ``string`` for the other and refuses to merge them, so the whole
+#: dataset becomes unreadable because of a column nobody was querying.
+FIELD_TYPES = {
+    "episode": "int64", "step": "int64", "interaction": "int64",
+    "action": "int64", "x": "int64", "y": "int64", "facing": "string",
+    "reward": "float64", "terminated": "bool_", "truncated": "bool_",
+    "new_cell": "bool_", "visit_count": "int64",
+    "unique_states": "int64", "h0_components": "int64",
+    "length": "int64", "interactions": "int64",
+    "episode_return": "float64", "steps_to_goal": "int64",
+    "reached_goal": "bool_", "episode_coverage": "float64",
+    "lifetime_coverage": "float64", "visit_entropy": "float64",
+    "chambers_entered": "int64", "chambers_total": "int64",
+    "decoys_entered": "int64", "decoys_total": "int64",
+    "observed_h0": "int64", "observed_h1": "int64",
+    "observed_frac": "float64", "archive_reset": "bool_",
+    "reset_cell": "string",
+    "instance": "string", "family": "string", "size": "int64",
+    "seed": "int64",
+}
+
+
+def _schema_for(rows: list):
+    """An Arrow schema for these columns: declared where known, inferred
+    where not (the instances table is open-ended). A null-typed column
+    is never left as such -- it could not merge with a populated one."""
+    import pyarrow as pa
+
+    fields = []
+    for field in pa.Table.from_pylist(rows).schema:
+        declared = FIELD_TYPES.get(field.name)
+        if declared is None:
+            kind = (pa.string() if pa.types.is_null(field.type)
+                    else field.type)
+        else:
+            kind = getattr(pa, declared)()
+        fields.append(pa.field(field.name, kind, nullable=True))
+    return pa.schema(fields)
+
+
 def is_available() -> bool:
     """Whether Parquet telemetry can be written in this environment."""
     try:
@@ -186,11 +232,11 @@ class TelemetryWriter:
             # file. Writing them in both places makes readers infer a
             # dictionary type from the directory and a plain string
             # from the body, and refuse to merge the two.
-            table_data = pa.Table.from_pylist([
-                {k: v for k, v in row.items()
-                 if k not in ("algorithm", "split")}
-                for row in group
-            ])
+            body = [{k: v for k, v in row.items()
+                     if k not in ("algorithm", "split")}
+                    for row in group]
+            table_data = pa.Table.from_pylist(body,
+                                              schema=_schema_for(body))
             with self._fs.open_output_stream(path) as sink:
                 pq.write_table(table_data, sink,
                                compression=self.compression)

@@ -82,6 +82,14 @@ class BaselineConfig:
     #: Environments vectorised inside each runner; multiplies throughput
     #: without another process.
     num_envs_per_runner: int = 1
+
+    #: Training budget in environment *steps*. When set it is the
+    #: authority, and the episode counts are derived from it per layout
+    #: rather than taken as given. Steps are the only currency every
+    #: method spends the same way: an episode is worth 130 steps on one
+    #: layout and 6,760 on another, and a method counted in gradient
+    #: iterations spends whatever its batch size multiplies out to.
+    train_steps: int | None = None
     #: Consecutive training episodes on one instance. One suits
     #: gradient methods; archive methods need a contiguous run for an
     #: archive to accumulate on a given world.
@@ -295,6 +303,102 @@ class Baseline(abc.ABC):
         its choice, and never including the hold-out.
         """
         return Hyperparameters()
+
+    def steps_per_iteration(self) -> int | None:
+        """Environment steps one training iteration consumes, or None
+        for a method not counted in iterations at all.
+
+        The one thing a step budget needs to know about a method's
+        training loop. Declaring it here lets
+        :meth:`apply_step_budget` enforce the budget for every method
+        from one place, rather than each reimplementing the arithmetic
+        and one of them getting it wrong.
+        """
+        return None
+
+    @staticmethod
+    def episodes_in(steps: int, horizon: int) -> int:
+        """Episodes that fit in a step budget at this horizon. Rounded
+        down and never zero: overrunning a budget is worse than
+        underrunning it, but a run of no episodes is not a run."""
+        return max(1, int(steps) // max(1, int(horizon)))
+
+    def apply_step_budget(self, step_budget: int | None,
+                          horizon: int | None = None) -> int | None:
+        """Make ``step_budget`` the authority for this run.
+
+        Every method gets the same number of environment steps, and
+        "the same" has to be enforced rather than announced. Two things
+        follow, and both happen here so no method can honour one and
+        forget the other: the episode count for methods that train
+        episode by episode, and the iteration cap for methods counted
+        in iterations -- which would otherwise take whatever
+        ``steps_per_iteration`` times their cap multiplies out to. A
+        100k-step study left at 40 iterations of 4,000 hands PPO 160k,
+        60% more than the archive methods, and every comparison drawn
+        from it measures that discrepancy rather than the methods.
+
+        Returns the derived episode count, or None without a budget or
+        horizon. The cap is a ceiling: a run that asked for fewer
+        iterations keeps them.
+        """
+        if not step_budget:
+            return None
+        self.config.train_steps = int(step_budget)
+        per_iteration = self.steps_per_iteration()
+        if per_iteration:
+            affordable = max(1, int(step_budget) // int(per_iteration))
+            if affordable < self.config.max_iterations:
+                logger.info(
+                    "[%s] step budget %d / %d per iteration caps "
+                    "training at %d iterations (was %d)",
+                    self.name, step_budget, per_iteration, affordable,
+                    self.config.max_iterations,
+                )
+            self.config.max_iterations = min(self.config.max_iterations,
+                                             affordable)
+        if not horizon:
+            return None
+        episodes = self.episodes_in(step_budget, horizon)
+        self.config.eval_episodes = episodes
+        return episodes
+
+    def bind_env(self, env) -> None:
+        """Offer the one world a single-layout study runs in.
+
+        Training and evaluation happen in the same world there, and
+        "the same" means the same live environment: rebuilding it
+        between the two resets the visit history the teleport guard is
+        checked against, and an archive method arrives holding cells
+        its environment has never heard of. A method that explores in
+        its own loop should keep this; one that trains through Ray
+        workers can ignore it, as the default does.
+        """
+        return None
+
+    def bind_telemetry(self, root: str | None, stride: int = 1) -> None:
+        """Offer a telemetry destination for the *training* phase.
+
+        Evaluation is recorded by the harness, which owns that loop. A
+        method exploring in a loop of its own owns the more interesting
+        half: on a single-layout study almost all the exploring happens
+        during training, so recording only evaluation leaves the
+        coverage curve invisible exactly where it was earned.
+        """
+        self._telemetry = (root, stride) if root else None
+
+    def restorable_cells(self) -> tuple:
+        """Cells this method may return to, having reached them during
+        training on this layout.
+
+        Empty for a method carrying no archive. It matters only where
+        training and evaluation share a world and the environment is
+        rebuilt between them -- the teleport guard is per instance, so
+        a fresh env refuses cells the archive knows about. These are
+        cells the agent genuinely stood on; returning to what it has
+        already found is the entire claim an archive method makes.
+        """
+        return ()
 
     def default_hyperparameters(self) -> dict:
         """Values to use when no tuning sweep is available.

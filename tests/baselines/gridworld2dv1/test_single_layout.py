@@ -102,11 +102,15 @@ def test_the_three_telemetry_tables_agree_on_the_study(tmp_path):
     episodes = pd.read_parquet(tmp_path / "episodes")
     instances = pd.read_parquet(tmp_path / "instances")
 
-    assert set(steps["split"]) == set(episodes["split"]) \
-        == set(instances["split"]) == {"single-eval"}
-    assert len(episodes) == 5
-    assert len(steps) == episodes["length"].sum()
-    assert len(steps) == result.evaluation["interactions"]
+    # Training is recorded as its own phase, so the evaluation half has
+    # to be selected rather than assumed to be the whole file.
+    assert {"single-eval", "single-train"} >= set(steps["split"])
+    assert "single-eval" in set(instances["split"])
+    eval_steps = steps[steps["split"] == "single-eval"]
+    eval_eps = episodes[episodes["split"] == "single-eval"]
+    assert len(eval_eps) == 5
+    assert len(eval_steps) == eval_eps["length"].sum()
+    assert len(eval_steps) == result.evaluation["interactions"]
 
 
 def test_go_explore_takes_the_archive_reset_it_is_offered(tmp_path):
@@ -119,8 +123,9 @@ def test_go_explore_takes_the_archive_reset_it_is_offered(tmp_path):
     row = layout_row("TopoGym/TopRP2-50-v0", 0)
     baseline = get_baseline("go-explore-phase1")(BaselineConfig(seed=0))
     run_single_layout(baseline, row, step_budget=1000, eval_episodes=6,
-                      telemetry_root=str(tmp_path))
-    episodes = pd.read_parquet(tmp_path / "episodes").sort_values("episode")
+                      telemetry_root=str(tmp_path), eval_archive=True)
+    episodes = (pd.read_parquet(tmp_path / "episodes")
+                .query("split == 'single-eval'").sort_values("episode"))
     # Never on the first episode -- there is no archive yet -- and
     # every time after.
     assert not episodes["archive_reset"].iloc[0]
@@ -161,3 +166,184 @@ def test_the_script_roster_resolves_to_real_layouts():
 
     assert any(benchmarks.is_standalone(e.split("/")[-1].removesuffix("-v0"))
                for e in ROSTER)
+
+
+# -- the budget has to bind, not merely be announced ------------------
+
+def test_the_step_budget_caps_a_method_counted_in_iterations():
+    """RLlib trains in iterations of train_batch_size steps, so a
+    100k-step study left at 40 iterations of 4,000 hands PPO 160k --
+    60% more than the archive methods -- and every comparison drawn
+    from it measures the discrepancy rather than the methods."""
+    baseline = get_baseline("ppo")(
+        BaselineConfig(max_iterations=40, train_batch_size=4000))
+    baseline.apply_step_budget(100_000)
+    assert baseline.config.max_iterations == 25
+
+
+def test_it_rounds_down_rather_than_over():
+    """Overrunning a budget is worse than underrunning it."""
+    baseline = get_baseline("ppo")(
+        BaselineConfig(max_iterations=100, train_batch_size=4000))
+    baseline.apply_step_budget(99_000)
+    assert baseline.config.max_iterations == 24
+    assert baseline.config.max_iterations * 4000 <= 99_000
+
+
+def test_a_smaller_iteration_cap_is_never_raised():
+    """The budget is a ceiling, not a target."""
+    baseline = get_baseline("ppo")(
+        BaselineConfig(max_iterations=5, train_batch_size=4000))
+    baseline.apply_step_budget(1_000_000)
+    assert baseline.config.max_iterations == 5
+
+
+def test_methods_counted_in_episodes_need_no_cap():
+    for name in ("random", "go-explore-phase1"):
+        baseline = get_baseline(name)(BaselineConfig(max_iterations=40))
+        baseline.apply_step_budget(100_000)
+        assert baseline.config.max_iterations == 40
+        assert baseline.steps_per_iteration() is None
+
+
+def test_the_budget_derives_the_episode_count_from_the_horizon():
+    baseline = get_baseline("random")(BaselineConfig())
+    assert baseline.apply_step_budget(1_000_000, 180) == 5555
+    assert baseline.apply_step_budget(1_000_000, 6760) == 147
+    assert baseline.episodes_in(100, 6760) == 1        # never zero
+    assert baseline.episodes_in(1_000, 0) == 1_000     # no zero-division
+
+
+# -- the evaluation horizon -------------------------------------------
+
+def test_a_pinned_training_horizon_is_not_carried_into_evaluation():
+    """EpicChase pins 180 so one episode reaches one chamber, which is
+    what forces an archive. Carrying that into evaluation makes the
+    goal unreachable by construction -- 937 actions of route against
+    180 of budget -- so every policy scores zero and the metric
+    distinguishes nothing."""
+    from topogym.baselines.gridworld2dv1.single_layout import eval_horizon
+
+    row = layout_row("TopoGym/EpicChase8-120-v0", 0)
+    assert int(row["horizon"]) == 180
+    assert eval_horizon(row) == 2820          # 3 x 937, to the ten
+    assert eval_horizon(row) > int(row["optimal_actions"])
+
+
+def test_an_unpinned_family_keeps_its_own_horizon():
+    """The rule must not inflate worlds whose horizon already covers
+    their route."""
+    from topogym.baselines.gridworld2dv1.single_layout import eval_horizon
+
+    for env_id in ("TopoGym/Decoys1-50-v0", "TopoGym/Maze-100-v0",
+                   "TopoGym/ClownChase-v0"):
+        row = layout_row(env_id, 0)
+        assert eval_horizon(row) == int(row["horizon"]), env_id
+
+
+# -- the single-episode ceiling ---------------------------------------
+
+def test_the_ceiling_bounds_what_no_archive_can_exceed():
+    """A method that never takes an archive reset restarts at the
+    layout's start every episode, so this bounds its coverage however
+    many steps it is given. Exceeding it is proof the archive carried
+    the agent out of the region one episode covers."""
+    from topogym.baselines.gridworld2dv1.single_layout import (
+        single_episode_ceiling,
+    )
+
+    spiral = single_episode_ceiling("TopoGym/EpicChase8-120-v0", 0)
+    assert 0.05 < spiral < 0.20        # ~10.4% of a 5,468-cell world
+    # A world one episode can cover entirely has no meaningful ceiling.
+    assert single_episode_ceiling("TopoGym/Decoys1-50-v0", 0) > 0.95
+
+
+# -- seeds are separate studies ---------------------------------------
+
+def test_each_layout_seed_gets_its_own_artefact_name():
+    """A seed sweep writing every study to one filename leaves one
+    result. Seed 0 keeps the bare name so existing paths do not move."""
+    assert layout_row("TopoGym/EpicChase8-120-v0", 0)["unit"] \
+        == "EpicChase8-120"
+    assert layout_row("TopoGym/EpicChase8-120-v0", 7)["unit"] \
+        == "EpicChase8-120@7"
+
+
+# -- evaluation measures the policy, not the archive -------------------
+
+def test_evaluation_takes_no_archive_reset_by_default(tmp_path):
+    """The archive is a training artefact. Evaluating with it still
+    available measures where the archive can drop you; without it, the
+    thing training was supposed to produce."""
+    pd = pytest.importorskip("pandas")
+    pytest.importorskip("pyarrow")
+
+    row = layout_row("TopoGym/Decoys1-50-v0", 0)
+    baseline = get_baseline("go-explore-phase1")(BaselineConfig(seed=0))
+    result = run_single_layout(baseline, row, step_budget=2000,
+                               eval_episodes=5,
+                               telemetry_root=str(tmp_path))
+    episodes = pd.read_parquet(tmp_path / "episodes")
+    evaluation = episodes[episodes["split"] == "single-eval"]
+    assert not evaluation["archive_reset"].any()
+    assert result.config["eval_archive"] is False
+
+
+def test_evaluation_can_be_asked_to_keep_the_archive(tmp_path):
+    pd = pytest.importorskip("pandas")
+    pytest.importorskip("pyarrow")
+
+    row = layout_row("TopoGym/Decoys1-50-v0", 0)
+    baseline = get_baseline("go-explore-phase1")(BaselineConfig(seed=0))
+    run_single_layout(baseline, row, step_budget=2000, eval_episodes=6,
+                      telemetry_root=str(tmp_path), eval_archive=True)
+    episodes = (pd.read_parquet(tmp_path / "episodes")
+                .query("split == 'single-eval'").sort_values("episode"))
+    assert not episodes["archive_reset"].iloc[0]   # none to draw from
+    assert episodes["archive_reset"].iloc[1:].all()
+
+
+def test_training_is_recorded_as_its_own_phase(tmp_path):
+    """Almost all the exploring happens during training on a
+    single-layout study; recording only evaluation leaves the coverage
+    curve invisible exactly where it was earned."""
+    pd = pytest.importorskip("pandas")
+    pytest.importorskip("pyarrow")
+
+    row = layout_row("TopoGym/Decoys1-50-v0", 0)
+    baseline = get_baseline("go-explore-phase1")(BaselineConfig(seed=0))
+    run_single_layout(baseline, row, step_budget=4000, eval_episodes=3,
+                      telemetry_root=str(tmp_path))
+    episodes = pd.read_parquet(tmp_path / "episodes")
+    assert set(episodes["split"]) == {"single-train", "single-eval"}
+    training = episodes[episodes["split"] == "single-train"]
+    assert len(training) > 3
+    # Evaluation runs in a fresh world, so its coverage describes the
+    # policy rather than inheriting what training uncovered.
+    assert training["lifetime_coverage"].max() > \
+        episodes[episodes["split"] == "single-eval"]["lifetime_coverage"].max()
+
+
+def test_go_explore_phase_one_actually_trains_under_a_budget():
+    """Its archive *is* what it learns. Without spending the training
+    budget it arrives at evaluation empty and is measured on the last
+    few percent of its budget."""
+    row = layout_row("TopoGym/Decoys1-50-v0", 0)
+    baseline = get_baseline("go-explore-phase1")(BaselineConfig(seed=0))
+    result = run_single_layout(baseline, row, step_budget=6000,
+                               eval_episodes=4)
+    assert result.training["iterations"] > 0
+    assert "explored" in result.training["stopped_because"]
+    assert baseline.restorable_cells()
+
+
+def test_without_a_budget_phase_one_still_trains_nothing():
+    """The benchmark path is unchanged: each hold-out world is new, so
+    its archive can only be built while that world is evaluated."""
+    from topogym.baselines.gridworld2dv1.protocol import Hyperparameters
+
+    rows = [layout_row("TopoGym/Decoys1-50-v0", 0)]
+    baseline = get_baseline("go-explore-phase1")(BaselineConfig(seed=0))
+    report = baseline.fit(rows, rows, Hyperparameters(values={}))
+    assert report.iterations == 0
+    assert "nothing is trained" in report.stopped_because

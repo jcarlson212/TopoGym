@@ -389,6 +389,11 @@ def test_published_artifacts_are_filed_under_the_benchmark_version():
     assert not stray, f"unversioned artefacts: {stray}"
     # And every published result must sit under a version directory.
     for path in (root / "benchmarks").rglob("*.json"):
+        # single_layout is a different study, not a benchmark version:
+        # one world and a step budget rather than a hold-out sweep, so
+        # it is filed beside the versions rather than inside one.
+        if path.relative_to(root / "benchmarks").parts[0] == "single_layout":
+            continue
         assert path.relative_to(root / "benchmarks").parts[0] \
             == "gridworld2dv1", path
 

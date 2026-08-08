@@ -96,7 +96,11 @@ def test_archive_resets_when_the_world_does():
     second = make_instance(rows[5]).unwrapped
     second.reset(seed=0)
     hook(second, {})
-    assert hook._layout is second.layout
+    # Fingerprint, not object identity -- see
+    # test_the_archive_survives_the_same_world_being_rebuilt.
+    from topogym.baselines.gridworld2dv1.archive import layout_fingerprint
+
+    assert hook._layout == layout_fingerprint(second.layout)
     assert set(hook.archive.cells) <= set(second.layout.free_cells)
 
 
@@ -187,3 +191,106 @@ def test_full_grid_and_rungs_are_declared():
         sweeps += survivors
         survivors = min(survivors, keep)
     assert sweeps == 28 < 3 * len(GoExplorePhase1Baseline.tune_grid)
+
+
+# -- the archive outlives the environment that built it ---------------
+
+def test_the_archive_survives_the_same_world_being_rebuilt():
+    """Keyed by fingerprint, not object identity. The harness rebuilds
+    the environment between training, evaluation and GIF recording, and
+    the layout cache hands out a fresh copy each time -- so identity
+    discards the archive three times over and an archive method arrives
+    at evaluation having learned nothing."""
+    from topogym.baselines.gridworld2dv1.instances import make_instance
+
+    hook = GoExploreReset(DEFAULTS, seed=0)
+    rows = load_split("test")
+
+    first = make_instance(rows[0]).unwrapped
+    first.reset(seed=0)
+    for _ in range(20):
+        first.step(2)
+    hook(first, {})
+    learned = set(hook.archive.cells)
+    assert learned
+
+    rebuilt = make_instance(rows[0]).unwrapped
+    rebuilt.reset(seed=0)
+    assert rebuilt.layout is not first.layout   # a different object
+    hook(rebuilt, {})
+    assert learned <= set(hook.archive.cells)   # the same archive
+
+
+def test_a_different_world_still_resets_it():
+    """An archive of another world's cells is meaningless."""
+    from topogym.baselines.gridworld2dv1.archive import layout_fingerprint
+    from topogym.baselines.gridworld2dv1.instances import make_instance
+
+    hook = GoExploreReset(DEFAULTS, seed=0)
+    rows = load_split("test")
+    first = make_instance(rows[0]).unwrapped
+    first.reset(seed=0)
+    for _ in range(10):
+        first.step(2)
+    hook(first, {})
+
+    second = make_instance(rows[5]).unwrapped
+    second.reset(seed=0)
+    hook(second, {})
+    assert hook._layout == layout_fingerprint(second.layout)
+    assert set(hook.archive.cells) <= set(second.layout.free_cells)
+
+
+# -- the counted attributes (A.5 equation 1) --------------------------
+
+def test_choosing_a_cell_increments_both_choice_counters():
+    archive = Archive(DEFAULTS, seed=0, adjacency={(0, 0): [], (1, 0): []})
+    archive.observe({(0, 0), (1, 0)})
+    before = {c: dict(e) for c, e in archive.cells.items()}
+    chosen = archive.select()
+    assert archive.cells[chosen]["chosen"] == before[chosen]["chosen"] + 1
+    assert archive.cells[chosen]["chosen_since_new"] == \
+        before[chosen]["chosen_since_new"] + 1
+    for cell in archive.cells:
+        if cell != chosen:
+            assert archive.cells[cell] == before[cell]
+
+
+def test_seen_counts_the_episodes_a_cell_appeared_in():
+    archive = Archive(DEFAULTS, seed=0, adjacency={})
+    archive.observe({(0, 0)})
+    assert archive.cells[(0, 0)]["seen"] == 1
+    archive.observe({(0, 0)})
+    archive.observe({(0, 0)})
+    assert archive.cells[(0, 0)]["seen"] == 3
+
+
+def test_a_new_cell_resets_chosen_since_new_for_its_origin_only():
+    """"Times chosen since exploring from the cell last produced
+    something new" -- so a productive episode clears the counter of the
+    cell it started from, and of no other."""
+    archive = Archive(DEFAULTS, seed=0, adjacency={})
+    archive.observe({(0, 0), (1, 0)})
+    archive.cells[(0, 0)]["chosen_since_new"] = 5
+    archive.cells[(1, 0)]["chosen_since_new"] = 7
+    archive.observe({(0, 0), (9, 9)}, chosen_from=(0, 0))
+    assert archive.cells[(0, 0)]["chosen_since_new"] == 0
+    assert archive.cells[(1, 0)]["chosen_since_new"] == 7
+
+
+def test_an_unproductive_episode_leaves_the_counter_alone():
+    archive = Archive(DEFAULTS, seed=0, adjacency={})
+    archive.observe({(0, 0)})
+    archive.cells[(0, 0)]["chosen_since_new"] = 4
+    archive.observe({(0, 0)}, chosen_from=(0, 0))
+    assert archive.cells[(0, 0)]["chosen_since_new"] == 4
+
+
+def test_a_more_visited_cell_scores_lower():
+    """The whole point of equation 1: staleness has to cost."""
+    archive = Archive(DEFAULTS, seed=0, adjacency={})
+    archive.observe({(0, 0), (1, 0)})
+    for _ in range(20):
+        archive.cells[(0, 0)]["chosen"] += 1
+        archive.cells[(0, 0)]["seen"] += 1
+    assert archive.score((0, 0)) < archive.score((1, 0))

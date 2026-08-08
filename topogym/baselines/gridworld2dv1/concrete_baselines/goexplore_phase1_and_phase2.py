@@ -57,6 +57,7 @@ import numpy as np
 from topogym.baselines.gridworld2dv1.archive import (
     DEFAULTS,
     LayoutArchive,
+    layout_fingerprint,
 )
 from topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1 import (
     GoExplorePhase1Baseline,
@@ -195,12 +196,16 @@ class _Session:
 
     def _ensure(self, env) -> None:
         layout = getattr(env, "layout", None)
-        if layout is not self._layout:
+        # By fingerprint, not identity: the harness rebuilds the env
+        # between phases, and identity would discard the trajectories
+        # phase 2 exists to robustify.
+        fingerprint = layout_fingerprint(layout)
+        if fingerprint != self._layout:
             # An archive of another world's cells is meaningless, and a
             # trajectory through it is worse than meaningless.
             self.archive = TrajectoryArchive(
                 self.params, self.seed, neighbors=layout.base.neighbors)
-            self._layout = layout
+            self._layout = fingerprint
             self.chosen_from = None
             self.trajectory = []
 
@@ -282,10 +287,32 @@ class GoExplorePhase12Baseline(PPOBaseline):
     #: non-hold-out split as one pool.
     tuning_splits = ("tune", "train", "val")
 
+    #: The archive grid, not PPO's. Inheriting from PPOBaseline would
+    #: search a learning rate that only matters once phase 1 has found
+    #: a route to robustify, while leaving the cell-selection weights
+    #: that decide whether it ever does at their defaults.
+    tune_grid = GoExplorePhase1Baseline.tune_grid
+
     def __init__(self, config=None):
         super().__init__(config)
         self._archive_params = dict(DEFAULTS)
         self._demonstration: tuple = ()
+        self._env = None
+
+    def bind_env(self, env) -> None:
+        """Phase 1 explores in the study's own world, so the archive
+        and the trajectories it records are still valid when phase 2
+        and the evaluation arrive."""
+        self._env = env
+
+    def restorable_cells(self) -> tuple:
+        session = _SESSIONS.get(self.config.seed)
+        archive = getattr(session, "archive", None) if session else None
+        cells = set(archive.cells) if archive else set()
+        # Plus the demonstration: phase 2 restarts along it, and a
+        # route recorded before an env rebuild is otherwise unreachable.
+        cells.update(tuple(c) for c in (self._demonstration or ()))
+        return tuple(cells)
 
     # -- phase 1 ------------------------------------------------------
 
@@ -299,20 +326,22 @@ class GoExplorePhase12Baseline(PPOBaseline):
         """
         from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
 
-        _SESSIONS.clear()  # a fresh archive per phase-1 run
+        # *This baseline's* session, not a fresh one keyed by instance:
+        # what phase 1 learns has to be what evaluation inherits, and
+        # the archive is the whole of what phase 1 learns.
+        session = _session(self._archive_params, self.config.seed)
+        root, stride = getattr(self, "_telemetry", None) or (None, 1)
         records = evaluate_split(
-            rows, None, episodes=episodes, seed=seed, trace=False,
-            policy_factory=TrajectoryPolicyFactory(
-                self._archive_params, seed),
-            choose_reset_factory=TrajectoryResetFactory(
-                self._archive_params, seed),
-            workers=1,  # the session is per-process; keep it in ours
+            rows, session.act, episodes=episodes, seed=seed, trace=False,
+            choose_reset=session.choose_reset,
             env_options=self.env_options(),
+            env=self._env if len(rows) == 1 else None,
+            telemetry_root=root, algorithm=self.name,
+            step_stride=stride, split="single-train",
         )
         demonstrations = [
             session.archive.best_goal_trajectory()
-            for session in _SESSIONS.values() if session.archive
-        ]
+        ] if session.archive else []
         demonstrations = [d for d in demonstrations if d]
         best = min(demonstrations, key=len) if demonstrations else ()
         logger.info(
@@ -481,6 +510,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
                                      telemetry_root: str | None = None,
                                      step_stride: int = 1,
                                      hyperparameters: dict | None = None,
+                                     eval_archive: bool = False,
                                      **kwargs):
         """Explore until the goal is found, then robustify, then freeze.
 
@@ -495,11 +525,14 @@ class GoExplorePhase12Baseline(PPOBaseline):
         import time
 
         from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
+        from topogym.baselines.gridworld2dv1.instances import make_instance
         from topogym.baselines.gridworld2dv1.protocol import Hyperparameters
         from topogym.baselines.gridworld2dv1.single_layout import (
             SingleLayoutResult,
             episodes_for,
+            eval_horizon,
         )
+        from topogym.stats import StatsRecorder
 
         started = time.time()
         horizon = int(row["horizon"])
@@ -511,6 +544,16 @@ class GoExplorePhase12Baseline(PPOBaseline):
                                    if k in DEFAULTS}}
 
         # Phase 1, in chunks, stopping the moment a route exists.
+        # The same world for both phases and the evaluation. This
+        # override does not go through run_single_layout, so it sets
+        # the study's world up itself -- and forgetting to left phase
+        # 1's archive stranded in an environment nobody kept.
+        horizon_for_eval = eval_horizon(row)
+        env = StatsRecorder(make_instance(row, **self.env_options()))
+        self.bind_env(env)
+        self.bind_telemetry(telemetry_root, step_stride)
+        self.apply_step_budget(step_budget, horizon)
+
         cap = total_episodes // 2
         chunk = max(1, cap // 10)
         demonstration, spent = (), 0
@@ -518,15 +561,31 @@ class GoExplorePhase12Baseline(PPOBaseline):
             _, demonstration = self.explore(
                 [row], min(chunk, cap - spent), self.config.seed + spent)
             spent += chunk
+        spent = min(spent, cap)
+        if not demonstration and spent < total_episodes:
+            # Phase 2 exists only once phase 1 has something to
+            # robustify. With no route, the budget phase 2 would have
+            # spent belongs back in phase 1 rather than going unspent:
+            # otherwise this method is phase 1 with half the
+            # exploration, and any comparison between them measures the
+            # split rather than the algorithms.
+            extra = total_episodes - spent
+            logger.info(
+                "[%s] no route after %d episodes; returning phase 2's "
+                "%d episodes to phase 1", self.name, spent, extra,
+            )
+            _, demonstration = self.explore([row], extra,
+                                            self.config.seed + spent)
+            spent += extra
         logger.info(
             "[%s] phase 1 spent %d of %d episodes; %s",
-            self.name, min(spent, cap), total_episodes,
+            self.name, spent, total_episodes,
             f"route of {len(demonstration)} cells"
             if demonstration else "no route found",
         )
         self._demonstration = demonstration
 
-        remaining = max(0, total_episodes - min(spent, cap))
+        remaining = max(0, total_episodes - spent)
         outcome = self.robustify(
             [row], demonstration, values,
             max(1, self.config.max_iterations), self.config.seed,
@@ -537,13 +596,27 @@ class GoExplorePhase12Baseline(PPOBaseline):
         }
 
         self.config.eval_episodes = eval_episodes
+        # Evaluation measures the policy phase 2 built, so it takes no
+        # archive resets and runs in a fresh world on an unpinned
+        # horizon. For this method that is the whole test:
+        # robustification is meant to turn a trajectory into a policy
+        # that can run it from the start.
+        if eval_archive:
+            eval_env, probe = env, self.choose_reset
+        else:
+            eval_env = StatsRecorder(make_instance(
+                row, max_steps=horizon_for_eval, **self.env_options()))
+            probe = None
         records = evaluate_split(
             [row], self.policy(), episodes=eval_episodes, seed=0,
-            trace=True, choose_reset=self.choose_reset,
-            env_options=self.env_options(),
+            trace=True, choose_reset=probe,
+            env_options=self.env_options(), env=eval_env,
             telemetry_root=telemetry_root, algorithm=self.name,
             step_stride=step_stride, split="single-eval",
         )
+        if eval_env is not env:
+            eval_env.close()
+        env.close()
         return SingleLayoutResult(
             algorithm=self.name, layout=row["unit"],
             env_id=row["template_id"], seed=int(row["seed"]),
@@ -553,9 +626,10 @@ class GoExplorePhase12Baseline(PPOBaseline):
             step_budget=step_budget,
             train_episodes=total_episodes,
             eval_episodes=eval_episodes,
+            eval_horizon=horizon_for_eval,
             evaluation=records[0] if records else {},
             training={
-                "phase1_episodes": min(spent, cap),
+                "phase1_episodes": spent,
                 "phase2_episodes_available": remaining,
                 "demonstration_cells": len(demonstration),
                 **outcome,
@@ -565,6 +639,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
             wall_seconds=time.time() - started,
             config={**self.config.to_dict(),
                     "env_options": self.env_options(),
+                    "eval_archive": eval_archive,
                     "adapts_per_instance": self.adapts_per_instance},
         )
 

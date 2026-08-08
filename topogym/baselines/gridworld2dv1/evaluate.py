@@ -67,7 +67,7 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                       choose_reset: Callable | None = None,
                       env_options: dict | None = None,
                       telemetry=None, step_stride: int = 1,
-                      split: str | None = None) -> dict:
+                      split: str | None = None, env=None) -> dict:
     """Run ``policy`` on one hold-out instance.
 
     ``policy(observation, env) -> action``. Returns the instance's
@@ -93,9 +93,17 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     the driver, from one ``StatsRecorder``. There is nothing to
     aggregate across workers.
     """
-    env = StatsRecorder(make_instance(row, **(env_options or {})),
-                        track_holes=track_topology,
-                        track_curvature=track_topology)
+    # ``env`` lets a caller supply a world that is already alive. A
+    # single-layout study trains and evaluates in the *same* world, so
+    # rebuilding it between the two resets the visit history the
+    # teleport guard is checked against, and an archive method arrives
+    # holding cells its environment has never heard of. Ownership
+    # follows creation: a supplied env is not closed here.
+    borrowed = env is not None
+    if not borrowed:
+        env = StatsRecorder(make_instance(row, **(env_options or {})),
+                            track_holes=track_topology,
+                            track_curvature=track_topology)
     core = env.unwrapped
     curves = {name: [] for name in CURVE_METRICS}
     steps_to_goal = []
@@ -128,11 +136,16 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
             options = {"teleport": tuple(int(v) for v in target)}
             archive_resets += 1
         obs, info = env.reset(seed=seed + episode, options=options)
-        if trace and episode == 0:  # the layout exists only after reset
-            negative = _negative_curvature_cells(core)
+        if episode == 0:  # the layout exists only after reset
+            # Not gated on ``trace``: these are the denominators every
+            # fraction is divided by, and leaving them at 1 does not
+            # disable those fields, it silently turns them into raw
+            # counts. Only the curvature set is expensive enough to gate.
             n_free = max(1, len(core.layout.free_cells))
             n_chambers = sum(1 for f in core.layout.features
                              if f.kind == "chamber")
+            if trace:
+                negative = _negative_curvature_cells(core)
         reached, step = None, 0
         episode_return = 0.0
         while True:
@@ -185,7 +198,16 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                     (interactions, total_return))
             if terminated or truncated:
                 break
-        chambers_seen |= set(core.chamber_entry_steps)
+        # Lifetime, not per-phase. The environment clears
+        # ``chamber_entry_steps`` each episode, and this loop may be the
+        # *evaluation* half of a world already explored -- so counting
+        # only what it saw reports 1 chamber beside a coverage figure
+        # that includes the 6 found earlier. Two numbers on different
+        # denominators in one record is worse than either being wrong.
+        chambers_seen |= {
+            index for cell, index in core._chamber_of.items()
+            if cell in core.lifetime_visit_counts
+        }
         steps_to_goal.append(reached)
         if telemetry is not None:
             lifetime = core._ever_visited | core._visited
@@ -269,7 +291,8 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
         record["curves"] = {
             name: _mean_curve(points) for name, points in curves.items()
         }
-    env.close()
+    if not borrowed:
+        env.close()
     return record
 
 
@@ -396,7 +419,7 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                    env_options: dict | None = None,
                    telemetry_root: str | None = None,
                    algorithm: str = "unknown", step_stride: int = 1,
-                   split: str | None = None) -> list:
+                   split: str | None = None, env=None) -> list:
     """Evaluate every hold-out instance, in manifest order.
 
     Instances are independent and separately seeded, so the loop
@@ -405,7 +428,11 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
     each worker; without one the run stays serial, which is correct
     for a policy that cannot cross a process boundary.
     """
-    if policy_factory is not None:
+    if env is not None and len(rows) != 1:
+        raise ValueError(
+            f"a supplied env belongs to one instance; got {len(rows)} rows"
+        )
+    if policy_factory is not None and env is None:
         # Same code path serial or parallel, so the two cannot drift.
         from topogym.baselines.gridworld2dv1.parallel import map_instances
 
@@ -429,7 +456,7 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                 track_topology=track_topology, choose_reset=choose_reset,
                 env_options=env_options,
                 telemetry=(writer if telemetry_root else None),
-                step_stride=step_stride, split=split,
+                step_stride=step_stride, split=split, env=env,
             )
             if telemetry_root:
                 writer.add_instance(
