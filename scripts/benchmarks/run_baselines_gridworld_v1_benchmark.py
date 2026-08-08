@@ -122,6 +122,21 @@ def main() -> int:
                              "the pipeline runs, not a result")
     parser.add_argument("--limit", type=int, default=None,
                         help="cap instances per split")
+    parser.add_argument("--shard-index", type=int, default=0,
+                        help="this worker's slice of the baseline list")
+    parser.add_argument("--shard-count", type=int, default=1,
+                        help="how many workers split it; each baseline "
+                             "is self-contained, so the split is exact")
+    parser.add_argument("--steps", type=int, default=None,
+                        help="environment steps per instance on train "
+                             "and test. Overrides --episodes, and is "
+                             "the fair unit when horizons differ. An "
+                             "archive method rebuilds from nothing on "
+                             "every hold-out world, so this has to be "
+                             "large -- a million is the working figure")
+    parser.add_argument("--tune-steps", type=int, default=None,
+                        help="environment steps per instance while "
+                             "tuning; the grid is wide, so smaller")
     parser.add_argument("--episodes", type=int, default=50,
                         help="evaluation episodes per hold-out instance")
     parser.add_argument("--tune-episodes", type=int, default=None,
@@ -228,6 +243,17 @@ def main() -> int:
         raise SystemExit(
             f"unknown baselines {unknown}; known: {sorted(BASELINES)}"
         )
+    # Sharding is over *algorithms*, because that is where this sweep's
+    # independence lies: each one tunes, trains and evaluates on its
+    # own and publishes its own result file. Splitting the instance
+    # list instead would cut a training run in half.
+    if args.shard_count > 1:
+        whole = list(requested)
+        requested = requested[args.shard_index::args.shard_count]
+        logger.info("shard %d/%d: %d of %d baselines -- %s",
+                    args.shard_index, args.shard_count, len(requested),
+                    len(whole), ", ".join(requested) or "none")
+
     queued, skipped = [], []
     for name in requested:
         if args.only_missing and (results_dir / f"{name}.json").exists():
@@ -354,6 +380,12 @@ def _run_one(name: str, splits: dict, args, runners: int,
             max_iterations=args.max_iterations,
             eval_episodes=args.episodes,
             tune_episodes=args.tune_episodes,
+            # Per-instance step budgets. Horizons across the registry
+            # span 130 to 6,760, so these -- not the episode counts --
+            # are what make one hold-out world comparable to another.
+            eval_steps=args.steps,
+            tune_steps=args.tune_steps,
+            train_steps=args.steps,
             val_every=1 if args.smoke else 5,
             patience=1 if args.smoke else 5,
             tune_iterations=1 if args.smoke else 2,

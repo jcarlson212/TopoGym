@@ -1,0 +1,30 @@
+{
+  "values": {
+    "lr": 0.0003,
+    "entropy_coeff": 0.01
+  },
+  "score": 0.09404123129059588,
+  "signal": "coverage",
+  "searched": [
+    {
+      "lr": 0.0003,
+      "entropy_coeff": 0.01,
+      "return": 0.0,
+      "coverage": 0.09404123129059588
+    },
+    {
+      "lr": 0.0001,
+      "entropy_coeff": 0.01,
+      "return": 0.0,
+      "coverage": 0.06721265179327873
+    },
+    {
+      "lr": 0.0003,
+      "entropy_coeff": 0.001,
+      "return": 0.0,
+      "coverage": 0.08698107879130189
+    }
+  ],
+  "layout": "TopoGym/DontFall-v0",
+  "seed": 987654321
+}

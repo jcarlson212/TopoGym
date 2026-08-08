@@ -1,0 +1,73 @@
+{
+  "argv": [
+    "scripts/benchmarks/run_single_layout.py",
+    "--shard-index",
+    "33",
+    "--shard-count",
+    "36",
+    "--baselines",
+    "all",
+    "--layouts",
+    "TopoGym/EpicChase8-120-v0",
+    "TopoGym/EnvironmentalIceShip-v0",
+    "TopoGym/Nested3-50-v0",
+    "TopoGym/Maze-100-v0",
+    "TopoGym/ClownChase-v0",
+    "TopoGym/TopRP2-50-v0",
+    "--layout-seeds",
+    "0",
+    "--steps",
+    "1000000",
+    "--eval-episodes",
+    "50",
+    "--tune-steps",
+    "50000",
+    "--tune-episodes",
+    "15",
+    "--step-stride",
+    "20",
+    "--num-env-runners",
+    "2",
+    "--envs-per-runner",
+    "2",
+    "--keep-going",
+    "--only-missing",
+    "--artifacts",
+    "/topogym/benchmarks/experiments/topogym/single_env"
+  ],
+  "commit": "",
+  "started": "2026-08-08T04:07:00.582328+00:00",
+  "algorithms": [
+    "go-explore-phase1",
+    "go-explore-phase1and2",
+    "icm-ppo",
+    "ppo",
+    "random",
+    "rnd-ppo"
+  ],
+  "layouts": [
+    "TopoGym/EpicChase8-120-v0",
+    "TopoGym/EnvironmentalIceShip-v0",
+    "TopoGym/Nested3-50-v0",
+    "TopoGym/Maze-100-v0",
+    "TopoGym/ClownChase-v0",
+    "TopoGym/TopRP2-50-v0"
+  ],
+  "layout_seeds": [
+    0
+  ],
+  "algorithm_seed": 0,
+  "steps": 1000000,
+  "eval_episodes": 50,
+  "eval_archive": false,
+  "tuning": {
+    "layout": "TopoGym/DontFall-v0",
+    "seed": 987654321,
+    "steps": 50000,
+    "episodes": 15
+  },
+  "shard": {
+    "index": 33,
+    "count": 36
+  }
+}

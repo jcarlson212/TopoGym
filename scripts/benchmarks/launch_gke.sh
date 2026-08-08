@@ -45,7 +45,15 @@ done
 
 REGION="${ZONE%-*}"
 REPO="${REGION}-docker.pkg.dev/${PROJECT}/topogym"
-IMAGE="${REPO}/benchmark:$(git rev-parse --short HEAD)"
+# Tagged by commit -- plus a marker when the tree is dirty. Cloud Build
+# uploads the working directory, not the commit, so tagging by commit
+# alone lets the "already built, skipping" check reuse an image that
+# predates uncommitted changes. That silently ran a job on stale code
+# once already.
+DIRTY=""
+git diff --quiet && git diff --cached --quiet \
+  || DIRTY="-dirty$(git status --porcelain | shasum | cut -c1-6)"
+IMAGE="${REPO}/benchmark:$(git rev-parse --short HEAD)${DIRTY}"
 
 run() {
   echo "+ $*"

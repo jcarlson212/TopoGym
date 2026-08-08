@@ -42,6 +42,7 @@ logger = logging.getLogger("topogym")
 
 __all__ = ["SingleLayoutResult", "episodes_for", "eval_horizon",
            "layout_row", "plot_single_layout", "run_single_layout",
+           "coverage_gif", "coverage_gifs",
            "single_episode_ceiling", "tune_on_layout",
            "write_single_layout_md"]
 
@@ -334,10 +335,23 @@ def write_result(result: SingleLayoutResult, root: pathlib.Path) -> pathlib.Path
 SINGLE_FIGURES = (
     ("lifetime_coverage", "world uncovered (fraction)",
      "Cumulative coverage"),
+    ("unique_states", "distinct cells stood on", "States discovered"),
+    ("chambers_entered", "chambers found (cumulative)", "Chambers"),
+    ("goals_found", "episodes reaching the goal (cumulative)",
+     "Goal reached"),
     ("episode_return", "return per episode", "Return"),
-    ("chambers_entered", "chambers found", "Chambers"),
     ("observed_h1", "H1 of the observed region", "Discovered topology"),
 )
+
+#: Which phase the curves describe.
+#:
+#: Training, not evaluation. On a single-layout study almost all the
+#: exploring happens while the budget is being spent -- the frozen
+#: evaluation is a short coda, and on the spiral it moved coverage by
+#: 0.77 of a percentage point. Plotting both on one axis would also lie
+#: about the x axis: evaluation runs in a fresh world, so its
+#: interaction count restarts and the line would double back.
+CURVE_SPLIT = "single-train"
 
 
 def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
@@ -354,6 +368,14 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
     import matplotlib.pyplot as plt
     import pandas as pd
 
+    # Writing a PDF makes matplotlib subset its fonts, and fontTools
+    # narrates every table it touches at INFO on stderr -- hundreds of
+    # lines per figure. Cloud Logging tags anything on stderr as ERROR,
+    # so a healthy run reads as a wall of errors and the real messages
+    # are lost in it.
+    logging.getLogger("fontTools").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+
     from topogym.baselines.gridworld2dv1.report import (
         FIGURE_STYLE,
         PALETTE,
@@ -365,6 +387,16 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
                        layout)
         return []
     frame = pd.read_parquet(source)
+    if "split" in frame.columns and CURVE_SPLIT in set(frame["split"]):
+        frame = frame[frame["split"] == CURVE_SPLIT]
+    # "Has it reached the goal yet" is a per-episode flag; the useful
+    # form is how many times, so far.
+    if "reached_goal" in frame.columns:
+        frame = frame.sort_values(["algorithm", "interactions"]).copy()
+        frame["goals_found"] = (
+            frame.groupby("algorithm")["reached_goal"]
+            .cumsum().astype(float)
+        )
     directory = pathlib.Path(root) / layout / "plots"
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -389,6 +421,12 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
             axis.set_xlabel("cumulative interactions")
             axis.set_ylabel(label)
             axis.set_title(f"{title} -- {layout}")
+            if key == "goals_found" and frame[key].max() == 0:
+                # A flat zero line is worth saying out loud rather than
+                # leaving a reader to wonder whether it plotted.
+                axis.text(0.5, 0.5, "no episode reached the goal",
+                          transform=axis.transAxes, ha="center",
+                          va="center", fontsize=7, alpha=0.6)
             axis.margins(x=0)
             axis.legend(loc="best")
             for extension in ("pdf", "png"):
@@ -555,3 +593,107 @@ def write_single_layout_md(root, layout: str):
     path.write_text("\n".join(lines))
     logger.info("wrote %s", path)
     return path
+
+
+#: Colour discovered cells are tinted, and how strongly.
+COVERAGE_COLOR = (60, 220, 90)
+COVERAGE_STRENGTH = 0.55
+
+#: Frames in a coverage animation, and how long it should play.
+COVERAGE_FRAMES = 120
+COVERAGE_SECONDS = 6.0
+
+
+def coverage_gif(root, layout: str, algorithm: str,
+                 split: str = "single-train", frames: int = COVERAGE_FRAMES):
+    """Animate what one algorithm discovered on one map.
+
+    Built from the ``steps`` telemetry rather than by re-running
+    anything: the table already holds every position the agent stood
+    on, so this works for any algorithm -- including ones whose fitted
+    policy did not survive the process that produced it -- and costs a
+    read rather than another million steps.
+
+    Each frame tints every cell discovered so far, so the animation
+    shows the shape of the search: a corridor crawling outward, a room
+    filling in, a method stuck in the region it started in.
+    """
+    import imageio.v3 as iio
+    import numpy as np
+    import pandas as pd
+
+    from topogym.baselines.gridworld2dv1.instances import make_instance
+    from topogym.rendering import tiles
+    from topogym.rendering.rgb import render_rgb_2d
+
+    source = pathlib.Path(root) / layout / "telemetry" / "steps"
+    results = pathlib.Path(root) / layout / "results" / f"{algorithm}.json"
+    if not source.exists() or not results.exists():
+        return None
+    with open(results, encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    table = pd.read_parquet(source)
+    table = table[table["algorithm"] == algorithm]
+    if "split" in table.columns and split in set(table["split"]):
+        table = table[table["split"] == split]
+    if table.empty:
+        logger.warning("no %s steps for %s on %s", split, algorithm, layout)
+        return None
+    table = table.sort_values("interaction")
+
+    row = layout_row(payload["env_id"], int(payload.get("seed", 0)))
+    env = make_instance(row, reveal_hidden=True, flatten=False)
+    core = env.unwrapped
+    core.reset(seed=int(payload.get("seed", 0)))
+    base_map = core.layout.base
+    width, height = base_map.layout_size()
+    tile = max(2, 520 // max(width, height))
+    canvas = render_rgb_2d(core, tile=tile)
+    env.close()
+    n_free = max(1, len(core.layout.free_cells))
+
+    # One frame per slice of the run, each showing everything found so
+    # far -- cumulative, because the question is what has been reached,
+    # not where the agent happens to be.
+    cells = list(zip(table["x"].to_numpy(), table["y"].to_numpy()))
+    marks = np.linspace(1, len(cells), min(frames, len(cells))).astype(int)
+    images, seen, cursor = [], set(), 0
+    for mark in marks:
+        while cursor < mark:
+            seen.add(cells[cursor])
+            cursor += 1
+        picture = canvas.copy()
+        for cell in seen:
+            col, rowpix = base_map.layout_coords(tuple(cell))
+            tiles.tint(picture[rowpix * tile:(rowpix + 1) * tile,
+                               col * tile:(col + 1) * tile],
+                       COVERAGE_COLOR, COVERAGE_STRENGTH)
+        images.append(picture)
+
+    folder = pathlib.Path(root) / layout / "gifs"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{algorithm}-coverage.gif"
+    duration = max(20, int(COVERAGE_SECONDS * 1000 / max(1, len(images))))
+    iio.imwrite(path, images, extension=".gif", duration=duration, loop=0)
+    logger.info("wrote %s (%d cells of %d, %d frames)", path, len(seen),
+                n_free, len(images))
+    return path
+
+
+def coverage_gifs(root, layout: str) -> list:
+    """One coverage animation per algorithm that ran on this layout."""
+    folder = pathlib.Path(root) / layout / "results"
+    if not folder.is_dir():
+        return []
+    written = []
+    for result in sorted(folder.glob("*.json")):
+        try:
+            path = coverage_gif(root, layout, result.stem)
+        except Exception as exc:
+            logger.warning("coverage gif for %s on %s failed: %s",
+                           result.stem, layout, exc)
+            continue
+        if path:
+            written.append(path)
+    return written

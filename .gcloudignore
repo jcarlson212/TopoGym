@@ -1,0 +1,22 @@
+# What Cloud Build uploads.
+#
+# Without this file gcloud falls back to .gitignore, which excludes the
+# private baselines -- correct for a public image, and wrong for a run
+# meant to include them. This file exists so the choice is explicit
+# rather than a side effect of version control.
+#
+# It deliberately does NOT exclude concrete_baselines/_private_*.py:
+# the image is pushed to a private Artifact Registry, and a benchmark
+# run that omits half its algorithms is not the run that was asked for.
+# Note this names no method -- it excludes by pattern, like .gitignore.
+.git/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+runs/
+benchmarks/
+docs/envs/
+docs/environments/
+*.gif
+.DS_Store

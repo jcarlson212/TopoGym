@@ -23,11 +23,13 @@ set -euo pipefail
 PROJECT=""; BUCKET=""; ZONE="us-central1-a"; CLUSTER="topogym-single"
 MACHINE="n2-standard-8"; SHARDS=9; MAX_NODES=3; DRY_RUN=0; TEARDOWN=0
 DEADLINE=2700            # 45 minutes, hard
-BACKOFF=2
+BACKOFF=8   # preemptions are ignored; this bounds real failures
 # Sized so three pods share an 8-vCPU node: a 7-CPU request would put
 # one pod per node and need nine nodes to run nine shards.
 CPU="2"; MEM="6Gi"
 KEEP=0
+SCRIPT="scripts/benchmarks/run_single_layout.py"
+JOBNAME="topogym-single-layout"
 # The bucket is mounted at /topogym/benchmarks, so this is
 # gs://<bucket>/experiments/topogym/single_env/<env>/{results,plots,
 # gifs,telemetry}. Note the bucket name itself is passed in, never
@@ -46,6 +48,14 @@ while [[ $# -gt 0 ]]; do
     --max-nodes) MAX_NODES="$2"; shift 2 ;;
     --deadline) DEADLINE="$2"; shift 2 ;;
     --args) STUDY_ARGS="$2"; shift 2 ;;
+    # The other entry point: the full benchmark over the splits,
+    # sharded by algorithm rather than by study. The sweep writes into
+    # the mounted bucket itself, so it needs no --artifacts.
+    --benchmark)
+      SCRIPT="scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py"
+      JOBNAME="topogym-benchmark"
+      STUDY_ARGS="--baselines all --only-missing --keep-going --group all --steps 1000000 --tune-steps 100000 --episodes 50 --max-iterations 250 --num-env-runners 2 --envs-per-runner 2 --eval-workers 2"
+      shift ;;
     --keep) KEEP=1; shift ;;          # leave the cluster up (debugging)
     --dry-run) DRY_RUN=1; shift ;;
     --teardown) TEARDOWN=1; shift ;;
@@ -56,7 +66,15 @@ done
 
 REGION="${ZONE%-*}"
 REPO="${REGION}-docker.pkg.dev/${PROJECT}/topogym"
-IMAGE="${REPO}/benchmark:$(git rev-parse --short HEAD)"
+# Tagged by commit -- plus a marker when the tree is dirty. Cloud Build
+# uploads the working directory, not the commit, so tagging by commit
+# alone lets the "already built, skipping" check reuse an image that
+# predates uncommitted changes. That silently ran a job on stale code
+# once already.
+DIRTY=""
+git diff --quiet && git diff --cached --quiet \
+  || DIRTY="-dirty$(git status --porcelain | shasum | cut -c1-6)"
+IMAGE="${REPO}/benchmark:$(git rev-parse --short HEAD)${DIRTY}"
 
 run() { echo "+ $*"; [[ "$DRY_RUN" == 1 ]] || "$@"; }
 
@@ -173,6 +191,8 @@ sed -e "s|IMAGE_PLACEHOLDER|${IMAGE}|g" \
     -e "s|CPU_PLACEHOLDER|\"${CPU}\"|g" \
     -e "s|MEM_PLACEHOLDER|\"${MEM}\"|g" \
     -e "s|ARGS_PLACEHOLDER|${STUDY_ARGS}|g" \
+    -e "s|SCRIPT_PLACEHOLDER|${SCRIPT}|g" \
+    -e "s|JOBNAME_PLACEHOLDER|${JOBNAME}|g" \
     scripts/benchmarks/gke_single_layout_job.yaml > "$MANIFEST"
 echo "--- manifest ---"; cat "$MANIFEST"; echo "----------------"
 run kubectl apply -f "$MANIFEST"
@@ -181,9 +201,9 @@ run kubectl apply -f "$MANIFEST"
 #    every exit path, so there is no way out of here that leaves the
 #    cluster running.
 run kubectl wait --for=condition=complete --timeout="${DEADLINE}s" \
-    job/topogym-single-layout || {
+    "job/${JOBNAME}" || {
   echo "job did not complete; recent logs:"
-  run kubectl logs job/topogym-single-layout --tail=50 --all-containers \
+  run kubectl logs "job/${JOBNAME}" --tail=50 --all-containers \
       || true
 }
 echo "=== results in gs://${BUCKET}/experiments/topogym/single_env/ ==="

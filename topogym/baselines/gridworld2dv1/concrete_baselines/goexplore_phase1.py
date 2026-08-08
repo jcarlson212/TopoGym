@@ -234,7 +234,8 @@ class GoExplorePhase1Baseline(Baseline):
         episodes = (self.config.tune_episodes
                     or self.config.eval_episodes)
         records = evaluate_split(
-            units, None, episodes=episodes, seed=self.config.seed,
+            units, None, episodes=episodes,
+            step_budget=self.config.tune_steps, seed=self.config.seed,
             trace=False,
             policy_factory=RandomPolicyFactory(self.config.seed),
             choose_reset_factory=GoExploreResetFactory(

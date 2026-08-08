@@ -67,7 +67,8 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                       choose_reset: Callable | None = None,
                       env_options: dict | None = None,
                       telemetry=None, step_stride: int = 1,
-                      split: str | None = None, env=None) -> dict:
+                      split: str | None = None, env=None,
+                      step_budget: int | None = None) -> dict:
     """Run ``policy`` on one hold-out instance.
 
     ``policy(observation, env) -> action``. Returns the instance's
@@ -99,6 +100,12 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     # teleport guard is checked against, and an archive method arrives
     # holding cells its environment has never heard of. Ownership
     # follows creation: a supplied env is not closed here.
+    # A step budget is per *layout*: horizons across the registry span
+    # 130 to 6,760, so a flat episode count hands one world fifty times
+    # the experience of another and the comparison measures the horizon
+    # rather than the method. Episodes are derived here, per instance.
+    if step_budget:
+        episodes = max(1, int(step_budget) // max(1, int(row["horizon"])))
     borrowed = env is not None
     if not borrowed:
         env = StatsRecorder(make_instance(row, **(env_options or {})),
@@ -356,7 +363,8 @@ class InstanceTask:
                  env_options: dict | None = None, trace: bool = True,
                  telemetry_root: str | None = None,
                  algorithm: str = "unknown", step_stride: int = 1,
-                 split: str | None = None):
+                 split: str | None = None,
+                 step_budget: int | None = None):
         self.policy_factory = policy_factory
         self.episodes = episodes
         self.seed = seed
@@ -370,6 +378,7 @@ class InstanceTask:
         self.algorithm = algorithm
         self.step_stride = step_stride
         self.split = split
+        self.step_budget = step_budget
 
     def __call__(self, row: dict) -> dict:
         # Rebuilt per instance, seeded from the instance: see
@@ -390,6 +399,7 @@ class InstanceTask:
                 choose_reset=choose_reset, env_options=self.env_options,
                 telemetry=(writer if self.telemetry_root else None),
                 step_stride=self.step_stride, split=self.split,
+                step_budget=self.step_budget,
             )
             if self.telemetry_root:
                 writer.add_instance(
@@ -419,7 +429,8 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                    env_options: dict | None = None,
                    telemetry_root: str | None = None,
                    algorithm: str = "unknown", step_stride: int = 1,
-                   split: str | None = None, env=None) -> list:
+                   split: str | None = None, env=None,
+                   step_budget: int | None = None) -> list:
     """Evaluate every hold-out instance, in manifest order.
 
     Instances are independent and separately seeded, so the loop
@@ -441,7 +452,8 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                             env_options, trace,
                             telemetry_root=telemetry_root,
                             algorithm=algorithm,
-                            step_stride=step_stride, split=split)
+                            step_stride=step_stride, split=split,
+                            step_budget=step_budget)
         return map_instances(task, rows, workers=workers)
 
     records = []
@@ -457,6 +469,7 @@ def evaluate_split(rows: list, policy: Callable, episodes: int = 5,
                 env_options=env_options,
                 telemetry=(writer if telemetry_root else None),
                 step_stride=step_stride, split=split, env=env,
+                step_budget=step_budget,
             )
             if telemetry_root:
                 writer.add_instance(

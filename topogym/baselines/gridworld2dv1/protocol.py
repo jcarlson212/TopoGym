@@ -90,6 +90,20 @@ class BaselineConfig:
     #: layout and 6,760 on another, and a method counted in gradient
     #: iterations spends whatever its batch size multiplies out to.
     train_steps: int | None = None
+
+    #: Environment steps allowed on *each* hold-out instance, and on
+    #: each instance during tuning. Set these rather than the episode
+    #: counts above whenever layouts differ in horizon -- across the
+    #: registry those span 130 to 6,760 steps, so a flat episode count
+    #: hands one world fifty times the experience of another and the
+    #: comparison measures the horizon rather than the method.
+    #:
+    #: They also have to be *large* for an archive method to be given a
+    #: fair reading: every hold-out world is new, so Go-Explore rebuilds
+    #: its archive from nothing there, and phase 2 only begins once that
+    #: archive has found the goal.
+    eval_steps: int | None = None
+    tune_steps: int | None = None
     #: Consecutive training episodes on one instance. One suits
     #: gradient methods; archive methods need a contiguous run for an
     #: archive to accumulate on a given world.
@@ -542,7 +556,8 @@ class Baseline(abc.ABC):
                     "look", self.name, len(splits["test"]))
         instances = evaluate_split(
             splits["test"], self.policy(),
-            episodes=self.config.eval_episodes, seed=self.config.seed,
+            episodes=self.config.eval_episodes,
+            step_budget=self.config.eval_steps, seed=self.config.seed,
             choose_reset=self.choose_reset,
             choose_reset_factory=self.choose_reset_factory(),
             policy_factory=self.policy_factory(),

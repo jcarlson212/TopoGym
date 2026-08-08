@@ -279,10 +279,21 @@ def _write_run_manifest(args, names: list) -> None:
             capture_output=True, text=True).stdout.strip()
     except Exception:
         commit = None
+    # A manifest at the public root may not name private baselines.
+    # It records the *resolved* algorithm list, and `--baselines all`
+    # resolves to whatever is installed -- so on a machine with a
+    # private module it writes those names into a tracked path. The
+    # names are split by visibility and each list goes to its own root.
+    public = [n for n in names if is_public(n)]
+    private = [n for n in names if not is_public(n)]
     manifest = {
-        "argv": _sys.argv, "commit": commit,
+        "argv": [a for a in _sys.argv
+                 if is_public(a) or not any(
+                     p in a for p in private)],
+        "commit": commit,
         "started": datetime.datetime.now().astimezone().isoformat(),
-        "algorithms": names, "layouts": args.layouts,
+        "algorithms": public, "layouts": args.layouts,
+        "private_algorithms": len(private),
         "layout_seeds": args.layout_seeds,
         "algorithm_seed": args.seed, "steps": args.steps,
         "eval_episodes": args.eval_episodes,
@@ -293,13 +304,22 @@ def _write_run_manifest(args, names: list) -> None:
         },
         "shard": {"index": args.shard_index, "count": args.shard_count},
     }
-    folder = pathlib.Path(args.artifacts)
-    folder.mkdir(parents=True, exist_ok=True)
     name = (f"run-shard{args.shard_index}.json" if args.shard_count > 1
             else "run.json")
+    folder = pathlib.Path(args.artifacts)
+    folder.mkdir(parents=True, exist_ok=True)
     with open(folder / name, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2, default=str)
     logger.info("wrote %s", folder / name)
+    if private:
+        # The private run gets its own record, under the ignored root,
+        # so nothing is lost and nothing is exposed.
+        secret = pathlib.Path(artifact_root(private[0], args.artifacts))
+        secret.mkdir(parents=True, exist_ok=True)
+        with open(secret / name, "w", encoding="utf-8") as handle:
+            json.dump({**manifest, "argv": _sys.argv,
+                       "algorithms": private}, handle, indent=2,
+                      default=str)
 
 
 def _publish_layouts(args) -> None:
@@ -313,6 +333,7 @@ def _publish_layouts(args) -> None:
         logger.info("artefacts are remote; skipping local publishing")
         return
     from topogym.baselines.gridworld2dv1.single_layout import (
+        coverage_gifs,
         plot_single_layout,
         write_single_layout_md,
     )
@@ -324,6 +345,7 @@ def _publish_layouts(args) -> None:
     ]
     for unit in units:
         for step, label in ((plot_single_layout, "plots"),
+                            (coverage_gifs, "coverage gifs"),
                             (write_single_layout_md, "summary")):
             try:
                 step(args.artifacts, unit)

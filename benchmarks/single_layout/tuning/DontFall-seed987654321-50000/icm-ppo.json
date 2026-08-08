@@ -1,0 +1,36 @@
+{
+  "values": {
+    "lr": 0.0003,
+    "intrinsic_reward_coeff": 0.5
+  },
+  "score": 0.11974018638802598,
+  "signal": "coverage",
+  "searched": [
+    {
+      "lr": 0.0003,
+      "intrinsic_reward_coeff": 0.05,
+      "return": 0.0,
+      "coverage": 0.09065235809093476
+    },
+    {
+      "lr": 0.0003,
+      "intrinsic_reward_coeff": 0.5,
+      "return": 0.0,
+      "coverage": 0.11974018638802598
+    },
+    {
+      "lr": 0.0001,
+      "intrinsic_reward_coeff": 0.05,
+      "return": 0.0,
+      "coverage": 0.10674950578932504
+    },
+    {
+      "lr": 0.0001,
+      "intrinsic_reward_coeff": 0.5,
+      "return": 0.0,
+      "coverage": 0.08811070319118892
+    }
+  ],
+  "layout": "TopoGym/DontFall-v0",
+  "seed": 987654321
+}

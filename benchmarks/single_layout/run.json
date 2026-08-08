@@ -1,0 +1,61 @@
+{
+  "argv": [
+    "scripts/benchmarks/run_single_layout.py",
+    "--baselines",
+    "--layouts",
+    "TopoGym/EpicChase8-120-v0",
+    "TopoGym/EnvironmentalIceShip-v0",
+    "TopoGym/Nested3-50-v0",
+    "TopoGym/Maze-100-v0",
+    "TopoGym/ClownChase-v0",
+    "TopoGym/TopRP2-50-v0",
+    "TopoGym/ChamberCount8-200-v0",
+    "--layout-seeds",
+    "0",
+    "--steps",
+    "1000000",
+    "--eval-episodes",
+    "50",
+    "--tune-steps",
+    "50000",
+    "--tune-episodes",
+    "15",
+    "--step-stride",
+    "20",
+    "--keep-going",
+    "--only-missing",
+    "--record-gifs",
+    "--artifacts",
+    "benchmarks/single_layout"
+  ],
+  "commit": "ad5c9b7b80a6f233c1396cf4d56265e70eccad07",
+  "started": "2026-08-08T09:47:57.841104-04:00",
+  "algorithms": [],
+  "layouts": [
+    "TopoGym/EpicChase8-120-v0",
+    "TopoGym/EnvironmentalIceShip-v0",
+    "TopoGym/Nested3-50-v0",
+    "TopoGym/Maze-100-v0",
+    "TopoGym/ClownChase-v0",
+    "TopoGym/TopRP2-50-v0",
+    "TopoGym/ChamberCount8-200-v0"
+  ],
+  "private_algorithms": 4,
+  "layout_seeds": [
+    0
+  ],
+  "algorithm_seed": 0,
+  "steps": 1000000,
+  "eval_episodes": 50,
+  "eval_archive": false,
+  "tuning": {
+    "layout": "TopoGym/DontFall-v0",
+    "seed": 987654321,
+    "steps": 50000,
+    "episodes": 15
+  },
+  "shard": {
+    "index": 0,
+    "count": 1
+  }
+}

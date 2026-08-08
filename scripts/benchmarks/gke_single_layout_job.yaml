@@ -15,18 +15,30 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: topogym-single-layout
+  name: JOBNAME_PLACEHOLDER
 spec:
   completionMode: Indexed
   completions: SHARDS_PLACEHOLDER
   parallelism: SHARDS_PLACEHOLDER
-  # A pod that fails twice is a bug, not bad luck on a spot node.
+  # A pod that fails twice on its *own* merits is a bug. Being
+  # preempted is not: spot nodes are reclaimed at Google's discretion,
+  # and a study that runs for hours will be. Counting preemptions
+  # against this limit killed a 36-study run after 15 -- and the 21 it
+  # lost were exactly the slow ones, because long pods are the ones
+  # preemption finds.
   backoffLimit: BACKOFF_PLACEHOLDER
+  podFailurePolicy:
+    rules:
+      # A preempted or evicted pod is retried without spending the
+      # budget meant for real failures.
+      - action: Ignore
+        onPodConditions:
+          - type: DisruptionTarget
+  # Spot reclaim sends SIGTERM and waits; give the study time to flush
+  # its parquet buffers to the bucket before the node goes.
+  ttlSecondsAfterFinished: 3600
   # Hard ceiling on the whole Job, in seconds. Nothing runs past it.
   activeDeadlineSeconds: DEADLINE_PLACEHOLDER
-  # Clean the Job up on its own so a forgotten kubectl does not keep
-  # pods (and their nodes) alive.
-  ttlSecondsAfterFinished: 600
   template:
     metadata:
       annotations:
@@ -55,7 +67,7 @@ spec:
           # same command and takes a different slice.
           args:
             - >-
-              python scripts/benchmarks/run_single_layout.py
+              python SCRIPT_PLACEHOLDER
               --shard-index "$JOB_COMPLETION_INDEX"
               --shard-count SHARDS_PLACEHOLDER
               ARGS_PLACEHOLDER
