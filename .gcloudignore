@@ -14,9 +14,13 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-runs/
-benchmarks/
-docs/envs/
-docs/environments/
+# Anchored with a leading slash. Unanchored, "benchmarks/" matches at
+# any depth -- including scripts/benchmarks/, which holds the
+# Dockerfile, so the build failed with "no such file or directory" on
+# its own build context.
+/runs/
+/benchmarks/
+/docs/envs/
+/docs/environments/
 *.gif
 .DS_Store

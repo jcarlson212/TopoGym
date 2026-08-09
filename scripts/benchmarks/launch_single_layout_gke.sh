@@ -23,10 +23,15 @@ set -euo pipefail
 PROJECT=""; BUCKET=""; ZONE="us-central1-a"; CLUSTER="topogym-single"
 MACHINE="n2-standard-8"; SHARDS=9; MAX_NODES=3; DRY_RUN=0; TEARDOWN=0
 DEADLINE=2700            # 45 minutes, hard
+POLL=20                  # seconds between Job-status checks
+STALL_LIMIT=15           # consecutive unreadable checks before giving up
 BACKOFF=8   # preemptions are ignored; this bounds real failures
 # Sized so three pods share an 8-vCPU node: a 7-CPU request would put
-# one pod per node and need nine nodes to run nine shards.
-CPU="2"; MEM="6Gi"
+# one pod per node and need nine nodes to run nine shards. The preset
+# defaults apply unless --cpu/--mem override them, and --benchmark
+# raises them because its sweep runs more Ray processes per pod.
+CPU_DEFAULT="2"; MEM_DEFAULT="6Gi"
+CPU=""; MEM=""
 KEEP=0
 SCRIPT="scripts/benchmarks/run_single_layout.py"
 JOBNAME="topogym-single-layout"
@@ -55,7 +60,15 @@ while [[ $# -gt 0 ]]; do
       SCRIPT="scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py"
       JOBNAME="topogym-benchmark"
       STUDY_ARGS="--baselines all --only-missing --keep-going --group all --steps 1000000 --tune-steps 100000 --episodes 50 --max-iterations 250 --num-env-runners 2 --envs-per-runner 2 --eval-workers 2"
+      # Two more Ray processes per pod than a single-layout study --
+      # the eval workers -- and 6Gi did not hold them: the raylet
+      # OOM-killed workers until the shard crashed, and the retries
+      # spent the whole backoff limit. Two of these share a node
+      # instead of three.
+      CPU_DEFAULT="3"; MEM_DEFAULT="12Gi"
       shift ;;
+    --cpu) CPU="$2"; shift 2 ;;       # override the preset's pod size
+    --mem) MEM="$2"; shift 2 ;;
     --keep) KEEP=1; shift ;;          # leave the cluster up (debugging)
     --dry-run) DRY_RUN=1; shift ;;
     --teardown) TEARDOWN=1; shift ;;
@@ -63,6 +76,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ -n "$PROJECT" ]] || { echo "usage: $0 --project P --bucket B" >&2; exit 2; }
+# After parsing, so --cpu wins wherever it sits relative to --benchmark.
+CPU="${CPU:-$CPU_DEFAULT}"; MEM="${MEM:-$MEM_DEFAULT}"
 
 REGION="${ZONE%-*}"
 REPO="${REGION}-docker.pkg.dev/${PROJECT}/topogym"
@@ -83,6 +98,56 @@ teardown() {
   echo "=== tearing down $CLUSTER ==="
   run gcloud container clusters delete "$CLUSTER" --zone "$ZONE" \
       --project "$PROJECT" --quiet || true
+}
+
+# Block until the Job ends, whichever way it ends.
+#
+# `kubectl wait` takes one condition and returns only when that
+# condition fires, so --for=condition=complete sits there for the whole
+# --timeout when a Job *fails*. A benchmark that died of OOM twenty
+# minutes in therefore held its cluster for the full twelve-hour
+# ceiling, which is precisely the bill this script exists to prevent.
+# Polling both conditions ends the wait on whichever arrives first.
+# (Racing two `kubectl wait` calls would need `wait -n`, which the bash
+# 3.2 that ships with macOS does not have.)
+#
+# Polling also survives what `kubectl wait` did not: when the gcloud
+# credentials expired mid-run, its watch neither returned nor errored,
+# so it sat past its own --timeout and the teardown never ran. A query
+# that cannot reach the cluster at all is retried for STALL_LIMIT
+# rounds and then gives up, which lands on the teardown path rather
+# than hanging forever.
+await_job() {
+  local name="$1" limit="$2" waited=0 conditions stalled=0
+  local query='{range .status.conditions[?(@.status=="True")]}{.type} {end}'
+  while :; do
+    if conditions="$(kubectl get "job/${name}" -o "jsonpath=${query}" \
+        2>/dev/null)"; then
+      stalled=0
+    else
+      # Either the API is unreachable or the Job is gone -- neither is
+      # a state this script can wait out indefinitely.
+      stalled=$(( stalled + 1 ))
+      if [[ "$stalled" -ge "$STALL_LIMIT" ]]; then
+        echo "cannot read job/${name} after ${stalled} tries;" \
+             "assuming it is over" >&2
+        return 1
+      fi
+      conditions=""
+    fi
+    case " $conditions " in
+      *" Complete "*) echo "job ${name} completed"; return 0 ;;
+      # FailureTarget precedes Failed while the pods drain; either one
+      # means the Job is over and the cluster has nothing left to do.
+      *" Failed "*|*" FailureTarget "*)
+        echo "job ${name} FAILED after ${waited}s" >&2; return 1 ;;
+    esac
+    if [[ "$waited" -ge "$limit" ]]; then
+      echo "job ${name} still running after ${limit}s; giving up" >&2
+      return 1
+    fi
+    sleep "$POLL"; waited=$(( waited + POLL ))
+  done
 }
 
 if [[ "$TEARDOWN" == 1 ]]; then teardown; exit 0; fi
@@ -200,10 +265,11 @@ run kubectl apply -f "$MANIFEST"
 # 4. Wait, with the deadline as the ceiling. The trap tears down on
 #    every exit path, so there is no way out of here that leaves the
 #    cluster running.
-run kubectl wait --for=condition=complete --timeout="${DEADLINE}s" \
-    "job/${JOBNAME}" || {
+if [[ "$DRY_RUN" == 1 ]]; then
+  echo "+ await job/${JOBNAME} (up to ${DEADLINE}s)"
+elif ! await_job "$JOBNAME" "$DEADLINE"; then
   echo "job did not complete; recent logs:"
   run kubectl logs "job/${JOBNAME}" --tail=50 --all-containers \
       || true
-}
+fi
 echo "=== results in gs://${BUCKET}/experiments/topogym/single_env/ ==="
