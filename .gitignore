@@ -29,17 +29,23 @@ seeds-*.png
 # Baseline run side effects: logs, checkpoints, per-step traces.
 runs/
 
-# Unpublished methods. A baseline under review lives outside the
-# repository but still has to face the same harness as a published one,
-# or its numbers are not comparable. The package imports any
-# `_private_*.py` under concrete_baselines when present and ignores it
-# when absent (see baselines/gridworld2dv1/__init__.py), so a clone
-# without these files is a working library with fewer baselines.
+# Unpublished methods are now tracked rather than ignored, so that a
+# refactor of the shared protocol can be reviewed against every
+# baseline that implements it rather than against the public half.
 #
-# Deliberately generic: naming the method here would put it in a
-# tracked file, which is the thing these patterns exist to prevent.
-topogym/baselines/gridworld2dv1/concrete_baselines/_private_*.py
-tests/**/test_private_*.py
+# What used to be enforced here -- that the code could not be committed
+# -- is enforced at the other end instead, by a pre-push hook that
+# refuses to publish these paths or the method's name. The hook is not
+# tracked, because naming the method in a tracked file is the thing
+# being prevented. It lives in .git/hooks/pre-push; a fresh clone does
+# not get it, so install it before adding a remote.
+#
+# Pushing anything at all is blocked while these files are tracked:
+# a push publishes whole trees, not diffs, so any descendant commit
+# would carry them. Strip them from history before publishing.
+#
+# Results still stay out: artefact paths carry the algorithm's name,
+# and nothing about a run needs to be in git.
 benchmarks/**/private/
 benchmarks/private/
 runs/**/private/
