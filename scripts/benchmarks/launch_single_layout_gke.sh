@@ -78,6 +78,15 @@ done
 [[ -n "$PROJECT" ]] || { echo "usage: $0 --project P --bucket B" >&2; exit 2; }
 # After parsing, so --cpu wins wherever it sits relative to --benchmark.
 CPU="${CPU:-$CPU_DEFAULT}"; MEM="${MEM:-$MEM_DEFAULT}"
+# Every kubectl call names its cluster. `get-credentials` sets the
+# *current* context, which is global to the kubeconfig, so two
+# launchers running at once on one machine fight over it: the second
+# one to authenticate silently redirects the first one's kubectl calls
+# to the wrong cluster. That is not hypothetical -- a benchmark run
+# polled for its Job against the single-layout cluster, was told it
+# did not exist, and tore its own cluster down mid-run. gcloud names
+# these contexts by rule, so the name can be built rather than read.
+CONTEXT="gke_${PROJECT}_${ZONE}_${CLUSTER}"
 
 REGION="${ZONE%-*}"
 REPO="${REGION}-docker.pkg.dev/${PROJECT}/topogym"
@@ -121,8 +130,8 @@ await_job() {
   local name="$1" limit="$2" waited=0 conditions stalled=0
   local query='{range .status.conditions[?(@.status=="True")]}{.type} {end}'
   while :; do
-    if conditions="$(kubectl get "job/${name}" -o "jsonpath=${query}" \
-        2>/dev/null)"; then
+    if conditions="$(kubectl --context "$CONTEXT" get "job/${name}" \
+        -o "jsonpath=${query}" 2>/dev/null)"; then
       stalled=0
     else
       # Either the API is unreachable or the Job is gone -- neither is
@@ -243,7 +252,7 @@ run gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
 run gcloud iam service-accounts add-iam-policy-binding "$GSA" \
     --project="$PROJECT" --role=roles/iam.workloadIdentityUser \
     --member="serviceAccount:${PROJECT}.svc.id.goog[default/default]"
-run kubectl annotate serviceaccount default \
+run kubectl --context "$CONTEXT" annotate serviceaccount default \
     "iam.gke.io/gcp-service-account=${GSA}" --overwrite
 
 # 3. The Job. Each pod takes its slice from JOB_COMPLETION_INDEX.
@@ -260,7 +269,7 @@ sed -e "s|IMAGE_PLACEHOLDER|${IMAGE}|g" \
     -e "s|JOBNAME_PLACEHOLDER|${JOBNAME}|g" \
     scripts/benchmarks/gke_single_layout_job.yaml > "$MANIFEST"
 echo "--- manifest ---"; cat "$MANIFEST"; echo "----------------"
-run kubectl apply -f "$MANIFEST"
+run kubectl --context "$CONTEXT" apply -f "$MANIFEST"
 
 # 4. Wait, with the deadline as the ceiling. The trap tears down on
 #    every exit path, so there is no way out of here that leaves the
@@ -269,7 +278,7 @@ if [[ "$DRY_RUN" == 1 ]]; then
   echo "+ await job/${JOBNAME} (up to ${DEADLINE}s)"
 elif ! await_job "$JOBNAME" "$DEADLINE"; then
   echo "job did not complete; recent logs:"
-  run kubectl logs "job/${JOBNAME}" --tail=50 --all-containers \
+  run kubectl --context "$CONTEXT" logs "job/${JOBNAME}" --tail=50 --all-containers \
       || true
 fi
 echo "=== results in gs://${BUCKET}/experiments/topogym/single_env/ ==="
