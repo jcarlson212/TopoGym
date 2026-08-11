@@ -29,23 +29,27 @@ seeds-*.png
 # Baseline run side effects: logs, checkpoints, per-step traces.
 runs/
 
-# Unpublished methods are now tracked rather than ignored, so that a
-# refactor of the shared protocol can be reviewed against every
-# baseline that implements it rather than against the public half.
+# Unpublished methods stay out of git entirely. Ignoring them here is
+# what makes them unpublishable: code that cannot be committed cannot
+# be pushed.
 #
-# What used to be enforced here -- that the code could not be committed
-# -- is enforced at the other end instead, by a pre-push hook that
-# refuses to publish these paths or the method's name. The hook is not
-# tracked, because naming the method in a tracked file is the thing
-# being prevented. It lives in .git/hooks/pre-push; a fresh clone does
-# not get it, so install it before adding a remote.
+# Tracking them was tried and reverted. A push publishes whole trees,
+# not diffs, so once one of these files is committed, every descendant
+# commit carries it and the only remedy is rewriting history -- after
+# which the objects still sit on the remote, reachable by hash.
 #
-# Pushing anything at all is blocked while these files are tracked:
-# a push publishes whole trees, not diffs, so any descendant commit
-# would carry them. Strip them from history before publishing.
+# The pre-push hook is a second line of defence, not the first. It
+# lives in .git/hooks/pre-push and is not tracked, because naming the
+# method in a tracked file is the thing being prevented. It inspects
+# only the pushed tip, so it does not catch a name left behind in an
+# older commit -- that gap is why ignoring has to do the real work. A
+# fresh clone gets neither the hook nor these files; install the hook
+# before adding a remote.
 #
-# Results still stay out: artefact paths carry the algorithm's name,
-# and nothing about a run needs to be in git.
+# Results stay out too: artefact paths carry the algorithm's name, and
+# nothing about a run needs to be in git.
+topogym/baselines/**/concrete_baselines/_private_*.py
+tests/baselines/**/test_private_*.py
 benchmarks/**/private/
 benchmarks/private/
 runs/**/private/
