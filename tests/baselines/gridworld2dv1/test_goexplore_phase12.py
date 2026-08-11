@@ -402,6 +402,10 @@ def test_the_recurrent_priming_step_is_declared_inapplicable():
     )
 
     assert DEMONSTRATION_PRIMING_STEPS == 0
+
+    # The constant above is the half of this claim that holds without
+    # the benchmark extra; policy_module_spec() reaches into RLlib.
+    pytest.importorskip("ray", reason="needs topogym[benchmarks]")
     baseline = get_baseline("go-explore-phase1and2")()
     spec = baseline.policy_module_spec()
     model_config = getattr(spec, "model_config", None) or {}
