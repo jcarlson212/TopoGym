@@ -43,9 +43,9 @@ with the universal `(x, y)` + 16-slot texture vector):
 
 | slice | families | axis | status |
 |---|---|---|---|
-| **GridWorld2D** | `Dilution`, `Chambers2`, `ChamberCount`, `Decoys`, `Shape{Sq,Ci,Tr,St}`, `Nested`, `GiveUp`, `Bottleneck`, `Maze` | world size, chamber/decoy count, shape, nesting depth, corridor length, braiding | 🟠 in development |
-| **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail | 🟠 in development |
-| **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal | 🟠 in development |
+| **GridWorld2D** | `Dilution`, `Chambers2`, `ChamberCount`, `Decoys`, `Shape{Sq,Ci,Tr,St}`, `Nested`, `GiveUp`, `Bottleneck`, `Maze` | world size, chamber/decoy count, shape, nesting depth, corridor length, braiding | 🟢 Live; Testing |
+| **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail | 🟢 Live; Testing |
+| **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal | 🟢 Live; Testing |
 
 Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`.
 Details per family: [docs/environments/](docs/environments/README.md).
@@ -374,7 +374,7 @@ If you use TopoGym in your research, please cite:
              Exploration in Reinforcement Learning},
   year    = {2026},
   url     = {https://github.com/jcarlson212/TopoGym},
-  version = {0.1.0}
+  version = {0.2.0}
 }
 ```
 
