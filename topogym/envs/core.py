@@ -407,14 +407,32 @@ class TopoEnvCore(gym.Env):
         distance (EpicChase spaces its chambers an episode apart) have
         to be able to state it, and archive methods have to be able to
         cost a return trip. ``None`` when no route exists."""
+        return self._actions_search(source, target)
+
+    def actions_from(self, source: tuple) -> dict:
+        """Fewest actions from ``source`` to every reachable cell, as a
+        ``{cell: actions}`` dict, in the same turn-charging currency as
+        :meth:`actions_between`.
+
+        One search answers every distance-from-here question at once.
+        Asking :meth:`actions_between` per cell repeats the same
+        traversal from the same source for every target -- quadratic in
+        free cells, and the difference between a second and an hour on
+        a 200-size world. A cell no route reaches is absent."""
+        return self._actions_search(source, None)
+
+    def _actions_search(self, source: tuple, target):
+        """BFS over cell x facing. Stops at ``target``, or maps every
+        reachable cell when ``target`` is None."""
         base = self.layout.base
         blocked = self._planning_blocked()
         state = base.turn_left(base.initial_state(source))
         seen = {state}
+        distances = {state.cell: 0}
         queue = deque([(state, 0)])
         while queue:
             current, dist = queue.popleft()
-            if current.cell == target:
+            if target is not None and current.cell == target:
                 return dist
             nxts = [base.turn_left(current), base.turn_right(current)]
             ahead = base.forward(current)
@@ -425,8 +443,11 @@ class TopoEnvCore(gym.Env):
             for nxt in nxts:
                 if nxt not in seen:
                     seen.add(nxt)
+                    # First arrival at a cell is the fewest-actions
+                    # route to it: BFS visits in distance order.
+                    distances.setdefault(nxt.cell, dist + 1)
                     queue.append((nxt, dist + 1))
-        return None
+        return None if target is not None else distances
 
     def homology_stats(self, which: str = "observed") -> HomologyStats:
         """Per-dimension hole counts as a :class:`HomologyStats`.

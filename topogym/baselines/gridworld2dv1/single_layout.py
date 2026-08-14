@@ -151,10 +151,13 @@ def single_episode_ceiling(env_id: str, seed: int = 0) -> float | None:
         return None
     budget = env._max_steps
     free = env.layout.free_cells
+    # One search for every cell. Asking actions_between per cell runs
+    # the same BFS once per target -- ~1.75 hours on a 200-size world,
+    # silently, which is what wedged every publishing pod on GKE.
+    distances = env.actions_from(env.layout.start)
     reachable = sum(
         1 for cell in free
-        if (d := env.actions_between(env.layout.start, cell)) is not None
-        and d <= budget
+        if (d := distances.get(tuple(cell))) is not None and d <= budget
     )
     env.close()
     return reachable / max(1, len(free))
