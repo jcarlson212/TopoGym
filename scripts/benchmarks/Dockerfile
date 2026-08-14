@@ -16,9 +16,11 @@ COPY topogym/__init__.py topogym/__init__.py
 RUN pip install --no-cache-dir ".[benchmarks,testing]" || true
 
 COPY . .
+# imageio is the [assets] extra: pods publish coverage GIFs, and a run
+# without it warns once per algorithm and ships no animations.
 RUN pip install --no-cache-dir --no-deps -e ".[benchmarks]" \
     && pip install --no-cache-dir "ray[rllib]>=2.9" torch rliable \
-        "arch>=7.2,<8" "pandas>=2.0,<3" matplotlib
+        "arch>=7.2,<8" "pandas>=2.0,<3" matplotlib "imageio>=2.31"
 
 # The splits are committed, so the container needs no generation step
 # and every task sees byte-identical instances.

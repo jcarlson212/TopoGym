@@ -161,10 +161,6 @@ await_job() {
 
 if [[ "$TEARDOWN" == 1 ]]; then teardown; exit 0; fi
 
-# Whatever happens next -- the Job failing, the deadline firing, a
-# Ctrl-C, an error under `set -e` -- the cluster goes away.
-trap teardown EXIT INT TERM
-
 [[ -n "$BUCKET" ]] || { echo "--bucket is required to run" >&2; exit 2; }
 
 # Preflight, *before* anything bills. Every one of these is a local or
@@ -200,6 +196,14 @@ preflight() {
   echo "preflight: ok"
 }
 preflight
+
+# Installed only after preflight passes. Any earlier and a preflight
+# exit would run teardown -- deleting a same-named cluster that a
+# *different* invocation may be using, to clean up resources this one
+# never created. From here on, though: whatever happens -- the Job
+# failing, the deadline firing, a Ctrl-C, an error under `set -e` --
+# the cluster goes away.
+trap teardown EXIT INT TERM
 
 echo "=== plan ==="
 echo "  project   : $PROJECT"
