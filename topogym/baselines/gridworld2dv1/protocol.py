@@ -22,6 +22,7 @@ import pathlib
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
+from topogym.baselines.utilities import BudgetPlan, SplitBudget
 from topogym.core.constants import ActionMode
 
 logger = logging.getLogger("topogym")
@@ -119,9 +120,20 @@ class BaselineConfig:
     #: Where checkpoints and logs go; gitignored by convention.
     run_dir: pathlib.Path | None = None
 
+    #: The budget authority this run was configured from, when it was
+    #: configured through one. The step/episode fields above remain
+    #: what every consumer reads; a plan is the one writer that sets
+    #: them coherently (see :meth:`Baseline.apply_budget_plan`), so a
+    #: recorded result can name the plan it ran under rather than the
+    #: trail of flags that used to add up to one.
+    plan: BudgetPlan | None = None
+
     def to_dict(self) -> dict:
         out = asdict(self)
         out["run_dir"] = str(self.run_dir) if self.run_dir else None
+        if self.plan is not None:
+            out["plan"] = {name: asdict(budget)
+                           for name, budget in self.plan.splits.items()}
         return out
 
 
@@ -330,13 +342,6 @@ class Baseline(abc.ABC):
         """
         return None
 
-    @staticmethod
-    def episodes_in(steps: int, horizon: int) -> int:
-        """Episodes that fit in a step budget at this horizon. Rounded
-        down and never zero: overrunning a budget is worse than
-        underrunning it, but a run of no episodes is not a run."""
-        return max(1, int(steps) // max(1, int(horizon)))
-
     def apply_step_budget(self, step_budget: int | None,
                           horizon: int | None = None) -> int | None:
         """Make ``step_budget`` the authority for this run.
@@ -345,37 +350,115 @@ class Baseline(abc.ABC):
         "the same" has to be enforced rather than announced. Two things
         follow, and both happen here so no method can honour one and
         forget the other: the episode count for methods that train
-        episode by episode, and the iteration cap for methods counted
+        episode by episode, and the iteration count for methods counted
         in iterations -- which would otherwise take whatever
         ``steps_per_iteration`` times their cap multiplies out to. A
         100k-step study left at 40 iterations of 4,000 hands PPO 160k,
         60% more than the archive methods, and every comparison drawn
         from it measures that discrepancy rather than the methods.
 
+        The iteration count is *derived* from the budget, in either
+        direction. It used to be ``min()``-ed against
+        ``max_iterations``, which made a default that predates the
+        budget a second authority: a ten-million-step budget under a
+        250-iteration default silently became one million steps, and
+        said so only in a log line nobody read.
+
         Returns the derived episode count, or None without a budget or
-        horizon. The cap is a ceiling: a run that asked for fewer
-        iterations keeps them.
+        horizon.
         """
         if not step_budget:
             return None
-        self.config.train_steps = int(step_budget)
+        budget = SplitBudget(steps=int(step_budget))
+        self.config.train_steps = budget.steps
         per_iteration = self.steps_per_iteration()
         if per_iteration:
-            affordable = max(1, int(step_budget) // int(per_iteration))
-            if affordable < self.config.max_iterations:
+            affordable = budget.iterations(int(per_iteration))
+            if affordable != self.config.max_iterations:
                 logger.info(
-                    "[%s] step budget %d / %d per iteration caps "
-                    "training at %d iterations (was %d)",
-                    self.name, step_budget, per_iteration, affordable,
+                    "[%s] step budget %d / %d per iteration sets "
+                    "training to %d iterations (was %d)",
+                    self.name, budget.steps, per_iteration, affordable,
                     self.config.max_iterations,
                 )
-            self.config.max_iterations = min(self.config.max_iterations,
-                                             affordable)
+            self.config.max_iterations = affordable
         if not horizon:
             return None
-        episodes = self.episodes_in(step_budget, horizon)
+        episodes = budget.resolve(int(horizon)).episodes
         self.config.eval_episodes = episodes
         return episodes
+
+    def apply_budget_plan(self, plan: BudgetPlan,
+                          horizon: int | None = None) -> None:
+        """Configure this run from ``plan``, the one writer of every
+        budget field on the config.
+
+        Consumers keep reading the flat fields -- ``tune_steps``,
+        ``eval_steps``, ``eval_episodes`` and friends -- but after this
+        call they all mean what one plan says, and the result JSON
+        records that plan (see :attr:`BaselineConfig.plan`) instead of
+        the trail of flags that used to add up to one.
+
+        Split names are checked against :data:`SPLIT_USAGE`: a plan
+        naming a split the protocol does not know is an error, not an
+        ignored key, because a budget that silently applies to nothing
+        is a budget somebody believes is being enforced.
+
+        - ``train``: ``train_steps`` plus the derived iteration count,
+          via :meth:`apply_step_budget` (step-authoritative only --
+          training compares across worlds, and steps are the only fair
+          currency there).
+        - ``tune``: ``tune_steps`` or ``tune_episodes``, whichever the
+          budget states.
+        - ``val``: ``val_episodes`` (episode-authoritative only; the
+          validation sweep is genuinely counted in episodes).
+        - ``test``: ``eval_steps``, and ``eval_episodes`` too when
+          ``horizon`` is given; an episode-authoritative test budget
+          sets ``eval_episodes`` alone.
+        """
+        for name in plan.splits:
+            if name not in SPLIT_USAGE:
+                raise ValueError(
+                    f"plan names unknown split {name!r}; this protocol "
+                    f"knows {sorted(SPLIT_USAGE)}")
+        self.config.plan = plan
+        if "train" in plan:
+            train = plan.for_split("train")
+            if train.steps is None:
+                raise ValueError(
+                    "a train budget must be step-authoritative: "
+                    "training compares across worlds whose horizons "
+                    "differ by up to 50x, and an episode count hands "
+                    "one world that multiple of the experience")
+            self.apply_step_budget(train.steps, horizon)
+        if "tune" in plan:
+            tune = plan.for_split("tune")
+            if tune.steps is not None:
+                self.config.tune_steps = tune.steps
+            else:
+                self.config.tune_episodes = tune.episodes
+        if "val" in plan:
+            val = plan.for_split("val")
+            if val.episodes is None:
+                raise ValueError(
+                    "a val budget must be episode-authoritative: the "
+                    "validation sweep runs across the split, not per "
+                    "instance, so it has no single horizon to resolve "
+                    "steps against")
+            self.config.val_episodes = val.episodes
+        if "test" in plan:
+            test = plan.for_split("test")
+            if test.steps is not None:
+                self.config.eval_steps = test.steps
+                if horizon:
+                    self.config.eval_episodes = (
+                        test.resolve(int(horizon)).episodes)
+            else:
+                self.config.eval_steps = None
+                self.config.eval_episodes = test.episodes
+        logger.info("[%s] configured from budget plan: %s", self.name,
+                    {name: asdict(budget)
+                     for name, budget in plan.splits.items()})
 
     def bind_env(self, env) -> None:
         """Offer the one world a single-layout study runs in.

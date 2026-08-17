@@ -20,7 +20,8 @@ def test_the_budget_is_steps_not_episodes():
     assert episodes_for(1_000_000, 180) == 5555
     assert episodes_for(1_000_000, 6760) == 147
     assert episodes_for(100, 6760) == 1  # never zero
-    assert episodes_for(1_000_000, 0) == 1_000_000  # no division by zero
+    with pytest.raises(ValueError):
+        episodes_for(1_000_000, 0)  # a zero horizon is a bug, said loudly
 
 
 def test_a_row_can_be_built_for_any_registry_id():
@@ -190,12 +191,16 @@ def test_it_rounds_down_rather_than_over():
     assert baseline.config.max_iterations * 4000 <= 99_000
 
 
-def test_a_smaller_iteration_cap_is_never_raised():
-    """The budget is a ceiling, not a target."""
+def test_the_budget_overrides_a_smaller_iteration_cap():
+    """The budget is the one authority, in either direction. A cap
+    that predates it -- default or hand-set -- is a second authority,
+    and the ``min()`` this replaces let the smaller one win silently.
+    A run that wants 5 iterations states a 20k budget, not a 1M budget
+    with a side channel."""
     baseline = get_baseline("ppo")(
         BaselineConfig(max_iterations=5, train_batch_size=4000))
     baseline.apply_step_budget(1_000_000)
-    assert baseline.config.max_iterations == 5
+    assert baseline.config.max_iterations == 250
 
 
 def test_methods_counted_in_episodes_need_no_cap():
@@ -210,8 +215,9 @@ def test_the_budget_derives_the_episode_count_from_the_horizon():
     baseline = get_baseline("random")(BaselineConfig())
     assert baseline.apply_step_budget(1_000_000, 180) == 5555
     assert baseline.apply_step_budget(1_000_000, 6760) == 147
-    assert baseline.episodes_in(100, 6760) == 1        # never zero
-    assert baseline.episodes_in(1_000, 0) == 1_000     # no zero-division
+    assert episodes_for(100, 6760) == 1                # never zero
+    with pytest.raises(ValueError):                    # loud, not aliased
+        episodes_for(1_000, 0)
 
 
 # -- the evaluation horizon -------------------------------------------

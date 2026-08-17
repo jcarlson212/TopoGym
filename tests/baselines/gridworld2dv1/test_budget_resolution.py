@@ -1,15 +1,14 @@
-"""What a budget resolves to today, pinned before it is refactored.
+"""What a budget resolves to, now that one authority resolves it.
 
-These tests do not claim the behaviour is right. Two of them pin
-behaviour that is meant to change: an evaluation whose episode count
-depends on which entry point called it, and a step budget that a
-stale iteration default silently divides by ten. They exist so that
-the change is visible as a diff in this file rather than as a number
-that quietly moves in a published result.
-
-The arithmetic they cover is currently written three times -- in
+The arithmetic used to be written three times -- in
 ``Baseline.episodes_in``, in ``single_layout.episodes_for`` and inline
-in ``evaluate_instance`` -- which is the reason for the refactor.
+in ``evaluate_instance``. It now lives once, in
+:class:`~topogym.baselines.utilities.SplitBudget`; ``episodes_for``
+survives as a reading of it and ``episodes_in`` is gone. These tests
+pin the call sites to the authority, and pin the two behaviour changes
+the refactor was for: an iteration count that is derived from the
+budget rather than ``min()``-ed against a stale default, and an
+episode count that no longer depends on which entry point asked.
 """
 
 import pytest
@@ -24,6 +23,7 @@ from topogym.baselines.gridworld2dv1.evaluate import evaluate_split
 from topogym.baselines.gridworld2dv1.instances import load_split
 from topogym.baselines.gridworld2dv1.protocol import Baseline, BaselineConfig
 from topogym.baselines.gridworld2dv1.single_layout import episodes_for
+from topogym.baselines.utilities import BudgetPlan, SplitBudget
 
 BUDGETS = (1, 999, 1_000, 50_000, 1_000_000)
 HORIZONS = (1, 130, 180, 510, 6_760, 7_680)
@@ -57,16 +57,21 @@ class _Iterated(_Countless):
 
 @pytest.mark.parametrize("steps", BUDGETS)
 @pytest.mark.parametrize("horizon", HORIZONS)
-def test_every_copy_of_the_formula_agrees(steps, horizon):
+def test_every_reading_of_the_formula_agrees(steps, horizon):
     expected = _reference(steps, horizon)
-    assert Baseline.episodes_in(steps, horizon) == expected
     assert episodes_for(steps, horizon) == expected
+    assert SplitBudget(steps=steps).resolve(horizon).episodes == expected
+
+
+def test_the_shared_copy_is_gone():
+    """``episodes_in`` was one of the three copies; a subclass reaching
+    for it should find the authority instead of a silent shadow."""
+    assert not hasattr(Baseline, "episodes_in")
 
 
 def test_a_budget_too_small_for_one_episode_still_buys_one():
     """Underrunning a budget beats overrunning it, but a run of no
     episodes is not a run."""
-    assert Baseline.episodes_in(10, 6_760) == 1
     assert episodes_for(10, 6_760) == 1
 
 
@@ -86,17 +91,17 @@ def test_ppo_counts_its_training_in_batches():
     assert baseline.steps_per_iteration() == 4_000
 
 
-def test_a_ten_million_step_budget_is_floored_by_the_iteration_default():
-    """PINNED BUG. The cap is a ceiling -- ``min`` of what was asked
-    for and what the budget affords -- so a default of 250 iterations
-    silently reduces a ten-million-step budget to one million, and
-    says so only in a log line. Changing this is the point of the
-    refactor; this test should fail loudly when it does."""
+def test_a_ten_million_step_budget_overrides_the_iteration_default():
+    """The bug this refactor was for: the cap used to be ``min``-ed,
+    so a default of 250 iterations silently reduced a ten-million-step
+    budget to one million and said so only in a log line. The budget
+    is the one authority now; the iteration count is derived from it,
+    in either direction."""
     baseline = _Iterated(BaselineConfig(max_iterations=250,
                                         train_batch_size=4_000))
     baseline.apply_step_budget(10_000_000, horizon=None)
-    assert baseline.config.max_iterations == 250
-    assert baseline.config.max_iterations * 4_000 == 1_000_000
+    assert baseline.config.max_iterations == 2_500
+    assert baseline.config.max_iterations * 4_000 == 10_000_000
 
 
 def test_a_budget_without_a_horizon_sets_no_episode_count():
@@ -143,3 +148,58 @@ def test_evaluation_is_episode_counted_without_a_budget():
                              policy_factory=RandomPolicyFactory(0),
                              workers=1)
     assert records[0]["episodes"] == 3
+
+
+# --- the plan as the one writer of the config ------------------------
+
+def _plan(**splits) -> BudgetPlan:
+    return BudgetPlan(splits=splits)
+
+
+def test_a_plan_writes_every_field_its_splits_govern():
+    baseline = _Iterated(BaselineConfig(max_iterations=250,
+                                        train_batch_size=4_000))
+    plan = _plan(train=SplitBudget(steps=10_000_000),
+                 tune=SplitBudget(steps=100_000),
+                 val=SplitBudget(episodes=25),
+                 test=SplitBudget(steps=1_000_000))
+    baseline.apply_budget_plan(plan, horizon=6_760)
+    config = baseline.config
+    assert config.plan is plan
+    assert config.train_steps == 10_000_000
+    assert config.max_iterations == 2_500
+    assert config.tune_steps == 100_000
+    assert config.val_episodes == 25
+    assert config.eval_steps == 1_000_000
+    assert config.eval_episodes == 147          # 1M // 6,760
+
+
+def test_a_plan_naming_an_unknown_split_is_an_error():
+    """A budget that silently applies to nothing is a budget somebody
+    believes is being enforced."""
+    baseline = _Countless(BaselineConfig())
+    with pytest.raises(ValueError, match="unknown split"):
+        baseline.apply_budget_plan(_plan(single=SplitBudget(steps=1)))
+    assert baseline.config.plan is None
+
+
+def test_an_episode_authoritative_test_budget_sets_episodes_alone():
+    baseline = _Countless(BaselineConfig(eval_steps=999))
+    baseline.apply_budget_plan(_plan(test=SplitBudget(episodes=50)))
+    assert baseline.config.eval_episodes == 50
+    assert baseline.config.eval_steps is None
+
+
+def test_a_train_budget_must_be_step_authoritative():
+    baseline = _Countless(BaselineConfig())
+    with pytest.raises(ValueError, match="step-authoritative"):
+        baseline.apply_budget_plan(_plan(train=SplitBudget(episodes=9)))
+
+
+def test_the_plan_is_recorded_with_the_config():
+    baseline = _Countless(BaselineConfig())
+    baseline.apply_budget_plan(_plan(tune=SplitBudget(steps=100_000),
+                                     test=SplitBudget(steps=1_000_000)))
+    recorded = baseline.config.to_dict()["plan"]
+    assert recorded == {"tune": {"steps": 100_000, "episodes": None},
+                        "test": {"steps": 1_000_000, "episodes": None}}

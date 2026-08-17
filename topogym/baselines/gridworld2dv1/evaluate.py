@@ -19,6 +19,7 @@ import numpy as np
 
 from topogym.baselines.gridworld2dv1 import telemetry
 from topogym.baselines.gridworld2dv1.instances import instance_key, make_instance
+from topogym.baselines.utilities import SplitBudget
 from topogym.stats import StatsRecorder
 
 logger = logging.getLogger("topogym")
@@ -105,7 +106,8 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     # the experience of another and the comparison measures the horizon
     # rather than the method. Episodes are derived here, per instance.
     if step_budget:
-        episodes = max(1, int(step_budget) // max(1, int(row["horizon"])))
+        episodes = (SplitBudget(steps=int(step_budget))
+                    .resolve(int(row["horizon"])).episodes)
     borrowed = env is not None
     if not borrowed:
         env = StatsRecorder(make_instance(row, **(env_options or {})),

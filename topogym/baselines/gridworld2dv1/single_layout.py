@@ -38,12 +38,15 @@ import pathlib
 import time
 from dataclasses import dataclass, field
 
+from topogym.baselines.utilities import BudgetPlan, SplitBudget
+
 logger = logging.getLogger("topogym")
 
-__all__ = ["SingleLayoutResult", "episodes_for", "eval_horizon",
+__all__ = ["BENCHMARK_PLAN", "SingleLayoutResult", "episodes_for",
+           "eval_horizon",
            "layout_row", "plot_single_layout", "run_single_layout",
            "coverage_gif", "coverage_gifs",
-           "single_episode_ceiling", "tune_on_layout",
+           "single_episode_ceiling", "tune_on_layout", "tune_on_rows",
            "write_single_layout_md"]
 
 #: The world hyperparameters are chosen on, and the seed it is drawn
@@ -56,8 +59,26 @@ __all__ = ["SingleLayoutResult", "episodes_for", "eval_horizon",
 TUNING_LAYOUT = "TopoGym/DontFall-v0"
 TUNING_SEED = 987_654_321
 
-#: The default interaction budget for a single-layout study.
-DEFAULT_STEP_BUDGET = 1_000_000
+#: The declared budgets of the published single-env benchmark, as one
+#: :class:`~topogym.baselines.utilities.BudgetPlan`: ``tune`` is what
+#: hyperparameter selection may spend per candidate on each tuning
+#: layout, ``test`` is what a method gets to spend learning in each
+#: hold-out world before its frozen evaluation. Step-authoritative on
+#: both, because horizons across the registry span 130 to 7,680 steps
+#: and steps are the only currency every world charges the same way.
+#: Every recorded result names this plan (``config.plan``), so the
+#: numbers state the budget they were bought with.
+BENCHMARK_PLAN = BudgetPlan(splits={
+    "tune": SplitBudget(steps=100_000),
+    "test": SplitBudget(steps=1_000_000),
+})
+
+#: The default interaction budget for a single-layout study -- the
+#: benchmark's test budget, read from the plan rather than restated.
+DEFAULT_STEP_BUDGET = BENCHMARK_PLAN.test.steps
+
+#: What hyperparameter selection spends per candidate per layout.
+DEFAULT_TUNE_STEPS = BENCHMARK_PLAN.tune.steps
 
 #: Episodes in the frozen evaluation that produces the headline
 #: number. Separate from the learning budget and stated as such, so
@@ -98,9 +119,11 @@ def episodes_for(step_budget: int, horizon: int) -> int:
 
     Truncation is the common case in these worlds -- most episodes run
     the full horizon -- so this is close to exact, and erring low keeps
-    a run inside its budget rather than over it.
+    a run inside its budget rather than over it. The arithmetic lives
+    in :class:`~topogym.baselines.utilities.SplitBudget`; this is a
+    reading of it, not another copy.
     """
-    return max(1, int(step_budget // max(1, horizon)))
+    return SplitBudget(steps=int(step_budget)).resolve(int(horizon)).episodes
 
 
 def eval_horizon(row: dict) -> int:
@@ -441,16 +464,16 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
     return written
 
 
-def tune_on_layout(factory, config, *, layout: str = TUNING_LAYOUT,
-                   seed: int = TUNING_SEED,
-                   step_budget: int = DEFAULT_STEP_BUDGET,
-                   eval_episodes: int = DEFAULT_EVAL_EPISODES,
-                   telemetry_root: str | None = None) -> dict:
-    """Grid-search a baseline's ``tune_grid`` on a held-out world.
+def tune_on_rows(factory, config, rows: list, *,
+                 step_budget: int = DEFAULT_TUNE_STEPS,
+                 eval_episodes: int = DEFAULT_EVAL_EPISODES,
+                 telemetry_root: str | None = None) -> dict:
+    """Grid-search a baseline's ``tune_grid`` across held-out worlds.
 
     Every candidate gets its own freshly built baseline and the same
-    budget on the same layout, so the only thing differing between them
-    is the values. Ranked by
+    budget on every row, and a candidate's score is its *mean* across
+    the rows -- scored per world and averaged, never pooled, so a row
+    with a generous world cannot drown the others. Ranked by
     :func:`~...protocol.rank_candidates`: return when any candidate
     earned one, coverage when none did, chosen once for the whole
     search since ranking one candidate by return and another by
@@ -470,31 +493,37 @@ def tune_on_layout(factory, config, *, layout: str = TUNING_LAYOUT,
     if not grid:
         return {"values": dict(probe.default_hyperparameters()),
                 "score": None, "signal": None, "searched": [],
-                "layout": layout, "seed": seed}
+                "rows": [row["unit"] for row in rows]}
 
-    row = layout_row(layout, seed)
-    logger.info("[%s] tuning on %s seed %d: %d candidates x %d steps",
-                probe.name, row["unit"], seed, len(grid), step_budget)
+    logger.info("[%s] tuning on %s: %d candidates x %d worlds x %d steps",
+                probe.name, [row["unit"] for row in rows], len(grid),
+                len(rows), step_budget)
     measurements = []
     for index, candidate in enumerate(grid, 1):
-        baseline = factory(config)
-        result = baseline.single_layout_train_test_run(
-            row, step_budget=step_budget, eval_episodes=eval_episodes,
-            telemetry_root=telemetry_root, hyperparameters=candidate,
-            eval_archive=True,
-        )
-        record = result.evaluation or {}
+        returns, coverages = [], []
+        for row in rows:
+            baseline = factory(config)
+            result = baseline.single_layout_train_test_run(
+                row, step_budget=step_budget,
+                eval_episodes=eval_episodes,
+                telemetry_root=telemetry_root,
+                hyperparameters=candidate, eval_archive=True,
+            )
+            record = result.evaluation or {}
+            returns.append(float(record.get("cumulative_return") or 0.0))
+            coverages.append(float(record.get("lifetime_coverage")
+                                   or 0.0))
+            if hasattr(baseline, "close"):
+                baseline.close()
         measurements.append({
             **candidate,
-            "return": float(record.get("cumulative_return") or 0.0),
-            "coverage": float(record.get("lifetime_coverage") or 0.0),
+            "return": sum(returns) / len(returns),
+            "coverage": sum(coverages) / len(coverages),
         })
-        logger.info("[%s]   %d/%d %s -> return %.4f, coverage %.4f",
-                    probe.name, index, len(grid), candidate,
-                    measurements[-1]["return"],
+        logger.info("[%s]   %d/%d %s -> mean return %.4f, mean "
+                    "coverage %.4f", probe.name, index, len(grid),
+                    candidate, measurements[-1]["return"],
                     measurements[-1]["coverage"])
-        if hasattr(baseline, "close"):
-            baseline.close()
 
     ranked, signal = rank_candidates(measurements)
     best = {k: v for k, v in ranked[0].items()
@@ -503,7 +532,26 @@ def tune_on_layout(factory, config, *, layout: str = TUNING_LAYOUT,
                 probe.name, signal, best, ranked[0].get(signal, 0.0))
     return {"values": best, "score": ranked[0].get(signal),
             "signal": signal, "searched": measurements,
-            "layout": layout, "seed": seed}
+            "rows": [row["unit"] for row in rows]}
+
+
+def tune_on_layout(factory, config, *, layout: str = TUNING_LAYOUT,
+                   seed: int = TUNING_SEED,
+                   step_budget: int = DEFAULT_STEP_BUDGET,
+                   eval_episodes: int = DEFAULT_EVAL_EPISODES,
+                   telemetry_root: str | None = None) -> dict:
+    """Grid-search a baseline's ``tune_grid`` on one held-out world.
+
+    The one-world reading of :func:`tune_on_rows`, kept for the studies
+    that tune where the benchmark's tune split is beside the point --
+    see :data:`TUNING_LAYOUT` for why the world is fixed and its seed
+    sits outside every split band.
+    """
+    outcome = tune_on_rows(factory, config, [layout_row(layout, seed)],
+                           step_budget=step_budget,
+                           eval_episodes=eval_episodes,
+                           telemetry_root=telemetry_root)
+    return {**outcome, "layout": layout, "seed": seed}
 
 
 def write_single_layout_md(root, layout: str):
