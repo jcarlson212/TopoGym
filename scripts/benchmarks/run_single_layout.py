@@ -16,6 +16,11 @@ Usage::
     python scripts/benchmarks/run_single_layout.py \\
         --baselines go-explore-phase1 --layouts TopoGym/Maze-100-v0
 
+    # the published benchmark: hyperparameters chosen on the tune
+    # split, then every test-split world as its own study
+    python scripts/benchmarks/run_single_layout.py --baselines all \\
+        --split test --tune-split tune
+
     # a cloud run writing everything to GCS
     python scripts/benchmarks/run_single_layout.py --baselines all \\
         --artifacts gs://topogym-runs/single-layout \\
@@ -49,15 +54,19 @@ from topogym.baselines.gridworld2dv1 import (  # noqa: E402
     get_baseline,
     is_public,
 )
+from topogym.baselines.gridworld2dv1.instances import load_split  # noqa: E402
 from topogym.baselines.gridworld2dv1.protocol import BaselineConfig  # noqa: E402
 from topogym.baselines.gridworld2dv1.single_layout import (  # noqa: E402
     DEFAULT_EVAL_EPISODES,
     DEFAULT_STEP_BUDGET,
+    DEFAULT_TUNE_STEPS,
     TUNING_LAYOUT,
     TUNING_SEED,
     layout_row,
     tune_on_layout,
+    tune_on_rows,
 )
+from topogym.baselines.utilities import BudgetPlan, SplitBudget  # noqa: E402
 
 logger = logging.getLogger("topogym")
 
@@ -132,19 +141,61 @@ def artifact_root(name: str, artifacts) -> str:
             else _join(artifacts, "private"))
 
 
-def tuned_hyperparameters(name: str, args) -> dict | None:
-    """Grid-search ``name`` on the tuning world, once, and cache it.
+def _split_rows(split: str) -> list:
+    """Rows of a published split, with artifact-unique units.
 
-    On a *different* layout from the one under study: a search scored
-    on the target would pick the values that suit it, and the study
-    would report a fit rather than a method. Cached on disk keyed by
-    (algorithm, layout, seed, budget), so studying five target layouts
-    tunes once rather than five times.
+    A split names its world (``BankRobber``) and keeps the seed in its
+    own column, so three seeds of one world share a unit -- and
+    artifact paths are keyed by unit, so three studies would silently
+    overwrite one another's results. Tag the seed the way
+    ``layout_row`` does; the rows are otherwise exactly as published.
+    """
+    rows = []
+    for row in load_split(split):
+        seed = int(row["seed"])
+        unit = row["unit"] if seed == 0 else f"{row['unit']}@{seed}"
+        rows.append({**row, "unit": unit})
+    return rows
+
+
+def _tuning_rows(args) -> list:
+    """The tune-split worlds hyperparameters are chosen on.
+
+    The first ``--tune-per-slice`` rows of each slice, in the split's
+    published order, so every run of the benchmark tunes on the same
+    worlds without anyone choosing them per run. The whole split would
+    be fairer still and costs ``grid x 189 x tune_steps``, which is
+    more than the benchmark it serves; a per-slice sample keeps every
+    slice's flavour of hardness represented for a bounded bill.
+    """
+    chosen, counts = [], {}
+    for row in _split_rows(args.tune_split):
+        if counts.get(row["slice"], 0) < args.tune_per_slice:
+            counts[row["slice"]] = counts.get(row["slice"], 0) + 1
+            chosen.append(row)
+    return chosen
+
+
+def tuned_hyperparameters(name: str, args) -> dict | None:
+    """Grid-search ``name`` on held-out worlds, once, and cache it.
+
+    On *different* layouts from the ones under study: a search scored
+    on a target would pick the values that suit it, and the study
+    would report a fit rather than a method. With ``--tune-split`` the
+    worlds are drawn from that split (see :func:`_tuning_rows`);
+    otherwise the fixed tuning layout is used. Cached on disk keyed by
+    what was searched and how much it spent, so studying many target
+    layouts tunes once rather than once each.
     """
     if args.no_tune:
         return None
-    unit = args.tune_layout.split("/")[-1].removesuffix("-v0")
-    stem = f"{unit}-seed{args.tune_seed}-{args.tune_steps}"
+    tune_steps = args.plan.for_split("tune").steps
+    if args.tune_split:
+        stem = (f"split-{args.tune_split}-per{args.tune_per_slice}"
+                f"-{tune_steps}")
+    else:
+        unit = args.tune_layout.split("/")[-1].removesuffix("-v0")
+        stem = f"{unit}-seed{args.tune_seed}-{tune_steps}"
     cache = (pathlib.Path(artifact_root(name, args.artifacts))
              / "tuning" / stem / f"{name}.json")
     if cache.exists():
@@ -154,11 +205,17 @@ def tuned_hyperparameters(name: str, args) -> dict | None:
                     payload.get("values"))
         return payload.get("values") or None
 
-    outcome = tune_on_layout(
-        get_baseline(name), _config(args),
-        layout=args.tune_layout, seed=args.tune_seed,
-        step_budget=args.tune_steps, eval_episodes=args.tune_episodes,
-    )
+    if args.tune_split:
+        outcome = tune_on_rows(
+            get_baseline(name), _config(args), _tuning_rows(args),
+            step_budget=tune_steps, eval_episodes=args.tune_episodes,
+        )
+    else:
+        outcome = tune_on_layout(
+            get_baseline(name), _config(args),
+            layout=args.tune_layout, seed=args.tune_seed,
+            step_budget=tune_steps, eval_episodes=args.tune_episodes,
+        )
     cache.parent.mkdir(parents=True, exist_ok=True)
     with open(cache, "w", encoding="utf-8") as handle:
         json.dump(outcome, handle, indent=2, default=str)
@@ -177,12 +234,14 @@ def _config(args) -> BaselineConfig:
         # run on it *is* the run -- an archive has nowhere else to
         # accumulate.
         train_episodes_per_instance=args.train_chunk,
+        # The budgets this run was configured from, named in every
+        # result JSON rather than reconstructed from flags.
+        plan=args.plan,
     )
 
 
-def run_one(name: str, env_id: str, seed: int, args) -> dict:
+def run_one(name: str, row: dict, args) -> dict:
     """One (algorithm, layout) study, start to finish."""
-    row = layout_row(env_id, seed)
     baseline = get_baseline(name)(_config(args))
     root = artifact_root(name, args.artifacts)
     if root != str(args.artifacts):
@@ -195,7 +254,7 @@ def run_one(name: str, env_id: str, seed: int, args) -> dict:
                                              "telemetry")
     result = baseline.single_layout_train_test_run(
         row,
-        step_budget=args.steps,
+        step_budget=args.plan.for_split("test").steps,
         eval_episodes=args.eval_episodes,
         telemetry_root=telemetry_root,
         step_stride=args.step_stride,
@@ -292,16 +351,26 @@ def _write_run_manifest(args, names: list) -> None:
                      p in a for p in private)],
         "commit": commit,
         "started": datetime.datetime.now().astimezone().isoformat(),
-        "algorithms": public, "layouts": args.layouts,
+        "algorithms": public,
+        "layouts": (f"split:{args.split}" if args.split
+                    else args.layouts),
         "private_algorithms": len(private),
         "layout_seeds": args.layout_seeds,
-        "algorithm_seed": args.seed, "steps": args.steps,
+        "algorithm_seed": args.seed,
+        "plan": {name: {"steps": budget.steps,
+                        "episodes": budget.episodes}
+                 for name, budget in args.plan.splits.items()},
         "eval_episodes": args.eval_episodes,
         "eval_archive": args.eval_archive,
-        "tuning": None if args.no_tune else {
-            "layout": args.tune_layout, "seed": args.tune_seed,
-            "steps": args.tune_steps, "episodes": args.tune_episodes,
-        },
+        "tuning": None if args.no_tune else (
+            {"split": args.tune_split,
+             "per_slice": args.tune_per_slice,
+             "steps": args.plan.for_split("tune").steps,
+             "episodes": args.tune_episodes}
+            if args.tune_split else
+            {"layout": args.tune_layout, "seed": args.tune_seed,
+             "steps": args.plan.for_split("tune").steps,
+             "episodes": args.tune_episodes}),
         "shard": {"index": args.shard_index, "count": args.shard_count},
     }
     name = (f"run-shard{args.shard_index}.json" if args.shard_count > 1
@@ -322,6 +391,19 @@ def _write_run_manifest(args, names: list) -> None:
                       default=str)
 
 
+def _units(args) -> list:
+    """The layout units this invocation covers, without building any
+    world: split rows already carry theirs, and registry ids reduce to
+    the same naming ``layout_row`` uses."""
+    if args.split:
+        return [row["unit"] for row in _split_rows(args.split)]
+    return [
+        env_id.split("/")[-1].removesuffix("-v0")
+        + ("" if seed == 0 else f"@{seed}")
+        for env_id in args.layouts for seed in args.layout_seeds
+    ]
+
+
 def _publish_layouts(args) -> None:
     """Figures and a summary per layout, from whatever has landed.
 
@@ -338,12 +420,7 @@ def _publish_layouts(args) -> None:
         write_single_layout_md,
     )
 
-    units = [
-        env_id.split("/")[-1].removesuffix("-v0")
-        + ("" if seed == 0 else f"@{seed}")
-        for env_id in args.layouts for seed in args.layout_seeds
-    ]
-    for unit in units:
+    for unit in _units(args):
         for step, label in ((plot_single_layout, "plots"),
                             (coverage_gifs, "coverage gifs"),
                             (write_single_layout_md, "summary")):
@@ -359,6 +436,11 @@ def main() -> int:
                         help="algorithm names, or 'all'")
     parser.add_argument("--layouts", nargs="+", default=list(ROSTER),
                         help="registry ids; the roster by default")
+    parser.add_argument("--split", default=None,
+                        help="study every row of this published split "
+                             "(e.g. 'test') instead of --layouts; rows "
+                             "are taken as published, so the worlds "
+                             "are exactly the benchmark's")
     parser.add_argument("--layout-seeds", type=int, nargs="+",
                         default=[0],
                         help="seeds of the layout under study; each is "
@@ -373,9 +455,19 @@ def main() -> int:
                         help="world hyperparameters are chosen on; not "
                              "the one under study")
     parser.add_argument("--tune-seed", type=int, default=TUNING_SEED)
-    parser.add_argument("--tune-steps", type=int, default=100_000,
-                        help="budget per grid candidate; smaller than "
-                             "the study's, since the grid is wide")
+    parser.add_argument("--tune-split", default=None,
+                        help="choose hyperparameters on worlds drawn "
+                             "from this split (e.g. 'tune') instead of "
+                             "the fixed tuning layout")
+    parser.add_argument("--tune-per-slice", type=int, default=1,
+                        help="tuning worlds drawn per slice from "
+                             "--tune-split; the whole split would cost "
+                             "more than the benchmark it serves")
+    parser.add_argument("--tune-steps", type=int,
+                        default=DEFAULT_TUNE_STEPS,
+                        help="budget per grid candidate per world; "
+                             "smaller than the study's, since the grid "
+                             "is wide")
     parser.add_argument("--tune-episodes", type=int, default=25)
     parser.add_argument("--no-tune", action="store_true")
     parser.add_argument("--eval-archive", action="store_true",
@@ -429,28 +521,41 @@ def main() -> int:
         parser.error(f"unknown baselines {unknown}; "
                      f"choose from {sorted(BASELINES)}")
 
+    # The budgets, stated once. Everything downstream -- the learning
+    # budget per study, the tuning budget per candidate per world, the
+    # config every result JSON records -- reads this plan rather than
+    # the flags it was built from.
+    args.plan = BudgetPlan(splits={
+        "tune": SplitBudget(steps=args.tune_steps),
+        "test": SplitBudget(steps=args.steps),
+    })
+
     _write_run_manifest(args, names)
     if args.publish_only:
         _publish_layouts(args)
         return 0
 
-    studies = [(name, env_id, seed) for env_id in args.layouts
-               for seed in args.layout_seeds for name in names]
+    if args.split:
+        rows = _split_rows(args.split)
+        logger.info("=== split %r: %d worlds, as published ===",
+                    args.split, len(rows))
+    else:
+        rows = [layout_row(env_id, seed) for env_id in args.layouts
+                for seed in args.layout_seeds]
+    studies = [(name, row) for row in rows for name in names]
     total = len(studies)
     if args.shard_count > 1:
         studies = studies[args.shard_index::args.shard_count]
         logger.info("=== shard %d/%d: %d of %d studies ===",
                     args.shard_index, args.shard_count, len(studies),
                     total)
-    logger.info("=== %d studies: %d algorithms x %d layouts x %d seeds, "
-                "%d steps each ===", total, len(names),
-                len(args.layouts), len(args.layout_seeds), args.steps)
+    logger.info("=== %d studies: %d algorithms x %d worlds, "
+                "%d steps each ===", total, len(names), len(rows),
+                args.plan.for_split("test").steps)
 
     failures = []
-    for index, (name, env_id, layout_seed) in enumerate(studies, 1):
-        unit = env_id.split("/")[-1].removesuffix("-v0")
-        if layout_seed != 0:
-            unit = f"{unit}@{layout_seed}"
+    for index, (name, row) in enumerate(studies, 1):
+        unit = row["unit"]
         if args.only_missing and not _is_uri(args.artifacts):
             existing = (pathlib.Path(artifact_root(name, args.artifacts))
                         / unit / "results" / f"{name}.json")
@@ -461,7 +566,7 @@ def main() -> int:
         logger.info("=== [%d/%d] %s on %s ===",
                     index, len(studies), name, unit)
         try:
-            run_one(name, env_id, layout_seed, args)
+            run_one(name, row, args)
         except Exception as exc:
             failures.append((name, unit, str(exc)))
             logger.exception("[%s] on %s failed", name, unit)

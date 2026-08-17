@@ -115,22 +115,28 @@ env.reset(options={"teleport": (12, 40)})  # any previously visited cell
 |---|---|---|---|---|---|---|---|
 | **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
 
-The random floor is measured under exactly that protocol: across all
+The random floor: across all
 189 hold-out instances (50 episodes each, 9,450 episodes) a
 uniform-random policy reaches the goal **0% of the time** and uncovers
 **11.0%** of the reachable space. Nothing in this benchmark falls out
 of undirected exploration, and coverage — not steps-to-goal — is what
 separates methods until one of them solves something.
 
-Baselines report **median steps to find the goal, with a 95% bootstrap
-confidence interval**, over the hold-out split. Full metrics, per-slice
+The published numbers are **per-world exploration results**:
+hyperparameters are chosen on the `tune` split, then every `test`
+world is its own experiment — one million environment steps of
+learning in it, followed by a frozen evaluation. They measure how much
+of a world a method uncovers given a budget in it, not whether a
+trained policy transfers; every method learns in the world it is
+scored on, under the same step budget. Full metrics, per-slice
 breakdowns, and the discovery-curve figures live in
 [BENCHMARKS.md](BENCHMARKS.md).
 
-Every baseline consumes the splits the same way — hyperparameters on
-`tune`, gradients on `train`, early stopping on `val`, and `test` read
-once at the end — enforced by `Baseline.run()` rather than left to each
-algorithm. The algorithms themselves are Ray RLlib's; TopoGym does not
+The transfer question — hyperparameters on `tune`, gradients on
+`train`, early stopping on `val`, and `test` read once at the end —
+remains fully posed by the published splits and enforced in-repo by
+`Baseline.run()`; we publish the splits so that benchmark can be run
+rather than exercising it ourselves. The algorithms themselves are Ray RLlib's; TopoGym does not
 reimplement PPO. A variant such as RND or ICM subclasses `PPOBaseline`
 and overrides one hook, and an algorithm that never uses PPO (Go-Explore
 explores randomly by default) implements the same small interface.
