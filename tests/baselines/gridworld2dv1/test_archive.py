@@ -32,12 +32,18 @@ def test_fingerprint_identifies_the_world_not_the_object():
         layout_fingerprint(other.layout)
 
 
-def test_fingerprint_notices_a_changed_world():
+def test_fingerprint_is_computed_once_per_layout_object():
+    """The fingerprint is a world's identity, computed once and cached
+    on the layout object. An archive method asks on every step, and
+    re-serializing the world each time cost forty times the stepping
+    it was keyed to. Nothing that defines a world mutates in place --
+    a changed world is a freshly built Layout -- so an in-place edit
+    is deliberately not noticed."""
     env = _world(0)
     before = layout_fingerprint(env.layout)
     cell = env.layout.free_cells[0]
-    env.layout.cell_types[cell] = 1  # wall it off
-    assert layout_fingerprint(env.layout) != before
+    env.layout.cell_types[cell] = 1  # in-place edit: not a new world
+    assert layout_fingerprint(env.layout) == before
 
 
 def test_service_keeps_one_archive_per_world():

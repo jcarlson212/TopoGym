@@ -53,7 +53,16 @@ def layout_fingerprint(layout) -> str:
     sits, and the dynamics the extras carry (a seasonal schedule, a
     wormhole map). Two instances of the same configuration and seed
     fingerprint alike in any process; a different seed does not.
+
+    Computed once per layout object and cached on it. Nothing that
+    defines a world mutates in place -- the one in-place write,
+    ``extras["optimal_actions"]``, is excluded below as derived -- and
+    an archive method asks on every step, where serializing a whole
+    world each time cost forty times the stepping it was keyed to.
     """
+    cached = getattr(layout, "_fingerprint", None)
+    if cached is not None:
+        return cached
     parts = [
         repr(sorted(layout.cell_types.items(), key=repr)),
         repr(sorted(layout.doors, key=repr)),
@@ -67,7 +76,8 @@ def layout_fingerprint(layout) -> str:
             continue
         parts.append(f"{key}={_stable(extras[key])}")
     digest = hashlib.sha256("|".join(parts).encode()).hexdigest()
-    return digest[:32]
+    layout._fingerprint = digest[:32]
+    return layout._fingerprint
 
 
 def _stable(value) -> str:

@@ -33,6 +33,9 @@ def _handoff(layout):
     out.doors = dict(layout.doors)
     out.features = list(layout.features)
     out.free_cells = list(layout.free_cells)
+    # The archive's cached fingerprint is per *object*; a copy earns
+    # its own rather than inheriting one it might outgrow.
+    out.__dict__.pop("_fingerprint", None)
     return out
 
 
