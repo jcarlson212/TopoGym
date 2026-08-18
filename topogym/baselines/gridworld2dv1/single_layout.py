@@ -778,7 +778,11 @@ def plot_first_goal_histogram(root, units: list,
         axis.set_ylabel("environments")
         axis.set_title("Steps to first goal, across the benchmark")
         axis.margins(x=0.01)
-        axis.legend(loc="upper right")
+        # Outside the axes on the right, like the by-family figures:
+        # inside "upper right" sits exactly on the never bar, which is
+        # routinely the tallest thing in the plot.
+        axis.legend(loc="center left", bbox_to_anchor=(1.005, 0.5),
+                    borderaxespad=0.0)
         for extension in ("pdf", "png"):
             path = directory / f"first_goal_histogram.{extension}"
             figure.savefig(path, bbox_inches="tight")
