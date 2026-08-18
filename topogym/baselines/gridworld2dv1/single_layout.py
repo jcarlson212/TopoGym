@@ -432,7 +432,8 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
         logger.warning("no episode telemetry for %s; nothing to plot",
                        layout)
         return []
-    frame = pd.read_parquet(source)
+    full = pd.read_parquet(source)
+    frame = full
     if "split" in frame.columns and CURVE_SPLIT in set(frame["split"]):
         frame = frame[frame["split"] == CURVE_SPLIT]
     # "Has it reached the goal yet" is a per-episode flag; the useful
@@ -480,8 +481,76 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
                 figure.savefig(path)
                 written.append(path)
             plt.close(figure)
+
+        # Steps to goal, one figure per phase. The same quantity means
+        # two different things across the study -- during the million
+        # learning steps it tracks whether the method is getting
+        # *faster* at reaching the goal as it learns, and in the frozen
+        # evaluation it grades the policy the learning produced -- so
+        # they get separate axes rather than one line that changes
+        # meaning partway.
+        optimal = _optimal_from_results(pathlib.Path(root) / layout)
+        for split, x_key, x_label, stem in (
+            ("single-train", "interactions", "cumulative interactions",
+             "steps_to_goal_train"),
+            ("single-eval", "episode", "evaluation episode",
+             "steps_to_goal_eval"),
+        ):
+            if "split" not in full.columns or "steps_to_goal" not in \
+                    full.columns:
+                break
+            part = full[full["split"] == split]
+            if part.empty:
+                continue
+            figure, axis = plt.subplots(figsize=(width, width * 0.72))
+            drew_any = False
+            for index, name in enumerate(sorted(part["algorithm"]
+                                                .unique())):
+                rows = (part[part["algorithm"] == name]
+                        .sort_values(x_key))
+                solved = rows[rows["steps_to_goal"].notna()]
+                if solved.empty:
+                    continue
+                axis.scatter(solved[x_key], solved["steps_to_goal"],
+                             label=name, s=4,
+                             color=PALETTE[index % len(PALETTE)])
+                drew_any = True
+            if optimal:
+                axis.axhline(optimal, linestyle="--", linewidth=0.8,
+                             alpha=0.6, label="optimal")
+            axis.set_xlabel(x_label)
+            axis.set_ylabel("steps to reach the goal")
+            axis.set_title(f"Steps to goal ({split.split('-')[1]}) -- "
+                           f"{layout}")
+            if not drew_any:
+                axis.text(0.5, 0.5, "no episode reached the goal",
+                          transform=axis.transAxes, ha="center",
+                          va="center", fontsize=7, alpha=0.6)
+            axis.margins(x=0)
+            if drew_any or optimal:
+                axis.legend(loc="best")
+            for extension in ("pdf", "png"):
+                path = directory / f"{stem}.{extension}"
+                figure.savefig(path)
+                written.append(path)
+            plt.close(figure)
     logger.info("wrote %d plot files to %s", len(written), directory)
     return written
+
+
+def _optimal_from_results(folder: pathlib.Path) -> int | None:
+    """The layout's turn-aware optimal route length, read from any
+    result already filed for it -- the reference line a steps-to-goal
+    figure is judged against."""
+    for path in sorted((folder / "results").glob("*.json")):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                value = json.load(handle).get("optimal_actions")
+            if value:
+                return int(value)
+        except Exception:  # a malformed result must not kill the plots
+            continue
+    return None
 
 
 def tune_on_rows(factory, config, rows: list, *,
