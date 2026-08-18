@@ -417,11 +417,13 @@ def _publish_layouts(args) -> None:
         return
     from topogym.baselines.gridworld2dv1.single_layout import (
         coverage_gifs,
+        plot_first_goal_histogram,
         plot_single_layout,
         write_single_layout_md,
     )
 
-    for unit in _units(args):
+    units = _units(args)
+    for unit in units:
         for step, label in ((plot_single_layout, "plots"),
                             (coverage_gifs, "coverage gifs"),
                             (write_single_layout_md, "summary")):
@@ -429,6 +431,12 @@ def _publish_layouts(args) -> None:
                 step(args.artifacts, unit)
             except Exception as exc:
                 logger.warning("%s for %s failed: %s", label, unit, exc)
+    # One figure across every world: when each algorithm first solved
+    # each environment, and how many it never solved.
+    try:
+        plot_first_goal_histogram(args.artifacts, units)
+    except Exception as exc:
+        logger.warning("first-goal histogram failed: %s", exc)
 
 
 def main() -> int:

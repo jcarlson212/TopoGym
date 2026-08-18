@@ -538,6 +538,107 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
     return written
 
 
+#: Bin width for the cross-environment first-goal histogram.
+FIRST_GOAL_BIN_STEPS = 50_000
+
+
+def plot_first_goal_histogram(root, units: list,
+                              budget: int = 1_000_000,
+                              width: float = 6.5):
+    """How long every algorithm took to first reach each world's goal.
+
+    One count per (world, algorithm): the cumulative training step at
+    which the goal was first reached, binned at
+    :data:`FIRST_GOAL_BIN_STEPS`, with a separated terminal bar for
+    worlds whose goal was never reached inside the budget -- "never"
+    is an outcome, not a 21st number, so it stands apart from the
+    numeric axis. Repeated goals in one world do not count again; the
+    question is when a method *first* solves a world, across all of
+    them.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+
+    logging.getLogger("fontTools").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    from topogym.baselines.gridworld2dv1.report import (
+        FIGURE_STYLE,
+        PALETTE,
+    )
+
+    firsts: dict = {}   # algorithm -> list of first-goal steps
+    nevers: dict = {}   # algorithm -> count of unsolved worlds
+    for unit in units:
+        source = pathlib.Path(root) / unit / "telemetry" / "episodes"
+        if not source.exists():
+            continue
+        frame = pd.read_parquet(source)
+        if "split" in frame.columns:
+            frame = frame[frame["split"] == CURVE_SPLIT]
+        for name, sub in frame.groupby("algorithm", observed=True):
+            sub = sub.sort_values("interactions")
+            hit = sub[sub["reached_goal"].fillna(False)]
+            if hit.empty:
+                nevers[name] = nevers.get(name, 0) + 1
+                continue
+            first = hit.iloc[0]
+            # ``interactions`` is cumulative at episode end; walk back
+            # to the step inside the episode where the goal was met.
+            step = float(first["interactions"]) - float(first["length"]) \
+                + float(first["steps_to_goal"] or first["length"])
+            firsts.setdefault(name, []).append(min(max(step, 0), budget))
+
+    names = sorted(set(firsts) | set(nevers))
+    if not names:
+        logger.warning("no training episodes found; no histogram")
+        return None
+    edges = np.arange(0, budget + 1, FIRST_GOAL_BIN_STEPS)
+    n_bins = len(edges) - 1
+    bar_width = 0.8 / len(names)
+    directory = pathlib.Path(root) / "plots"
+    directory.mkdir(parents=True, exist_ok=True)
+
+    written = []
+    with plt.rc_context(FIGURE_STYLE):
+        figure, axis = plt.subplots(figsize=(width, width * 0.5))
+        never_slot = n_bins + 1  # one empty slot of air before it
+        for index, name in enumerate(names):
+            counts, _ = np.histogram(firsts.get(name, []), bins=edges)
+            offset = (index - (len(names) - 1) / 2) * bar_width
+            color = PALETTE[index % len(PALETTE)]
+            axis.bar(np.arange(n_bins) + offset, counts, bar_width,
+                     label=name, color=color)
+            axis.bar([never_slot + offset], [nevers.get(name, 0)],
+                     bar_width, color=color)
+        tick_positions = list(np.arange(0, n_bins + 1, 5) - 0.5)
+        tick_labels = []
+        for tick_index in range(len(tick_positions)):
+            steps = tick_index * 5 * FIRST_GOAL_BIN_STEPS
+            tick_labels.append(
+                "0" if steps == 0
+                else f"{steps // 1000}k" if steps < 1_000_000
+                else f"{steps / 1_000_000:g}M")
+        axis.set_xticks(tick_positions + [never_slot])
+        axis.set_xticklabels(tick_labels + ["never"])
+        axis.set_xlabel(f"training steps until the goal was first "
+                        f"reached ({FIRST_GOAL_BIN_STEPS // 1000}k bins)")
+        axis.set_ylabel("environments")
+        axis.set_title("Steps to first goal, across the benchmark")
+        axis.margins(x=0.01)
+        axis.legend(loc="upper right")
+        for extension in ("pdf", "png"):
+            path = directory / f"first_goal_histogram.{extension}"
+            figure.savefig(path, bbox_inches="tight")
+            written.append(path)
+        plt.close(figure)
+    logger.info("wrote %s", written[-1])
+    return written
+
+
 def _optimal_from_results(folder: pathlib.Path) -> int | None:
     """The layout's turn-aware optimal route length, read from any
     result already filed for it -- the reference line a steps-to-goal
