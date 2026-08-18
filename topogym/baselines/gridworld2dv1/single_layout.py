@@ -102,6 +102,13 @@ class SingleLayoutResult:
     #: Episode length at evaluation, larger than ``horizon`` when a
     #: family pins its training budget below what the route needs.
     eval_horizon: int = 0
+    #: The manifest row the study actually ran -- canonical config,
+    #: jitter, sizes and all. Publishing rebuilds the world from this,
+    #: never from ``(env_id, seed)``: the registry default for an id
+    #: can be a *different world* than a split row's configuration,
+    #: and a GIF of the wrong world paints the run's positions onto
+    #: walls it never stood on.
+    row: dict = field(default_factory=dict)
     #: Frozen-evaluation record -- the headline.
     evaluation: dict = field(default_factory=dict)
     #: What the learning phase did, in the method's own terms.
@@ -152,7 +159,8 @@ def eval_horizon(row: dict) -> int:
     return max(horizon, math.ceil(HORIZON_SLACK * optimal / 10) * 10)
 
 
-def single_episode_ceiling(env_id: str, seed: int = 0) -> float | None:
+def single_episode_ceiling(env_id: str, seed: int = 0,
+                           row: dict | None = None) -> float | None:
     """The share of a world one episode from the start can reach.
 
     The honest denominator for a layout whose goal sits several
@@ -161,13 +169,24 @@ def single_episode_ceiling(env_id: str, seed: int = 0) -> float | None:
     however many steps it is given -- exceeding it is proof the archive
     carried the agent out of the region one episode covers, a sharper
     claim than any coverage number alone.
+
+    Pass the study's manifest ``row`` whenever one exists: the ceiling
+    belongs to the world that was actually run, and the registry
+    default for an id can be a different world entirely.
     """
     import gymnasium as gym
 
     import topogym  # noqa: F401  (registers the ids)
 
     try:
-        env = gym.make(env_id, seed=seed).unwrapped
+        if row:
+            from topogym.baselines.gridworld2dv1.instances import (
+                make_instance,
+            )
+
+            env = make_instance(row).unwrapped
+        else:
+            env = gym.make(env_id, seed=seed).unwrapped
         env.reset(seed=seed)
     except Exception as exc:
         logger.warning("cannot size the ceiling for %s: %s", env_id, exc)
@@ -324,6 +343,7 @@ def run_single_layout(baseline, row: dict, *,
         layout=row["unit"],
         env_id=row["template_id"],
         seed=int(row["seed"]),
+        row=dict(row),
         horizon=horizon,
         optimal_actions=(int(row["optimal_actions"])
                          if row["optimal_actions"] else None),
@@ -588,12 +608,14 @@ def write_single_layout_md(root, layout: str):
             "values": (payload.get("hyperparameters") or {}).get("values"),
             "env_id": payload.get("env_id"),
             "seed": payload.get("seed", 0),
+            "row": payload.get("row"),
         })
     if not rows:
         return None
     rows.sort(key=lambda r: -(r["coverage"] or 0))
 
-    ceiling = single_episode_ceiling(rows[0]["env_id"], rows[0]["seed"])
+    ceiling = single_episode_ceiling(rows[0]["env_id"], rows[0]["seed"],
+                                     row=rows[0].get("row"))
     lines = [f"# {layout}", ""]
     # Only worth saying where it bites: on a world one episode can
     # cover entirely, the line is at 100% and carries no information.
@@ -693,14 +715,32 @@ def coverage_gif(root, layout: str, algorithm: str,
         return None
     table = table.sort_values("interaction")
 
-    row = layout_row(payload["env_id"], int(payload.get("seed", 0)))
+    # The row the study ran, not the registry default for its id --
+    # they can be different worlds (size, jitter, start), and painting
+    # one world's positions on the other's map is how a coverage GIF
+    # comes to tint walls.
+    row = (payload.get("row")
+           or layout_row(payload["env_id"], int(payload.get("seed", 0))))
     env = make_instance(row, reveal_hidden=True, flatten=False)
     core = env.unwrapped
     core.reset(seed=int(payload.get("seed", 0)))
     base_map = core.layout.base
     width, height = base_map.layout_size()
-    tile = max(2, 520 // max(width, height))
-    canvas = render_rgb_2d(core, tile=tile)
+    # Frame the world, not the base map: some layouts occupy a tenth
+    # of their canvas, and at 520px over 200 cells a corridor is two
+    # pixels -- the structure reads as a smudge on a field of wall.
+    # Sizing the tiles to the free-cell bounding box keeps every wall
+    # the world actually has while spending the pixels on it.
+    coords = [base_map.layout_coords(tuple(cell))
+              for cell in core.layout.free_cells]
+    pad = 2
+    x0 = max(0, min(c[0] for c in coords) - pad)
+    x1 = min(width - 1, max(c[0] for c in coords) + pad)
+    y0 = max(0, min(c[1] for c in coords) - pad)
+    y1 = min(height - 1, max(c[1] for c in coords) + pad)
+    tile = max(2, 520 // max(x1 - x0 + 1, y1 - y0 + 1))
+    canvas = render_rgb_2d(core, tile=tile)[y0 * tile:(y1 + 1) * tile,
+                                            x0 * tile:(x1 + 1) * tile]
     env.close()
     n_free = max(1, len(core.layout.free_cells))
 
@@ -717,6 +757,7 @@ def coverage_gif(root, layout: str, algorithm: str,
         picture = canvas.copy()
         for cell in seen:
             col, rowpix = base_map.layout_coords(tuple(cell))
+            col, rowpix = col - x0, rowpix - y0  # into the cropped frame
             tiles.tint(picture[rowpix * tile:(rowpix + 1) * tile,
                                col * tile:(col + 1) * tile],
                        COVERAGE_COLOR, COVERAGE_STRENGTH)

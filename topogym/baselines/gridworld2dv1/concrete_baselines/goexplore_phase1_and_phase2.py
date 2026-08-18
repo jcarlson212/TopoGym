@@ -620,6 +620,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
         return SingleLayoutResult(
             algorithm=self.name, layout=row["unit"],
             env_id=row["template_id"], seed=int(row["seed"]),
+            row=dict(row),
             horizon=horizon,
             optimal_actions=(int(row["optimal_actions"])
                              if row["optimal_actions"] else None),

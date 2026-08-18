@@ -304,7 +304,8 @@ def _record_gif(result, args, baseline, root) -> None:
         # Training then evaluation, one continuous step counter: the
         # archive filling up, then the policy turned loose on what it
         # learned. Neither half shows that shape on its own.
-        record(layout_row(result.env_id, result.seed), baseline,
+        record(result.row or layout_row(result.env_id, result.seed),
+               baseline,
                folder / f"{result.algorithm}.gif",
                episodes=args.gif_episodes,
                phases=[
@@ -470,6 +471,15 @@ def main() -> int:
                              "is wide")
     parser.add_argument("--tune-episodes", type=int, default=25)
     parser.add_argument("--no-tune", action="store_true")
+    parser.add_argument("--tune-only", action="store_true",
+                        help="write each baseline's tuning cache and "
+                             "exit without running studies. Shards "
+                             "divide the *baseline list* rather than "
+                             "the study list, so a 12-pod job tunes 12 "
+                             "algorithms exactly once each -- the one "
+                             "tuning every later pod must share, since "
+                             "RLlib selection is not deterministic "
+                             "across machines")
     parser.add_argument("--eval-archive", action="store_true",
                         help="let evaluation take archive resets. Off "
                              "by default: the archive is a training "
@@ -533,6 +543,15 @@ def main() -> int:
     _write_run_manifest(args, names)
     if args.publish_only:
         _publish_layouts(args)
+        return 0
+
+    if args.tune_only:
+        mine = (names[args.shard_index::args.shard_count]
+                if args.shard_count > 1 else names)
+        logger.info("=== tune-only: %d of %d baselines on this shard ===",
+                    len(mine), len(names))
+        for name in mine:
+            tuned_hyperparameters(name, args)
         return 0
 
     if args.split:
