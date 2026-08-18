@@ -226,6 +226,20 @@ class TelemetryWriter:
                       f"algorithm={self.algorithm}/split={split}")
             self._fs.create_dir(folder, recursive=True)
             index = self._counts.get((table, split), 0)
+            # Past any part an *earlier writer* left: the counter is
+            # per writer, and a chunked run builds a fresh writer per
+            # chunk, so restarting at part-00000 silently overwrote
+            # every chunk but the last -- half a training run's curves,
+            # gone without a message.
+            import pyarrow.fs as pafs
+
+            def taken(i: int) -> bool:
+                info = self._fs.get_file_info(
+                    f"{folder}/part-{self.part_prefix}{i:05d}.parquet")
+                return info.type != pafs.FileType.NotFound
+
+            while taken(index):
+                index += 1
             self._counts[(table, split)] = index + 1
             path = f"{folder}/part-{self.part_prefix}{index:05d}.parquet"
             # The two partition columns live in the *path*, not the

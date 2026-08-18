@@ -118,7 +118,16 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     steps_to_goal = []
     negative: set = set()
 
-    interactions, chambers_seen, archive_resets = 0, set(), 0
+    # A borrowed env carries its lifetime step count into the x-axis;
+    # a fresh one starts at zero. A chunked training loop evaluates
+    # the same live world across many calls, and a counter restarting
+    # each call filed every chunk's curves on top of one another at
+    # the origin -- a curve that began at two thousand discovered
+    # states was the second half of a run wearing the first half's
+    # x-positions.
+    start = (sum(getattr(core, "lifetime_visit_counts", {}).values())
+             if borrowed else 0)
+    interactions, chambers_seen, archive_resets = start, set(), 0
     total_return = 0.0
     keys = {
         # The caller's label wins: a row knows which manifest split it
@@ -264,7 +273,10 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
                             if row["optimal_actions"] else None),
         "horizon": int(row["horizon"]),
         "episodes": episodes,
-        "interactions": interactions,
+        # What *this call* spent, not the borrowed env's lifetime: the
+        # offset above places curves on a shared axis, while a record
+        # still answers "how many steps did this evaluation take".
+        "interactions": interactions - start,
         "archive_resets": archive_resets,
         # Summed over the instance's whole episode budget. Aggregates
         # then average across *instances*, not across instance-episodes
