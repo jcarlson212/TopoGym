@@ -109,6 +109,25 @@ def test_goal_reward_and_termination():
     obs, reward, terminated, truncated, info = env.step(env.ACTION_FORWARD)
     assert terminated and reward > 0
     assert info["position"] == goal
+    assert info["goal_reached"] is True
+
+
+def test_the_env_states_goal_reached_in_step_info():
+    """The environment says so itself; wrappers must not have to infer
+    it from reward or termination. When this key was missing, the
+    harness's steps-to-goal, the goals-found curve, and Go-Explore's
+    goal trajectories -- phase 2's entire trigger -- all silently read
+    zero while the reward was being paid."""
+    env = _door_env(base="square", size=15, n_holes=1, n_chambers=0,
+                    n_decoys=0, layout_seed=4, actions="egocentric",
+                    reward_mode="sparse")
+    _, info = env.reset(seed=0)
+    assert info["goal_reached"] is False
+    base = env.layout.base
+    nbr_state = base.neighbor_states(env.layout.goal)[0]
+    env._state = base.turn_left(base.turn_left(nbr_state))
+    *_, info = env.step(env.ACTION_FORWARD)
+    assert info["goal_reached"] is True
 
 
 def test_reward_free_mode_truncates():

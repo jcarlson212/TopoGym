@@ -712,6 +712,15 @@ class TopoEnvCore(gym.Env):
         n_free = len(self.layout.free_cells)
         return {
             "position": agent_cell,
+            # Stated by the environment, not left for wrappers to
+            # reconstruct: the harness's steps-to-goal, the archive's
+            # goal trajectories, and the goals-found curve all read
+            # this key. When it was missing they all silently reported
+            # zero -- across a sweep where exploration reached the
+            # goal on 151 of 189 worlds -- and phase 2 of Go-Explore,
+            # gated on a recorded goal trajectory, never ran at all.
+            "goal_reached": bool(self.goal_exists
+                                 and agent_cell == self.layout.goal),
             "steps": self._steps,
             "coverage": len(self._visited) / n_free,
             # Coverage across the env's lifetime on this layout (all
