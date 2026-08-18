@@ -693,7 +693,7 @@ def plot_first_goal_by_family(root, units: list, algorithm: str,
         axis.set_xlabel("training steps until the goal was first "
                         f"reached ({FIRST_GOAL_BIN_STEPS // 1000}k bins)")
         axis.set_ylabel("environments")
-        axis.set_title(f"Steps to first goal by family -- {algorithm}")
+        axis.set_title(f"Steps to first goal by family for {algorithm}")
         axis.margins(x=0.01)
         axis.legend(loc="center left", bbox_to_anchor=(1.005, 0.5),
                     ncols=1, fontsize=5.5, handlelength=1.0,
