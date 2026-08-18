@@ -542,6 +542,171 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
 FIRST_GOAL_BIN_STEPS = 50_000
 
 
+def _first_goal_steps(root, units: list, budget: int) -> dict:
+    """``{algorithm: {unit: step or None}}`` -- the cumulative training
+    step at which each world's goal was first reached, or None for a
+    world never solved inside the budget. One entry per world however
+    many times its goal was reached afterwards."""
+    import pandas as pd
+
+    per_unit: dict = {}
+    for unit in units:
+        source = pathlib.Path(root) / unit / "telemetry" / "episodes"
+        if not source.exists():
+            continue
+        frame = pd.read_parquet(source)
+        if "split" in frame.columns:
+            frame = frame[frame["split"] == CURVE_SPLIT]
+        for name, sub in frame.groupby("algorithm", observed=True):
+            sub = sub.sort_values("interactions")
+            hit = sub[sub["reached_goal"].fillna(False)]
+            if hit.empty:
+                per_unit.setdefault(name, {})[unit] = None
+                continue
+            first = hit.iloc[0]
+            # ``interactions`` is cumulative at episode end; walk back
+            # to the step inside the episode where the goal was met.
+            step = float(first["interactions"]) - float(first["length"]) \
+                + float(first["steps_to_goal"] or first["length"])
+            per_unit.setdefault(name, {})[unit] = min(max(step, 0),
+                                                      budget)
+    return per_unit
+
+
+def _family_of_unit(unit: str) -> str:
+    """``ShapeSq-100@4002`` -> ``ShapeSq``: the published family, from
+    the test split's own column rather than re-derived name parsing."""
+    if not hasattr(_family_of_unit, "_table"):
+        from topogym.baselines.gridworld2dv1.instances import load_split
+
+        table = {}
+        for row in load_split("test"):
+            tagged = (row["unit"] if int(row["seed"]) == 0
+                      else f"{row['unit']}@{row['seed']}")
+            table[tagged] = row["family"]
+        _family_of_unit._table = table
+    return _family_of_unit._table.get(unit, unit.split("-")[0])
+
+
+#: Slice hue families for the stacked-by-family figures: hue names the
+#: slice, shade separates families within it. Twenty-six arbitrary
+#: hues cannot stay tellable-apart; three hue ramps with ordered
+#: shades keep the slice proportions legible at a glance and leave
+#: exact family identity to the legend and the fixed stacking order.
+_SLICE_CMAPS = {"GridWorld2D": "Blues", "Texture": "Oranges",
+                "Top": "Greens"}
+
+
+def _family_palette(families: list) -> dict:
+    """family -> color, hue by slice, shade by position in the slice."""
+    import matplotlib.pyplot as plt
+
+    from topogym import registry
+
+    def slice_of(family: str) -> str:
+        if family.startswith("Top"):
+            return "Top"
+        if family in registry.TEXTURE_SCENARIOS or family in (
+                "IceShip", "EnvironmentalIceShip"):
+            return "Texture"
+        return "GridWorld2D"
+
+    colors = {}
+    by_slice: dict = {}
+    for family in families:
+        by_slice.setdefault(slice_of(family), []).append(family)
+    for slice_name, members in by_slice.items():
+        cmap = plt.get_cmap(_SLICE_CMAPS.get(slice_name, "Purples"))
+        for position, family in enumerate(sorted(members)):
+            shade = 0.35 + 0.55 * (position / max(1, len(members) - 1))
+            colors[family] = cmap(shade)
+    return colors
+
+
+def plot_first_goal_by_family(root, units: list, algorithm: str,
+                              budget: int = 1_000_000,
+                              width: float = 6.5):
+    """One algorithm's steps-to-first-goal, stacked by world family.
+
+    The same bins as :func:`plot_first_goal_histogram`, but each bar
+    is a stack: a bar of height five at 500k whose segments are one
+    ShapeSq and four ShapeSt says *which kinds* of world took that
+    long, not merely how many. Seeds and sizes fold into their family
+    -- ``ShapeSq-100@4002`` counts as ``ShapeSq``.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    logging.getLogger("fontTools").setLevel(logging.WARNING)
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    from topogym.baselines.gridworld2dv1.report import FIGURE_STYLE
+
+    per_unit = _first_goal_steps(root, units, budget).get(algorithm)
+    if not per_unit:
+        logger.warning("no training episodes for %s; no histogram",
+                       algorithm)
+        return None
+    by_family: dict = {}
+    for unit, step in per_unit.items():
+        by_family.setdefault(_family_of_unit(unit), []).append(step)
+    families = sorted(by_family)
+    colors = _family_palette(families)
+
+    edges = np.arange(0, budget + 1, FIRST_GOAL_BIN_STEPS)
+    n_bins = len(edges) - 1
+    never_slot = n_bins + 1
+    directory = pathlib.Path(root) / "plots"
+    directory.mkdir(parents=True, exist_ok=True)
+
+    written = []
+    with plt.rc_context(FIGURE_STYLE):
+        figure, axis = plt.subplots(figsize=(width, width * 0.5))
+        bottoms = np.zeros(n_bins)
+        never_bottom = 0.0
+        for family in families:
+            steps = by_family[family]
+            counts, _ = np.histogram(
+                [s for s in steps if s is not None], bins=edges)
+            never = sum(1 for s in steps if s is None)
+            axis.bar(np.arange(n_bins), counts, 0.9, bottom=bottoms,
+                     label=family, color=colors[family])
+            bottoms += counts
+            if never:
+                axis.bar([never_slot], [never], 0.9,
+                         bottom=[never_bottom], color=colors[family])
+                never_bottom += never
+        axis.axvline(n_bins + 0.25, linewidth=0.6, linestyle=":",
+                     color="0.5", alpha=0.7)
+        tick_positions = list(np.arange(0, n_bins + 1, 5) - 0.5)
+        tick_labels = []
+        for tick_index in range(len(tick_positions)):
+            steps = tick_index * 5 * FIRST_GOAL_BIN_STEPS
+            tick_labels.append(
+                "0" if steps == 0
+                else f"{steps // 1000}k" if steps < 1_000_000
+                else f"{steps / 1_000_000:g}M")
+        axis.set_xticks(tick_positions + [never_slot])
+        axis.set_xticklabels(tick_labels + ["never"])
+        axis.set_xlabel("training steps until the goal was first "
+                        f"reached ({FIRST_GOAL_BIN_STEPS // 1000}k bins)")
+        axis.set_ylabel("environments")
+        axis.set_title(f"Steps to first goal by family -- {algorithm}")
+        axis.margins(x=0.01)
+        axis.legend(loc="center left", bbox_to_anchor=(1.005, 0.5),
+                    ncols=1, fontsize=5.5, handlelength=1.0,
+                    borderaxespad=0.0)
+        for extension in ("pdf", "png"):
+            path = directory / f"first_goal_by_family-{algorithm}.{extension}"
+            figure.savefig(path, bbox_inches="tight")
+            written.append(path)
+        plt.close(figure)
+    logger.info("wrote %s", written[-1])
+    return written
+
+
 def plot_first_goal_histogram(root, units: list,
                               budget: int = 1_000_000,
                               width: float = 6.5):
@@ -561,7 +726,6 @@ def plot_first_goal_histogram(root, units: list,
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
-    import pandas as pd
 
     logging.getLogger("fontTools").setLevel(logging.WARNING)
     logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -570,29 +734,12 @@ def plot_first_goal_histogram(root, units: list,
         PALETTE,
     )
 
-    firsts: dict = {}   # algorithm -> list of first-goal steps
-    nevers: dict = {}   # algorithm -> count of unsolved worlds
-    for unit in units:
-        source = pathlib.Path(root) / unit / "telemetry" / "episodes"
-        if not source.exists():
-            continue
-        frame = pd.read_parquet(source)
-        if "split" in frame.columns:
-            frame = frame[frame["split"] == CURVE_SPLIT]
-        for name, sub in frame.groupby("algorithm", observed=True):
-            sub = sub.sort_values("interactions")
-            hit = sub[sub["reached_goal"].fillna(False)]
-            if hit.empty:
-                nevers[name] = nevers.get(name, 0) + 1
-                continue
-            first = hit.iloc[0]
-            # ``interactions`` is cumulative at episode end; walk back
-            # to the step inside the episode where the goal was met.
-            step = float(first["interactions"]) - float(first["length"]) \
-                + float(first["steps_to_goal"] or first["length"])
-            firsts.setdefault(name, []).append(min(max(step, 0), budget))
-
-    names = sorted(set(firsts) | set(nevers))
+    per_unit = _first_goal_steps(root, units, budget)
+    firsts = {name: [s for s in by_unit.values() if s is not None]
+              for name, by_unit in per_unit.items()}
+    nevers = {name: sum(1 for s in by_unit.values() if s is None)
+              for name, by_unit in per_unit.items()}
+    names = sorted(per_unit)
     if not names:
         logger.warning("no training episodes found; no histogram")
         return None
@@ -614,6 +761,8 @@ def plot_first_goal_histogram(root, units: list,
                      label=name, color=color)
             axis.bar([never_slot + offset], [nevers.get(name, 0)],
                      bar_width, color=color)
+        axis.axvline(n_bins + 0.25, linewidth=0.6, linestyle=":",
+                     color="0.5", alpha=0.7)
         tick_positions = list(np.arange(0, n_bins + 1, 5) - 0.5)
         tick_labels = []
         for tick_index in range(len(tick_positions)):

@@ -417,6 +417,7 @@ def _publish_layouts(args) -> None:
         return
     from topogym.baselines.gridworld2dv1.single_layout import (
         coverage_gifs,
+        plot_first_goal_by_family,
         plot_first_goal_histogram,
         plot_single_layout,
         write_single_layout_md,
@@ -431,10 +432,19 @@ def _publish_layouts(args) -> None:
                 step(args.artifacts, unit)
             except Exception as exc:
                 logger.warning("%s for %s failed: %s", label, unit, exc)
-    # One figure across every world: when each algorithm first solved
-    # each environment, and how many it never solved.
+    # Figures across every world: when each algorithm first solved
+    # each environment (all algorithms together, then one stacked-by-
+    # family figure per algorithm), and how many it never solved.
     try:
         plot_first_goal_histogram(args.artifacts, units)
+        seen_algorithms = sorted({
+            path.stem
+            for unit in units
+            for path in (pathlib.Path(args.artifacts) / unit
+                         / "results").glob("*.json")
+        })
+        for name in seen_algorithms:
+            plot_first_goal_by_family(args.artifacts, units, name)
     except Exception as exc:
         logger.warning("first-goal histogram failed: %s", exc)
 
