@@ -353,15 +353,20 @@ class TopoEnvCore(gym.Env):
     def ollivier_ricci(self) -> dict:
         """Per-cell Ollivier-Ricci curvature of the free-cell graph
         (mean over incident edges; alpha = 0, exact W1). Expensive on
-        large worlds; computed once and cached per layout."""
-        cached = getattr(self, "_ricci_cache", None)
-        if cached is not None and cached[0] is self.layout:
-            return cached[1]
+        large worlds; computed once and cached *on the layout*, so
+        every env sharing the world -- training, evaluation, the
+        publishing helpers -- pays once rather than once each. Sound
+        because a changed world is a freshly built Layout (the
+        fingerprint pins that contract); worlds never mutate in place.
+        """
+        cached = getattr(self.layout, "_ricci_field", None)
+        if cached is not None:
+            return cached
         from topogym.curvature import ollivier_ricci
 
         ricci = ollivier_ricci(set(self.layout.free_cells),
                                self.layout.base.neighbors)
-        self._ricci_cache = (self.layout, ricci)
+        self.layout._ricci_field = ricci
         return ricci
 
     def _planning_blocked(self) -> set:

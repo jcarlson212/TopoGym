@@ -109,20 +109,81 @@ def edge_curvature(u: tuple, v: tuple, free: set,
     return 1.0 - w1
 
 
-def ollivier_ricci(free: set, neighbors_fn: Callable) -> dict:
-    """Per-cell Ollivier-Ricci curvature: the mean over incident free
-    edges. Deterministic (sorted iteration)."""
+#: How far an edge's curvature can see: its endpoints' neighbours (1)
+#: plus the capped BFS between their neighbourhoods (_DIST_CAP), with
+#: one step of margin. A cell farther than this from every endpoint
+#: cannot change the edge's value -- which is what makes an exact
+#: incremental update possible.
+_EDGE_BALL = _DIST_CAP + 2
+
+
+def _canonical(u: tuple, v: tuple) -> tuple:
+    return (u, v) if u <= v else (v, u)
+
+
+def ollivier_ricci_edges(free: set, neighbors_fn: Callable) -> dict:
+    """Curvature per free edge, keyed canonically (smaller endpoint
+    first). Deterministic (sorted iteration)."""
     edge_k: dict = {}
     for u in sorted(free):
         for v in neighbors_fn(u):
-            if v in free and (v, u) not in edge_k:
-                edge_k[(u, v)] = edge_curvature(u, v, free, neighbors_fn)
+            if v in free:
+                key = _canonical(u, v)
+                if key not in edge_k:
+                    edge_k[key] = edge_curvature(u, v, free, neighbors_fn)
+    return edge_k
+
+
+def update_ricci_edges(edge_k: dict, free: set, added: set,
+                       neighbors_fn: Callable) -> dict:
+    """Exact incremental update of an edge-curvature table after
+    ``added`` cells joined ``free``.
+
+    Every edge value depends only on ``free`` within :data:`_EDGE_BALL`
+    of its endpoints, so only edges with an endpoint inside that ball
+    of some added cell can have changed; everything farther keeps its
+    cached value verbatim. Returns a new table; the input is not
+    modified. Exactness over recomputation is the entire point --
+    recomputing the whole field per archive growth turned a method's
+    per-step cost superlinear in what it had explored.
+    """
+    if not added:
+        return edge_k
+    from collections import deque
+
+    added = {tuple(c) for c in added}
+    dist = dict.fromkeys(added, 0)
+    queue = deque(added)
+    while queue:
+        cell = queue.popleft()
+        if dist[cell] >= _EDGE_BALL:
+            continue
+        for n in neighbors_fn(cell):
+            if n in free and n not in dist:
+                dist[n] = dist[cell] + 1
+                queue.append(n)
+    dirty = set(dist)
+    out = dict(edge_k)
+    for u in sorted(dirty):
+        for v in neighbors_fn(u):
+            if v in free:
+                out[_canonical(u, v)] = edge_curvature(u, v, free,
+                                                       neighbors_fn)
+    return out
+
+
+def per_cell_curvature(edge_k: dict) -> dict:
+    """Fold an edge table into per-cell means over incident edges."""
     per_cell: dict = {}
     counts: dict = {}
     for (u, v), k in edge_k.items():
         for c in (u, v):
             per_cell[c] = per_cell.get(c, 0.0) + k
             counts[c] = counts.get(c, 0) + 1
-    return {
-        c: per_cell[c] / counts[c] for c in per_cell
-    }
+    return {c: per_cell[c] / counts[c] for c in per_cell}
+
+
+def ollivier_ricci(free: set, neighbors_fn: Callable) -> dict:
+    """Per-cell Ollivier-Ricci curvature: the mean over incident free
+    edges. Deterministic (sorted iteration)."""
+    return per_cell_curvature(ollivier_ricci_edges(free, neighbors_fn))

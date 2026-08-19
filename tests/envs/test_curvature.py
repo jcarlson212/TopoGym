@@ -69,3 +69,38 @@ def test_curvature_coverage_toggle_and_accessor():
     # env.ollivier_ricci is cached per layout.
     core = off.env.unwrapped
     assert core.ollivier_ricci() is core.ollivier_ricci()
+
+
+def test_incremental_ricci_update_equals_full_recompute():
+    """The archive-growth path: updating only the edges near newly
+    observed cells must reproduce the full field exactly, at every
+    stage of growth. Exactness is the contract that lets a method
+    maintain curvature incrementally instead of paying the whole
+    observed set per step."""
+    import gymnasium as gym
+
+    from topogym.curvature import (
+        ollivier_ricci,
+        ollivier_ricci_edges,
+        per_cell_curvature,
+        update_ricci_edges,
+    )
+
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=17,
+                   actions="fourway", n_holes=1, n_chambers=1,
+                   n_decoys=0, layout_seed=3).unwrapped
+    env.reset(seed=0)
+    free = sorted(map(tuple, env.layout.free_cells))
+    neighbors = env.layout.base.neighbors
+
+    # Grow the observed set in uneven bites, as an archive would.
+    stops = [5, 6, 19, 40, 41, 90, len(free)]
+    observed: set = set()
+    edges = {}
+    for stop in stops:
+        added = set(free[len(observed):stop])
+        observed |= added
+        edges = update_ricci_edges(edges, observed, added, neighbors)
+        assert per_cell_curvature(edges) == ollivier_ricci(observed,
+                                                           neighbors)
+    assert edges == ollivier_ricci_edges(observed, neighbors)
