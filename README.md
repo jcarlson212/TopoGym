@@ -2,16 +2,9 @@
 
 [![CI](https://github.com/jcarlson212/TopoGym/actions/workflows/ci.yml/badge.svg)](https://github.com/jcarlson212/TopoGym/actions/workflows/ci.yml) [![PyPI](https://img.shields.io/pypi/v/topogym.svg)](https://pypi.org/project/topogym/) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg)](pyproject.toml) [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](.pre-commit-config.yaml) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/2Sn6cTYbbw)
 
-**Gridworld environments with certified topology, for exploration
-research.**
+**Gridworld environments with certified topology, for exploration research.**
 
-TopoGym is a [Gymnasium](https://gymnasium.farama.org) environment
-library where the shape of every world — its chambers (sort of like rooms), decoys (filled rooms, large icebergs, or other blatant & large obstructions), and identifications (going in a circle or going in a circle while twisting in space) — is known exactly: computed from the free-space
-cell complex by [GUDHI](https://gudhi.inria.fr/) and cross-checked
-against the analytic expectation at generation time. Everything is
-**deterministic up to seeds**, end to end. We provide benchmarks for 
-reinforcement learning researchers to test how good their agents are at exploring 
-complex environment shapes.
+TopoGym is a [Gymnasium](https://gymnasium.farama.org) environment library where the shape of every world — its chambers (sort of like rooms), decoys (filled rooms, large icebergs, or other blatant & large obstructions), and identifications (going in a circle or going in a circle while twisting in space) — is known exactly: computed from the free-space cell complex by [GUDHI](https://gudhi.inria.fr/) and cross-checked against the analytic expectation at generation time. Everything is **deterministic up to seeds**, end to end. We provide benchmarks for reinforcement learning researchers to test how good their agents are at exploring complex environment shapes.
 
 <table>
 <tr>
@@ -28,18 +21,11 @@ complex environment shapes.
 </tr>
 </table>
 
-*Full gallery and per-environment documentation:
-[`docs/envs/`](docs/envs/README.md) ·
-[`docs/environments/`](docs/environments/README.md).*
+*Full gallery and per-environment documentation: [`docs/envs/`](docs/envs/README.md) · [`docs/environments/`](docs/environments/README.md).*
 
 ## Environments
 
-One benchmark, **TopoGym-v1**, in three slices under a universal
-interface (egocentric `Discrete(3)` turn-left / turn-right / forward
-actions with an occluded egocentric view by default — the rendered
-agent is a MiniGrid-style arrow, so its heading is always visible;
-`actions="fourway"` opts into `Discrete(4)` screen-direction actions
-with the universal `(x, y)` + 16-slot texture vector):
+One benchmark, **TopoGym-v1**, in three slices under a universal interface (egocentric `Discrete(3)` turn-left / turn-right / forward actions with an occluded egocentric view by default — the rendered agent is a MiniGrid-style arrow, so its heading is always visible; `actions="fourway"` opts into `Discrete(4)` screen-direction actions with the universal `(x, y)` + 16-slot texture vector):
 
 | slice | families | axis | status |
 |---|---|---|---|
@@ -47,8 +33,7 @@ with the universal `(x, y)` + 16-slot texture vector):
 | **Texture** | `IceShip`, `EnvironmentalIceShip`, `Ladders`, `BankRobber`, `DontFall`, `SpaceWarp`, `ClownChase`, `SearchRescue` | semantic local signals — and exactly where they fail | 🟢 Live; Beta |
 | **Top** | `TopPlane`, `TopCylinder`, `TopMobius`, `TopTorus`, `TopKlein`, `TopRP2` | global topology with zero local signal | 🟢 Live; Beta |
 
-Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`.
-Details per family: [docs/environments/](docs/environments/README.md).
+Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`. Details per family: [docs/environments/](docs/environments/README.md).
 
 ## Install
 
@@ -71,14 +56,7 @@ info["topology"]["betti_z2"]         # [1, 4, 0] — doors walkable
 info["topology"]["betti_z2_sealed"]  # [2, 5, 0] — doors count as walls
 ```
 
-Episodes truncate after a pre-determined horizon — the larger of
-`1.2 * max(W, H)` and 3x the turn-aware optimal route, so the goal is
-always reachable with room to wander; the
-goal pays +1 terminal reward by default (`reward_mode="sparse"`) and
-sits inside a designated chamber. `reward_mode="none"` for pure
-exploration, `"coverage"`, `"deceptive"`; `goal=False` removes the goal;
-`p_slip=0.1` for sticky-action noise; `complex="rips"` swaps the
-homology backend to a Vietoris–Rips complex on the quotient metric.
+Episodes truncate after a pre-determined horizon — the larger of `1.2 * max(W, H)` and 3x the turn-aware optimal route, so the goal is always reachable with room to wander; the goal pays +1 terminal reward by default (`reward_mode="sparse"`) and sits inside a designated chamber. `reward_mode="none"` for pure exploration, `"coverage"`, `"deceptive"`; `goal=False` removes the goal; `p_slip=0.1` for sticky-action noise; `complex="rips"` swaps the homology backend to a Vietoris–Rips complex on the quotient metric.
 
 Compose custom worlds with the fluent spec API:
 
@@ -115,38 +93,13 @@ env.reset(options={"teleport": (12, 40)})  # any previously visited cell
 |---|---|---|---|---|---|---|---|
 | **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
 
-The random floor: across all
-189 hold-out instances (50 episodes each, 9,450 episodes) a
-uniform-random policy reaches the goal **0% of the time** and uncovers
-**11.0%** of the reachable space. Nothing in this benchmark falls out
-of undirected exploration, and coverage — not steps-to-goal — is what
-separates methods until one of them solves something.
+The random floor: across all 189 hold-out instances (50 episodes each, 9,450 episodes) a uniform-random policy reaches the goal **0% of the time** and uncovers **11.0%** of the reachable space. Nothing in this benchmark falls out of undirected exploration, and coverage — not steps-to-goal — is what separates methods until one of them solves something.
 
-The published numbers are **per-world exploration results**:
-hyperparameters are chosen on the `tune` split, then every `test`
-world is its own experiment — one million environment steps of
-learning in it, followed by a frozen evaluation. They measure how much
-of a world a method uncovers given a budget in it, not whether a
-trained policy transfers; every method learns in the world it is
-scored on, under the same step budget. Full metrics, per-slice
-breakdowns, and the discovery-curve figures live in
-[BENCHMARKS.md](BENCHMARKS.md).
+The published numbers are **per-world exploration results**: hyperparameters are chosen on the `tune` split, then every `test` world is its own experiment — one million environment steps of learning in it, followed by a frozen evaluation. They measure how much of a world a method uncovers given a budget in it, not whether a trained policy transfers; every method learns in the world it is scored on, under the same step budget. Full metrics, per-slice breakdowns, and the discovery-curve figures live in [BENCHMARKS.md](BENCHMARKS.md).
 
-The transfer question — hyperparameters on `tune`, gradients on
-`train`, early stopping on `val`, and `test` read once at the end —
-remains fully posed by the published splits and enforced in-repo by
-`Baseline.run()`; we publish the splits so that benchmark can be run
-rather than exercising it ourselves. The algorithms themselves are Ray RLlib's; TopoGym does not
-reimplement PPO. A variant such as RND or ICM subclasses `PPOBaseline`
-and overrides one hook, and an algorithm that never uses PPO (Go-Explore
-explores randomly by default) implements the same small interface.
+The transfer question — hyperparameters on `tune`, gradients on `train`, early stopping on `val`, and `test` read once at the end — remains fully posed by the published splits and enforced in-repo by `Baseline.run()`; we publish the splits so that benchmark can be run rather than exercising it ourselves. The algorithms themselves are Ray RLlib's; TopoGym does not reimplement PPO. A variant such as RND or ICM subclasses `PPOBaseline` and overrides one hook, and an algorithm that never uses PPO (Go-Explore explores randomly by default) implements the same small interface.
 
-`--group` decides what one policy is trained on, and therefore what is
-being measured. `family` (the default) trains a policy per family
-across its sizes and seeds, in the spirit of Procgen's train-on-levels,
-test-on-held-out-levels design; `unit` is the strictest per-world
-version; `all` asks instead for a single general explorer across every
-family at once.
+`--group` decides what one policy is trained on, and therefore what is being measured. `family` (the default) trains a policy per family across its sizes and seeds, in the spirit of Procgen's train-on-levels, test-on-held-out-levels design; `unit` is the strictest per-world version; `all` asks instead for a single general explorer across every family at once.
 
 ```bash
 pip install topogym[benchmarks]
@@ -155,20 +108,11 @@ python scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py \
 python scripts/benchmarks/run_baselines_gridworld_v1_benchmark.py --smoke   # pipeline check
 ```
 
-Environment stepping is the bottleneck — the policy is a small MLP over
-a 49-dimensional vector — so throughput comes from `--num-env-runners`
-and `--envs-per-runner`, not from an accelerator. `--gpus-per-learner`
-is there for CUDA machines; Apple MPS is not a Ray GPU resource.
+Environment stepping is the bottleneck — the policy is a small MLP over a 49-dimensional vector — so throughput comes from `--num-env-runners` and `--envs-per-runner`, not from an accelerator. `--gpus-per-learner` is there for CUDA machines; Apple MPS is not a Ray GPU resource.
 
-Published artefacts land in [`benchmarks/`](benchmarks/README.md) and are
-committed; Ray logs, checkpoints, and per-step traces land in `runs/`
-and are not.
+Published artefacts land in [`benchmarks/`](benchmarks/README.md) and are committed; Ray logs, checkpoints, and per-step traces land in `runs/` and are not.
 
-**All three slices are in every split** — GridWorld2D, Texture, and
-Top — across 63 family-size units. The splits differ only in *which
-seeds* they draw, never in which environments they contain: every unit
-appears in all four, so tune, train, val, and test are samples of the
-same task rather than different ones.
+**All three slices are in every split** — GridWorld2D, Texture, and Top — across 63 family-size units. The splits differ only in *which seeds* they draw, never in which environments they contain: every unit appears in all four, so tune, train, val, and test are samples of the same task rather than different ones.
 
 | | units | instances per split |
 |---|---|---|
@@ -176,20 +120,9 @@ same task rather than different ones.
 | Texture | 8 | 48 train · 24 each eval |
 | Top | 6 | 36 train · 18 each eval |
 
-Seeds come from disjoint bands — tune 1000+, train 2000+, val 3000+,
-test 4000+, with the canonical seed 0 in none of them — and each
-instance carries size-scaled placement jitter, so no two are the same
-world. Every row records its canonical config, certified topology,
-turn-aware optimal route, and horizon, making a split's difficulty
-distribution auditable rather than asserted. Every split, and the
-extrapolation views, are published in `croissant.json` as their own
-Croissant record sets.
+Seeds come from disjoint bands — tune 1000+, train 2000+, val 3000+, test 4000+, with the canonical seed 0 in none of them — and each instance carries size-scaled placement jitter, so no two are the same world. Every row records its canonical config, certified topology, turn-aware optimal route, and horizon, making a split's difficulty distribution auditable rather than asserted. Every split, and the extrapolation views, are published in `croissant.json` as their own Croissant record sets.
 
-GridWorld2D dominates by unit count, so report **per slice** rather
-than pooling: a single mean over all instances is mostly a GridWorld2D
-score. Scenario mechanics stay live at benchmark defaults — including
-ClownChase's depleting reward trickle toward the wrong target, which
-is deception the benchmark is meant to contain.
+GridWorld2D dominates by unit count, so report **per slice** rather than pooling: a single mean over all instances is mostly a GridWorld2D score. Scenario mechanics stay live at benchmark defaults — including ClownChase's depleting reward trickle toward the wrong target, which is deception the benchmark is meant to contain.
 
 ```python
 import csv, gymnasium as gym, topogym
@@ -203,8 +136,7 @@ with open("docs/splits/train.csv") as f:
         # ... train; row["optimal_actions"] is the turn-aware optimum
 ```
 
-Regenerate with `python scripts/benchmarks/generate_splits.py`; browse any split
-visually with `python scripts/browse.py --all --split test -n 4`.
+Regenerate with `python scripts/benchmarks/generate_splits.py`; browse any split visually with `python scripts/browse.py --all --split test -n 4`.
 
 ## Play any environment yourself
 
@@ -213,15 +145,7 @@ python scripts/play.py --list
 python scripts/play.py TopoGym/SpaceWarp-v0
 ```
 
-Arrow keys move; `Tab` reveals hidden structure; `r` resets;
-`Backspace` regenerates the layout. Rendering dims everything outside
-the agent's current line of sight (reveal mode shows all). Set
-`TOPOGYM_DEBUG=1` to stream everything the env computes each step to
-the console, and `TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) for
-the live H1 overlay: every step, the known region's holes are drawn on
-the grid — representative cycles in yellow, enclosed-wall rims in
-green (a yellow cycle with no green rim is a transient belief), with a
-legend and live H1 count top-right.
+Arrow keys move; `Tab` reveals hidden structure; `r` resets; `Backspace` regenerates the layout. Rendering dims everything outside the agent's current line of sight (reveal mode shows all). Set `TOPOGYM_DEBUG=1` to stream everything the env computes each step to the console, and `TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) for the live H1 overlay: every step, the known region's holes are drawn on the grid — representative cycles in yellow, enclosed-wall rims in green (a yellow cycle with no green rim is a transient belief), with a legend and live H1 count top-right.
 
 ## Determinism, certification, and stats
 
@@ -243,25 +167,16 @@ legend and live H1 count top-right.
 
 ## Learning from the topology w/ a map
 
-Agents can choose to consume TopoGym's topology through
-[`VisitedComplex`](docs/reference.md#visitedcomplex-build-your-own-topological-algorithms):
-feed it the states you have visited and read back the shape of what
-you know: a map of the holes you have found and the loops enclosing
-them. The representative cycles are closed walks through
-archive-restorable states, so an agent can treat them as places to
-return to, frontiers to push, or features to encode. The certified
-metadata stays the answer key for scoring; this is the signal.
+Agents can choose to consume TopoGym's topology through [`VisitedComplex`](docs/reference.md#visitedcomplex-build-your-own-topological-algorithms): feed it the states you have visited and read back the shape of what you know: a map of the holes you have found and the loops enclosing them. The representative cycles are closed walks through archive-restorable states, so an agent can treat them as places to return to, frontiers to push, or features to encode. The certified metadata stays the answer key for scoring; this is the signal.
 
-Actions are named constants — `env.step(FORWARD)` says what
-`env.step(2)` only implies:
+Actions are named constants — `env.step(FORWARD)` says what `env.step(2)` only implies:
 
 ```python
 from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
 from topogym import MOVE_UP, MOVE_DOWN, MOVE_LEFT, MOVE_RIGHT  # fourway
 ```
 
-Actions are named constants — `env.step(FORWARD)` says what
-`env.step(2)` only implies:
+Actions are named constants — `env.step(FORWARD)` says what `env.step(2)` only implies:
 
 ```python
 from topogym import TURN_LEFT, TURN_RIGHT, FORWARD    # Discrete(3)
@@ -278,20 +193,11 @@ vc.representatives()                # a closed loop of cells per hole
 vc.rims(observed=seen)              # where each loop can still tighten
 ```
 
-Backends: `cubical` (movement-consistent on the env's own grid), `vr`
-(Vietoris–Rips at any `epsilon`, over cells or your encoder's
-vectors), and `witness` (de Silva–Carlsson landmarks, with the
-admit/evict policy yours to override). Coefficients: any prime or `Z`.
+Backends: `cubical` (movement-consistent on the env's own grid), `vr` (Vietoris–Rips at any `epsilon`, over cells or your encoder's vectors), and `witness` (de Silva–Carlsson landmarks, with the admit/evict policy yours to override). Coefficients: any prime or `Z`.
 
-Cost — lazy and cached but not incremental, so query once an
-episode rather than once a step. Measured over F₂ on a dense square
-archive, calling in this order and timing each with the previous
-already cached: `add` fills the archive, then the build (triggered by
-the first query), then `betti()`, then `representatives()`, then
-`rims()`. `add` is negligible throughout (0.03s at 100k).
+Cost — lazy and cached but not incremental, so query once an episode rather than once a step. Measured over F₂ on a dense square archive, calling in this order and timing each with the previous already cached: `add` fills the archive, then the build (triggered by the first query), then `betti()`, then `representatives()`, then `rims()`. `add` is negligible throughout (0.03s at 100k).
 
-**`vr`, ε = 1.5** — the general-purpose choice, and the one to assume
-for non-voxel spaces:
+**`vr`, ε = 1.5** — the general-purpose choice, and the one to assume for non-voxel spaces:
 
 | cells | build | betti | representatives |
 |---|---|---|---|
@@ -308,24 +214,15 @@ for non-voxel spaces:
 | 50k | 1.48s | 1.53s | 12.5s | ~0 |
 | 100k | 3.00s | 5.30s | 44.1s | 0.01s |
 
-Builds and rims are linear and `betti` near-linear in both backends;
-`representatives` is the superlinear one — comfortable to ~20k cells,
-expensive past 50k. Costs are sequential, so cycles from a 100k-cell
-cubical archive cost the build plus the extraction (~47s), while a
-50-grid archive is ~2.5k cells, where it is hundredths of a second.
-Use `witness` to hold a large point cloud at a fixed landmark budget.
-`torsion()` runs an integer Smith normal form and is an offline
-diagnostic, not an online signal.
+Builds and rims are linear and `betti` near-linear in both backends; `representatives` is the superlinear one — comfortable to ~20k cells, expensive past 50k. Costs are sequential, so cycles from a 100k-cell cubical archive cost the build plus the extraction (~47s), while a 50-grid archive is ~2.5k cells, where it is hundredths of a second. Use `witness` to hold a large point cloud at a fixed landmark budget. `torsion()` runs an integer Smith normal form and is an offline diagnostic, not an online signal.
 
 ## Env Step Profile
 
-How fast the environment steps under random actions, and how that
-scales across `gymnasium.vector.AsyncVectorEnv`:
+How fast the environment steps under random actions, and how that scales across `gymnasium.vector.AsyncVectorEnv`:
 
 ![Step throughput vs parallelism](docs/env_step_profile.png)
 
-A 50×50 world with `actions="egocentric"`. `obs_mode` is the
-observation — a separate axis from the action space:
+A 50×50 world with `actions="egocentric"`. `obs_mode` is the observation — a separate axis from the action space:
 
 | `obs_mode` | what the agent sees |
 |---|---|
@@ -380,7 +277,7 @@ If you use TopoGym in your research, please cite:
              Exploration in Reinforcement Learning},
   year    = {2026},
   url     = {https://github.com/jcarlson212/TopoGym},
-  version = {0.2.0}
+  version = {0.3.0}
 }
 ```
 

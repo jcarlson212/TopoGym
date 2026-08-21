@@ -26,13 +26,13 @@
   "name": "TopoGym-v1",
   "description": "The pinned environment registry and benchmark splits of TopoGym: gridworld reinforcement-learning environments with certified topology for exploration research. One record per stable environment id, with its canonical generator configuration and the certified Betti numbers (in both door conventions) at the reference seed. Environments are deterministic up to seeds, end to end.",
   "url": "https://github.com/jcarlson212/TopoGym",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "https://spdx.org/licenses/MIT.html",
   "creator": {
     "@type": "sc:Person",
     "name": "Jason Carlson"
   },
-  "citeAs": "@software{carlson2026topogym, author={Carlson, Jason}, title={TopoGym: Environments and Benchmarks for Topological Exploration in Reinforcement Learning}, year={2026}, version={0.2.0}, url={https://github.com/jcarlson212/TopoGym}}",
+  "citeAs": "@software{carlson2026topogym, author={Carlson, Jason}, title={TopoGym: Environments and Benchmarks for Topological Exploration in Reinforcement Learning}, year={2026}, version={0.3.0}, url={https://github.com/jcarlson212/TopoGym}}",
   "distribution": [
     {
       "@type": "cr:FileObject",
