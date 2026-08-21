@@ -528,9 +528,9 @@ def test_undefined_returns_also_fall_back():
     assert ranked[0]["lr"] == 2
 
 
-def test_one_signal_for_the_whole_sweep():
-    """Mixing signals across candidates would compare incomparable
-    scales -- a return of 0.5 against a coverage of 0.9."""
+def test_a_later_rung_never_outvotes_an_earlier_one():
+    """Lexicographic, not mixed: coverage only ever breaks an exact
+    tie in return -- a return of 0.5 beats any coverage whatsoever."""
     from topogym.baselines.gridworld2dv1.protocol import rank_candidates
 
     ranked, signal = rank_candidates([
@@ -539,6 +539,40 @@ def test_one_signal_for_the_whole_sweep():
     ])
     assert signal == "return"
     assert ranked[0]["lr"] == 1  # not the high-coverage one
+
+
+def test_return_ties_are_broken_by_chambers_then_coverage():
+    """The grid-order coin flip this replaces: with few tuning worlds
+    return is a coarse fraction, and candidates tied on it used to be
+    ranked by enumeration order. Now the ladder descends."""
+    from topogym.baselines.gridworld2dv1.protocol import rank_candidates
+
+    ranked, signal = rank_candidates([
+        {"lr": 1, "return": 0.5, "chambers": 2.0, "coverage": 0.9},
+        {"lr": 2, "return": 0.5, "chambers": 4.0, "coverage": 0.1},
+        {"lr": 3, "return": 0.5, "chambers": 4.0, "coverage": 0.6},
+    ])
+    # Chambers eliminated lr=1 despite its coverage; coverage then
+    # decided between the chambers-tied pair, and is what the winner
+    # finally won on.
+    assert signal == "coverage"
+    assert [m["lr"] for m in ranked] == [3, 2, 1]
+
+
+def test_chamberless_worlds_fall_through_to_coverage():
+    """Maze, Dilution and the Shape families have no chamber features,
+    so every candidate reports zero chambers there. A uniform zero is
+    a tie, not a signal: the ladder must descend to coverage instead
+    of crowning whichever zero the grid enumerated first."""
+    from topogym.baselines.gridworld2dv1.protocol import rank_candidates
+
+    ranked, signal = rank_candidates([
+        {"lr": 1, "return": 0.0, "chambers": 0.0, "coverage": 0.2},
+        {"lr": 2, "return": 0.0, "chambers": 0.0, "coverage": 0.7},
+        {"lr": 3, "return": 0.0, "chambers": 0.0, "coverage": 0.4},
+    ])
+    assert signal == "coverage"
+    assert [m["lr"] for m in ranked] == [2, 3, 1]
 
 
 # -- per-instance adaptation -----------------------------------------

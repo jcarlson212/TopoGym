@@ -843,7 +843,7 @@ def tune_on_rows(factory, config, rows: list, *,
                 len(rows), step_budget)
     measurements = []
     for index, candidate in enumerate(grid, 1):
-        returns, coverages = [], []
+        returns, chambers, coverages = [], [], []
         for row in rows:
             baseline = factory(config)
             result = baseline.single_layout_train_test_run(
@@ -854,6 +854,9 @@ def tune_on_rows(factory, config, rows: list, *,
             )
             record = result.evaluation or {}
             returns.append(float(record.get("cumulative_return") or 0.0))
+            # Raw counts, not fractions: every candidate runs the same
+            # rows, so the denominators cancel and the mean compares.
+            chambers.append(float(record.get("chambers_entered") or 0))
             coverages.append(float(record.get("lifetime_coverage")
                                    or 0.0))
             if hasattr(baseline, "close"):
@@ -861,16 +864,18 @@ def tune_on_rows(factory, config, rows: list, *,
         measurements.append({
             **candidate,
             "return": sum(returns) / len(returns),
+            "chambers": sum(chambers) / len(chambers),
             "coverage": sum(coverages) / len(coverages),
         })
-        logger.info("[%s]   %d/%d %s -> mean return %.4f, mean "
-                    "coverage %.4f", probe.name, index, len(grid),
+        logger.info("[%s]   %d/%d %s -> mean return %.4f, chambers "
+                    "%.2f, coverage %.4f", probe.name, index, len(grid),
                     candidate, measurements[-1]["return"],
+                    measurements[-1]["chambers"],
                     measurements[-1]["coverage"])
 
     ranked, signal = rank_candidates(measurements)
     best = {k: v for k, v in ranked[0].items()
-            if k not in ("return", "coverage")}
+            if k not in ("return", "chambers", "coverage")}
     logger.info("[%s] tuning ranked on %s; chose %s (%.4f)",
                 probe.name, signal, best, ranked[0].get(signal, 0.0))
     return {"values": best, "score": ranked[0].get(signal),

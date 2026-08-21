@@ -222,12 +222,55 @@ class _Session:
 
     def choose_reset(self, env, info: dict):
         self._ensure(env)
+        reached = bool(info.get("goal_reached"))
+        if reached:
+            # ``act`` records the cell it stands on *before* each
+            # action, so the step onto the goal is never followed by
+            # another act and the goal cell goes unrecorded. A
+            # demonstration one cell short of the goal hands phase 2 a
+            # curriculum whose first stage does not contain the reward.
+            cell = tuple(env._state.cell)
+            if not self.trajectory or self.trajectory[-1] != cell:
+                self.trajectory.append(cell)
         self.archive.observe(env._visited, self.chosen_from,
                              trajectory=tuple(self.trajectory),
-                             reached_goal=bool(info.get("goal_reached")))
+                             reached_goal=reached)
         self.trajectory = []
         self.chosen_from = self.archive.select()
         return self.chosen_from
+
+    def end_chunk(self, env) -> None:
+        """Fold the dangling last episode into the archive; clear the
+        per-episode state.
+
+        The evaluation loop fires the boundary probe at the start of
+        every episode *except its first*, so a chunked exploration --
+        many short ``evaluate_split`` calls over one session -- never
+        observes each chunk's final episode there, and the probe state
+        it leaves behind (``trajectory``, ``chosen_from``) is stitched
+        onto the next chunk's first episode, which actually starts at
+        the layout start. That stitching is how a one-cell
+        "demonstration" got recorded and a curriculum "reached the
+        start" of a route that never touched it.
+        """
+        if self.archive is not None and self.trajectory:
+            core = getattr(env, "unwrapped", env) if env is not None \
+                else None
+            visited = set(getattr(core, "_visited", ()) or ())
+            reached = bool(
+                core is not None
+                and getattr(core, "_state", None) is not None
+                and core.goal_exists
+                and tuple(core._state.cell) == tuple(core.layout.goal))
+            if reached:
+                cell = tuple(core._state.cell)
+                if self.trajectory[-1] != cell:
+                    self.trajectory.append(cell)
+            self.archive.observe(visited, self.chosen_from,
+                                 trajectory=tuple(self.trajectory),
+                                 reached_goal=reached)
+        self.trajectory = []
+        self.chosen_from = None
 
 
 #: seed -> session, so the two factories below hand back the same
@@ -316,6 +359,19 @@ class GoExplorePhase12Baseline(PPOBaseline):
 
     # -- phase 1 ------------------------------------------------------
 
+    def phase1_probe(self):
+        """The one session object phase 1 explores through: its
+        ``act`` walks, its ``choose_reset`` answers the boundary probe,
+        its ``end_chunk`` flushes between chunked calls.
+
+        A hook so a subclass that swaps the archive swaps it *here*,
+        where exploration actually runs. When this was hardwired to
+        the plain session, a subclass's archive drove only evaluation:
+        phase 1 explored with vanilla selection while the subclass's
+        whole contribution sat unused.
+        """
+        return _session(self._archive_params, self.config.seed)
+
     def explore(self, rows: list, episodes: int, seed: int = 0) -> tuple:
         """Run phase 1 and return ``(records, demonstration)``.
 
@@ -329,7 +385,11 @@ class GoExplorePhase12Baseline(PPOBaseline):
         # *This baseline's* session, not a fresh one keyed by instance:
         # what phase 1 learns has to be what evaluation inherits, and
         # the archive is the whole of what phase 1 learns.
-        session = _session(self._archive_params, self.config.seed)
+        session = self.phase1_probe()
+        # Flush whatever the previous chunk left dangling before this
+        # one's first episode -- which starts at the layout start and
+        # must not inherit a stale teleport prefix.
+        session.end_chunk(self._env)
         root, stride = getattr(self, "_telemetry", None) or (None, 1)
         records = evaluate_split(
             rows, session.act, episodes=episodes, seed=seed, trace=False,
@@ -404,20 +464,38 @@ class GoExplorePhase12Baseline(PPOBaseline):
         tau = len(demonstration) - 1
         reached_start = False
         stage = 0
+        carried_state = None
         while tau >= 0:
             window = self.local_starts(demonstration, tau)
             config = self.algorithm_config(rows, values, seed + stage)
             config.env_config["start_cells"] = [tuple(c) for c in window]
             config.env_config["demonstration"] = tuple(demonstration)
             algorithm = config.build_algo()
+            if carried_state is not None:
+                # One policy, fine-tuned backward: the Backward
+                # Algorithm's stages continue the same weights, and a
+                # stage rebuilt from scratch relearns the whole tail
+                # of the route inside a budget sized for one increment
+                # -- which is why curricula stalled partway. The env
+                # differs per stage (its start window), so the
+                # algorithm is rebuilt; the learner state is what
+                # carries over, synced to the runners so the first
+                # batch is collected with the carried weights too.
+                algorithm.learner_group.set_state(carried_state)
+                algorithm.env_runner_group.sync_weights(
+                    from_worker_or_learner_group=algorithm.learner_group)
             success, iteration = 0.0, 0
             try:
                 for iteration in range(1, per_stage + 1):
                     success = mean_return(algorithm.train())
                     if success >= SUCCESS_THRESHOLD:
                         break
+                carried_state = algorithm.learner_group.get_state()
+                previous = self._algorithm
                 self._algorithm = algorithm
                 self._checkpoint_path = self._checkpoint()
+                if previous is not None and previous is not algorithm:
+                    previous.stop()  # one live algorithm, not a leak per stage
             finally:
                 if algorithm is not self._algorithm:
                     algorithm.stop()

@@ -229,18 +229,45 @@ def choose_tuning_signal(measurements: list) -> str:
     return "return" if informative else "coverage"
 
 
+#: The tuning ladder, most important first. Return is the objective
+#: (under the sparse default it counts goals found); chambers grade
+#: structural discovery when no candidate found a goal or several tie;
+#: coverage is the floor that always discriminates. Lexicographic --
+#: a later signal only ever breaks an *exact tie* in every earlier one,
+#: so scales are never mixed across candidates.
+TUNING_LADDER = ("return", "chambers", "coverage")
+
+
 def rank_candidates(measurements: list) -> tuple:
-    """``(ranked measurements, signal)``, best first."""
-    signal = choose_tuning_signal(measurements)
+    """``(ranked measurements, signal)``, best first.
+
+    Ranked lexicographically down :data:`TUNING_LADDER`; ``signal``
+    names the first rung that actually discriminated between the top
+    candidates, for the log. The ``min()``-of-one-signal this replaces
+    threw coverage away the moment any candidate earned return -- and
+    with a handful of tuning worlds return is a coarse fraction, so
+    ties were everywhere and "the winner" was whichever tied candidate
+    the grid enumerated first.
+    """
     import math
 
-    def key(measurement):
-        value = measurement.get(signal)
-        if value is None or math.isnan(value):
-            return float("inf")
-        return -value
+    def value(measurement, name):
+        v = measurement.get(name)
+        if v is None or (isinstance(v, float) and math.isnan(v)):
+            return float("-inf")
+        return float(v)
 
-    return sorted(measurements, key=key), signal
+    def key(measurement):
+        return tuple(-value(measurement, name) for name in TUNING_LADDER)
+
+    ranked = sorted(measurements, key=key)
+    signal = TUNING_LADDER[-1]
+    if len(ranked) > 1:
+        for name in TUNING_LADDER:
+            if value(ranked[0], name) != value(ranked[1], name):
+                signal = name
+                break
+    return ranked, signal
 
 
 class Baseline(abc.ABC):

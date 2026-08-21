@@ -168,8 +168,21 @@ def _tuning_rows(args) -> list:
     more than the benchmark it serves; a per-slice sample keeps every
     slice's flavour of hardness represented for a bounded bill.
     """
+    rows = _split_rows(args.tune_split)
+    if args.tune_seeds_per_unit:
+        # One (or N) seeds of *every* family-size unit: hyperparameters
+        # respond to family and size, the axes this covers completely;
+        # extra seeds of the same unit mostly buy selection-noise
+        # reduction the final three-seed benchmark provides anyway.
+        chosen, counts = [], {}
+        for row in rows:
+            base = row["unit"].split("@")[0]
+            if counts.get(base, 0) < args.tune_seeds_per_unit:
+                counts[base] = counts.get(base, 0) + 1
+                chosen.append(row)
+        return chosen
     chosen, counts = [], {}
-    for row in _split_rows(args.tune_split):
+    for row in rows:
         if counts.get(row["slice"], 0) < args.tune_per_slice:
             counts[row["slice"]] = counts.get(row["slice"], 0) + 1
             chosen.append(row)
@@ -191,8 +204,15 @@ def tuned_hyperparameters(name: str, args) -> dict | None:
         return None
     tune_steps = args.plan.for_split("tune").steps
     if args.tune_split:
-        stem = (f"split-{args.tune_split}-per{args.tune_per_slice}"
-                f"-{tune_steps}")
+        # "lex1" names the ranking semantics (the lexicographic
+        # goals -> chambers -> coverage ladder). Caches from the old
+        # single-signal ranking share worlds and budget but not
+        # meaning, and a cache that silently survives a semantics
+        # change is a wrong answer with a valid filename.
+        scope = (f"unitseeds{args.tune_seeds_per_unit}"
+                 if args.tune_seeds_per_unit
+                 else f"per{args.tune_per_slice}")
+        stem = f"split-{args.tune_split}-{scope}-{tune_steps}-lex1"
     else:
         unit = args.tune_layout.split("/")[-1].removesuffix("-v0")
         stem = f"{unit}-seed{args.tune_seed}-{tune_steps}"
@@ -478,6 +498,10 @@ def main() -> int:
                         help="choose hyperparameters on worlds drawn "
                              "from this split (e.g. 'tune') instead of "
                              "the fixed tuning layout")
+    parser.add_argument("--tune-seeds-per-unit", type=int, default=0,
+                        help="tune on this many seeds of every unit in "
+                             "--tune-split (63 worlds at 1); overrides "
+                             "--tune-per-slice when set")
     parser.add_argument("--tune-per-slice", type=int, default=1,
                         help="tuning worlds drawn per slice from "
                              "--tune-split; the whole split would cost "
