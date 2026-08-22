@@ -178,3 +178,14 @@ def test_curriculum_stages_continue_the_same_weights():
             second.stop()
     finally:
         first.stop()
+
+
+def test_archive_values_filters_to_declared_knobs_only():
+    """The filter keeps what the *baseline* declares, not what GE's
+    defaults happen to contain: an optimizer key is dropped, GE's own
+    selection weights pass, and a subclass widens the vocabulary by
+    widening default_hyperparameters()."""
+    baseline = GoExplorePhase12Baseline(BaselineConfig(seed=0))
+    merged = baseline.archive_values({"w_a": 3.0, "p_a": 1.0, "lr": 9.0})
+    assert merged["w_a"] == 3.0 and merged["p_a"] == 1.0
+    assert "lr" not in merged

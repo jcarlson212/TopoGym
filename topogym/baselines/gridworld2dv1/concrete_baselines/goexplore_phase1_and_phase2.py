@@ -359,6 +359,20 @@ class GoExplorePhase12Baseline(PPOBaseline):
 
     # -- phase 1 ------------------------------------------------------
 
+    def archive_values(self, values: dict) -> dict:
+        """The archive parameters this run uses, from candidate values.
+
+        Filtered to the keys this baseline *declares* -- its archive
+        defaults plus its own tuning vocabulary -- rather than to GE's
+        defaults alone. The old filter kept only GE's keys, so a
+        subclass's additional weights were silently dropped on every
+        run path: a whole tuning grid swept them and measured nothing.
+        """
+        allowed = set(DEFAULTS) | set(self.default_hyperparameters())
+        return {**DEFAULTS, **self.default_hyperparameters(),
+                **{k: v for k, v in (values or {}).items()
+                   if k in allowed}}
+
     def phase1_probe(self):
         """The one session object phase 1 explores through: its
         ``act`` walks, its ``choose_reset`` answers the boundary probe,
@@ -557,9 +571,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
         and what it becomes is the checkpoint the hold-out starts from.
         """
         values = dict(hyperparameters.values or {})
-        self._archive_params = {**DEFAULTS,
-                                **{k: v for k, v in values.items()
-                                   if k in DEFAULTS}}
+        self._archive_params = self.archive_values(values)
         episodes = (self.config.train_episodes_per_instance
                     or self.config.eval_episodes)
         _, demonstration = self.explore(train_rows, episodes,
@@ -617,9 +629,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
         total_episodes = episodes_for(step_budget, horizon)
         values = dict(hyperparameters if hyperparameters is not None
                       else self.default_hyperparameters())
-        self._archive_params = {**DEFAULTS,
-                                **{k: v for k, v in values.items()
-                                   if k in DEFAULTS}}
+        self._archive_params = self.archive_values(values)
 
         # Phase 1, in chunks, stopping the moment a route exists.
         # The same world for both phases and the evaluation. This
