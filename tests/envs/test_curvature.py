@@ -218,3 +218,61 @@ def test_uncapped_curvature_matches_analytic_ground_truth():
         assert abs(value - (1.0 - 5.0 / 3.0)) < 1e-9
     finally:
         curvature._DIST_CAP = old_cap
+
+
+def test_ricci_field_grow_equals_fresh_build():
+    """The class-shaped contract: a field grown in uneven bites is
+    bit-identical -- edges and per-cell -- to one built fresh over the
+    same cells."""
+    import gymnasium as gym
+
+    from topogym.curvature import RicciField
+
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=17,
+                   actions="fourway", n_holes=1, n_chambers=1,
+                   n_decoys=0, layout_seed=3).unwrapped
+    env.reset(seed=0)
+    free = sorted(map(tuple, env.layout.free_cells))
+    neighbors = env.layout.base.neighbors
+
+    field = RicciField(free[:5], neighbors)
+    for stop in (6, 19, 40, 41, 90, len(free)):
+        field.grow(free[len(field.free):stop])
+        fresh = RicciField(free[:stop], neighbors)
+        assert field.edges == fresh.edges
+        assert field.per_cell() == fresh.per_cell()
+
+
+def test_ricci_field_contracts():
+    """The class's small print: growing by already-known cells is a
+    no-op; per-cell results are refreshed after growth; and the
+    functional wrapper never mutates the caller's table."""
+    from topogym.curvature import (
+        RicciField,
+        ollivier_ricci_edges,
+        update_ricci_edges,
+    )
+
+    cells = {(x, y) for x in range(4) for y in range(4)}
+
+    def neighbors(cell):
+        x, y = cell
+        return [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+
+    field = RicciField(sorted(cells)[:8], neighbors)
+    before = dict(field.edges)
+    field.grow(sorted(cells)[:8])          # nothing new
+    assert field.edges == before
+
+    first = field.per_cell()
+    field.grow(sorted(cells)[8:])
+    assert field.per_cell() != first       # cache invalidated by grow
+    assert field.free == cells
+
+    # Wrapper parity and no-mutation.
+    table = ollivier_ricci_edges(set(sorted(cells)[:8]), neighbors)
+    snapshot = dict(table)
+    grown = update_ricci_edges(table, cells, cells - field.free
+                               | set(sorted(cells)[8:]), neighbors)
+    assert table == snapshot               # input untouched
+    assert grown == field.edges
