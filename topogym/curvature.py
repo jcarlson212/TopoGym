@@ -8,11 +8,21 @@ curvature near 0; corridors, doorways, and bottlenecks are negatively
 curved; dead ends and pockets positively. Per-cell curvature is the
 mean over incident edges.
 
-Computation is exact: masses are unit-expanded (degrees are at most 4,
-so at most lcm(4, 3) = 12 units per side) and matched with a Hungarian
-assignment. Cost is a few microseconds per edge — cheap per call, but
-quadratic-ish in world area, so it is an opt-in stat and cached per
-layout.
+The transport itself is solved exactly: masses are unit-expanded
+(degrees are at most 4, so at most lcm(4, 3) = 12 units per side) and
+matched with a Hungarian assignment — no Sinkhorn-style approximation.
+The *ground metric* is deliberately not exact: distances saturate at
+``_DIST_CAP``, so an edge whose neighbours are separated by a longer
+detour (or disconnected, which the observed-region field can be) reads
+as "maximally pinched" rather than as its literal detour length. The
+value equals textbook Ollivier-Ricci exactly when no pairwise detour
+exceeds the cap — flat space, mild corners — and is a saturated
+variant of it at true bottlenecks, bounding kappa to
+``[1 - _DIST_CAP, 1]``. The saturation is also what confines an
+edge's dependence to a fixed ball, which is what makes
+:func:`update_ricci_edges` exact. Cost is a few microseconds per edge
+— cheap per call, but quadratic-ish in world area, so it is an opt-in
+stat and cached per layout.
 """
 
 from __future__ import annotations
@@ -95,7 +105,10 @@ def _local_distances(sources: list, targets: set, free: set,
 
 def edge_curvature(u: tuple, v: tuple, free: set,
                    neighbors_fn: Callable) -> float:
-    """Exact Ollivier-Ricci curvature of the edge (u, v), alpha = 0."""
+    """Ollivier-Ricci curvature of the edge (u, v), alpha = 0: exact
+    W1 (Hungarian assignment) over the cap-saturated ground metric.
+    Textbook-exact when no neighbour-to-neighbour detour exceeds
+    ``_DIST_CAP``; saturated at real bottlenecks (see module doc)."""
     nu = [n for n in neighbors_fn(u) if n in free]
     nv = [n for n in neighbors_fn(v) if n in free]
     if not nu or not nv:

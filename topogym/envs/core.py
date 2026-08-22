@@ -352,7 +352,8 @@ class TopoEnvCore(gym.Env):
 
     def ollivier_ricci(self) -> dict:
         """Per-cell Ollivier-Ricci curvature of the free-cell graph
-        (mean over incident edges; alpha = 0, exact W1). Expensive on
+        (mean over incident edges; alpha = 0; exact W1 over the
+        cap-saturated metric of :mod:`topogym.curvature`). Expensive on
         large worlds; computed once and cached *on the layout*, so
         every env sharing the world -- training, evaluation, the
         publishing helpers -- pays once rather than once each. Sound
