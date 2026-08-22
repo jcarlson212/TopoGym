@@ -47,9 +47,16 @@ from topogym.baselines.gridworld2dv1.single_layout import (  # noqa: E402
 logger = logging.getLogger("topogym")
 
 
-def tuning_rows(split: str, seeds_per_unit: int) -> list:
+def tuning_rows(split: str, seeds_per_unit: int,
+                families: list | None = None,
+                unit_prefixes: list | None = None) -> list:
     rows, counts = [], {}
     for row in load_split(split):
+        if families and row["family"] not in families:
+            continue
+        if unit_prefixes and not any(row["unit"].startswith(p)
+                                     for p in unit_prefixes):
+            continue
         seed = int(row["seed"])
         unit = row["unit"] if seed == 0 else f"{row['unit']}@{seed}"
         base = row["unit"]
@@ -59,10 +66,29 @@ def tuning_rows(split: str, seeds_per_unit: int) -> list:
     return rows
 
 
+def build_grid(algo: str, sweep: dict | None, fixed: dict) -> list | None:
+    """The candidate list: the cross-product of ``sweep``, each merged
+    over ``fixed`` -- or None to use the baseline's declared grid.
+    Mechanism-targeted stages sweep one or two knobs on the family
+    that exercises them, with everything already-decided held fixed.
+    """
+    if not sweep:
+        return None
+    import itertools
+
+    keys = sorted(sweep)
+    grid = []
+    for combo in itertools.product(*(sweep[k] for k in keys)):
+        grid.append({**fixed, **dict(zip(keys, combo))})
+    return grid
+
+
 def cache_path(algo: str, args) -> pathlib.Path:
     root = ROOT / "benchmarks" / "single_layout"
     if not is_public(algo):
         root = root / "private"
+    if args.cache_name:
+        return root / "tuning" / "staged-lex1" / f"{args.cache_name}.json"
     stem = (f"split-{args.tune_split}-unitseeds{args.tune_seeds_per_unit}"
             f"-{args.tune_steps}-lex1")
     return root / "tuning" / stem / f"{algo}.json"
@@ -75,14 +101,24 @@ def candidate_key(measurement: dict) -> tuple:
 
 
 def run_child(args) -> int:
-    rows = tuning_rows(args.tune_split, args.tune_seeds_per_unit)
+    rows = tuning_rows(args.tune_split, args.tune_seeds_per_unit,
+                       args.families.split(",") if args.families else None,
+                       args.units.split(",") if args.units else None)
     mine = rows[args.shard_index::args.shards]
+    if not mine:  # more shards than worlds: an empty slice is no data
+        pathlib.Path(args.part_file).write_text(json.dumps(
+            {"n_rows": 0, "searched": [], "rows": []}))
+        return 0
     config = BaselineConfig(seed=args.seed,
                             num_env_runners=args.num_env_runners,
                             num_envs_per_runner=args.envs_per_runner)
+    grid = build_grid(args.algo, json.loads(args.sweep) if args.sweep
+                      else None,
+                      json.loads(args.fixed) if args.fixed else {})
     outcome = tune_on_rows(get_baseline(args.algo), config, mine,
                            step_budget=args.tune_steps,
-                           eval_episodes=args.tune_episodes)
+                           eval_episodes=args.tune_episodes,
+                           grid=grid)
     payload = {"n_rows": len(mine), "searched": outcome["searched"],
                "rows": outcome["rows"]}
     pathlib.Path(args.part_file).write_text(json.dumps(payload))
@@ -94,8 +130,13 @@ def run_parent(args) -> int:
     if target.exists():
         logger.info("[%s] cache exists at %s; skipping", args.algo, target)
         return 0
+    n_rows = len(tuning_rows(
+        args.tune_split, args.tune_seeds_per_unit,
+        args.families.split(",") if args.families else None,
+        args.units.split(",") if args.units else None))
+    args.shards = max(1, min(args.shards, n_rows))
     parts_dir = pathlib.Path(args.work_dir or "/tmp") / \
-        f"tune-parts-{args.algo}"
+        f"tune-parts-{args.cache_name or args.algo}"
     parts_dir.mkdir(parents=True, exist_ok=True)
     procs = []
     for index in range(args.shards):
@@ -108,6 +149,12 @@ def run_parent(args) -> int:
                "--tune-split", args.tune_split,
                "--tune-seeds-per-unit", str(args.tune_seeds_per_unit),
                "--tune-steps", str(args.tune_steps),
+               *(["--families", args.families] if args.families else []),
+               *(["--units", args.units] if args.units else []),
+               *(["--sweep", args.sweep] if args.sweep else []),
+               *(["--fixed", args.fixed] if args.fixed else []),
+               *(["--cache-name", args.cache_name]
+                 if args.cache_name else []),
                "--tune-episodes", str(args.tune_episodes),
                "--seed", str(args.seed),
                "--num-env-runners", str(args.num_env_runners),
@@ -182,6 +229,16 @@ def main() -> int:
     parser.add_argument("--num-env-runners", type=int, default=2)
     parser.add_argument("--envs-per-runner", type=int, default=2)
     parser.add_argument("--work-dir", default=None)
+    parser.add_argument("--families", default=None,
+                        help="comma-separated families to tune on")
+    parser.add_argument("--units", default=None,
+                        help="comma-separated unit-name prefixes")
+    parser.add_argument("--sweep", default=None,
+                        help='JSON {knob: [values]} cross-product grid')
+    parser.add_argument("--fixed", default=None,
+                        help="JSON dict merged under every candidate")
+    parser.add_argument("--cache-name", default=None,
+                        help="write the cache under staged-lex1/<name>")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")

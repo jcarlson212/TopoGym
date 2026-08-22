@@ -810,7 +810,8 @@ def _optimal_from_results(folder: pathlib.Path) -> int | None:
 def tune_on_rows(factory, config, rows: list, *,
                  step_budget: int = DEFAULT_TUNE_STEPS,
                  eval_episodes: int = DEFAULT_EVAL_EPISODES,
-                 telemetry_root: str | None = None) -> dict:
+                 telemetry_root: str | None = None,
+                 grid: list | None = None) -> dict:
     """Grid-search a baseline's ``tune_grid`` across held-out worlds.
 
     Every candidate gets its own freshly built baseline and the same
@@ -832,7 +833,10 @@ def tune_on_rows(factory, config, rows: list, *,
     from topogym.baselines.gridworld2dv1.protocol import rank_candidates
 
     probe = factory(config)
-    grid = [dict(candidate) for candidate in (probe.tune_grid or ())]
+    if grid is None:
+        grid = [dict(candidate) for candidate in (probe.tune_grid or ())]
+    else:
+        grid = [dict(candidate) for candidate in grid]
     if not grid:
         return {"values": dict(probe.default_hyperparameters()),
                 "score": None, "signal": None, "searched": [],
