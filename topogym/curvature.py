@@ -29,13 +29,24 @@ from __future__ import annotations
 
 import math
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Hashable, Iterable
+from typing import TypeVar
+
+#: A graph node. The module is generic pure-graph code; TopoGym
+#: instantiates it with grid cells, i.e. ``tuple[int, int]`` -- but
+#: the tests exercise it with plain labels, and nothing here assumes
+#: coordinates.
+Cell = TypeVar("Cell", bound=Hashable)
+
+#: ``neighbors(cell)`` for the graph under study. Movement adjacency
+#: in TopoGym: ``layout.base.neighbors`` (4-adjacent).
+NeighborsFn = Callable[["Cell"], Iterable["Cell"]]
 
 _INF = float("inf")
 _DIST_CAP = 6  # local BFS radius; farther-than-cap pairs use the cap
 
 
-def hungarian(cost: list) -> float:
+def hungarian(cost: list[list[float]]) -> float:
     """Minimum-cost perfect matching on a square matrix (Kuhn's
     algorithm with potentials, O(n^3))."""
     n = len(cost)
@@ -80,8 +91,9 @@ def hungarian(cost: list) -> float:
     return -v[0]
 
 
-def _local_distances(sources: list, targets: set, free: set,
-                     neighbors_fn: Callable) -> dict:
+def _local_distances(sources: list[Cell], targets: set[Cell],
+                     free: set[Cell],
+                     neighbors_fn: NeighborsFn) -> dict[Cell, dict[Cell, int]]:
     """Graph distances from each source to every target, capped."""
     out = {}
     targets = set(targets)
@@ -103,8 +115,8 @@ def _local_distances(sources: list, targets: set, free: set,
     return out
 
 
-def edge_curvature(u: tuple, v: tuple, free: set,
-                   neighbors_fn: Callable) -> float:
+def edge_curvature(u: Cell, v: Cell, free: set[Cell],
+                   neighbors_fn: NeighborsFn) -> float:
     """Ollivier-Ricci curvature of the edge (u, v), alpha = 0: exact
     W1 (Hungarian assignment) over the cap-saturated ground metric.
     Textbook-exact when no neighbour-to-neighbour detour exceeds
@@ -130,11 +142,13 @@ def edge_curvature(u: tuple, v: tuple, free: set,
 _EDGE_BALL = _DIST_CAP + 2
 
 
-def _canonical(u: tuple, v: tuple) -> tuple:
+def _canonical(u: Cell, v: Cell) -> tuple[Cell, Cell]:
     return (u, v) if u <= v else (v, u)
 
 
-def ollivier_ricci_edges(free: set, neighbors_fn: Callable) -> dict:
+def ollivier_ricci_edges(
+        free: set[Cell],
+        neighbors_fn: NeighborsFn) -> dict[tuple[Cell, Cell], float]:
     """Curvature per free edge, keyed canonically (smaller endpoint
     first). Deterministic (sorted iteration)."""
     edge_k: dict = {}
@@ -147,8 +161,10 @@ def ollivier_ricci_edges(free: set, neighbors_fn: Callable) -> dict:
     return edge_k
 
 
-def update_ricci_edges(edge_k: dict, free: set, added: set,
-                       neighbors_fn: Callable) -> dict:
+def update_ricci_edges(
+        edge_k: dict[tuple[Cell, Cell], float], free: set[Cell],
+        added: set[Cell],
+        neighbors_fn: NeighborsFn) -> dict[tuple[Cell, Cell], float]:
     """Exact incremental update of an edge-curvature table after
     ``added`` cells joined ``free``.
 
@@ -185,7 +201,8 @@ def update_ricci_edges(edge_k: dict, free: set, added: set,
     return out
 
 
-def per_cell_curvature(edge_k: dict) -> dict:
+def per_cell_curvature(
+        edge_k: dict[tuple[Cell, Cell], float]) -> dict[Cell, float]:
     """Fold an edge table into per-cell means over incident edges."""
     per_cell: dict = {}
     counts: dict = {}
@@ -196,7 +213,8 @@ def per_cell_curvature(edge_k: dict) -> dict:
     return {c: per_cell[c] / counts[c] for c in per_cell}
 
 
-def ollivier_ricci(free: set, neighbors_fn: Callable) -> dict:
+def ollivier_ricci(free: set[Cell],
+                   neighbors_fn: NeighborsFn) -> dict[Cell, float]:
     """Per-cell Ollivier-Ricci curvature: the mean over incident free
     edges. Deterministic (sorted iteration)."""
     return per_cell_curvature(ollivier_ricci_edges(free, neighbors_fn))
