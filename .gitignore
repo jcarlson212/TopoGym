@@ -50,6 +50,7 @@ runs/
 # nothing about a run needs to be in git.
 topogym/baselines/**/concrete_baselines/_private_*.py
 tests/baselines/**/test_private_*.py
+scripts/benchmarks/_private_*.py
 benchmarks/**/private/
 benchmarks/private/
 runs/**/private/
