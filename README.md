@@ -35,6 +35,21 @@ One benchmark, **TopoGym-v1**, in three slices under a universal interface (egoc
 
 Every id is stable: `gym.make("TopoGym/{Family}-{size}-v0", seed=n)`. Details per family: [docs/environments/](docs/environments/README.md).
 
+### Actions
+
+Both spaces are named, so a policy says what it does rather than passing bare integers. The members are `IntEnum`s, so they go straight to `env.step`:
+
+```python
+from topogym import ActionMode, EgocentricAction, FourwayAction
+
+env.step(EgocentricAction.FORWARD)          # default Discrete(3): TURN_LEFT, TURN_RIGHT, FORWARD
+env.step(FourwayAction.UP)                  # actions="fourway": UP, DOWN, LEFT, RIGHT (screen directions)
+
+ActionMode.FOURWAY.actions                  # -> FourwayAction, for code generic over the mode
+```
+
+The bare names — `FORWARD`, `TURN_LEFT`, `MOVE_UP`, … — remain importable from `topogym` and are defined *from* the enums, so `FORWARD == EgocentricAction.FORWARD` holds by construction.
+
 ## Install
 
 ```bash
