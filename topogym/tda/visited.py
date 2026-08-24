@@ -121,14 +121,46 @@ class VisitedComplex:
         self._landmarks: list = []
         self._chain: ChainComplex | None = None
 
+    #: What ``from_env`` may seed a complex from. Both are things the
+    #: agent legitimately knows -- neither reads ``layout.cell_types``,
+    #: which is the oracle line the rest of the library draws.
+    SOURCES = ("visited", "observed")
+
     @classmethod
     def from_env(cls, env, backend: str = "cubical",
-                 **kwargs) -> VisitedComplex:
-        """A complex seeded with the env's lifetime-visited cells (the
-        archive-restorable set); keep calling ``add`` as you explore."""
+                 source: str = "visited", **kwargs) -> VisitedComplex:
+        """A complex seeded from what the env knows; keep calling
+        ``add`` as you explore.
+
+        ``source="visited"`` (the default) seeds the lifetime-visited
+        cells: the archive-restorable set, accumulated across every
+        episode, every one of which the agent can return to.
+
+        ``source="observed"`` seeds the cells it has *seen and believes
+        free* -- a loop can close here as soon as the agent has looked
+        all the way around a region, well before it has walked around
+        it. Two things make this a different object rather than a
+        bigger one, and both matter:
+
+        - It is **episode-scoped**. ``env._observed_free`` is cleared on
+          every reset, so this complex describes the current episode's
+          visibility, not the run's knowledge. Seed it once per episode
+          (or keep your own union across episodes if you want the
+          lifetime version).
+        - It is **not a superset of the visited set**. Sight is
+          occluded and range-limited, so a cell can be stood on in an
+          early episode and absent from the current observed region;
+          measured on a 15-square with view radius 3, the two sets
+          crossed rather than nested.
+        """
+        if source not in cls.SOURCES:
+            raise ValueError(
+                f"source must be one of {cls.SOURCES}, got {source!r}")
         core = env.unwrapped
         vc = cls(backend, env=core, **kwargs)
-        return vc.add(list(core.lifetime_visit_counts))
+        cells = (core.lifetime_visit_counts if source == "visited"
+                 else core._observed_free)
+        return vc.add(list(cells))
 
     # -- growing ----------------------------------------------------------
 

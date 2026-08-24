@@ -137,3 +137,100 @@ def test_validation():
         VisitedComplex("vr", coefficients=4)  # not prime
     with pytest.raises(ValueError):
         VisitedComplex("delaunay")
+
+
+# -- what "visited" and "observed" actually mean ----------------------
+#
+# These pin the lifetime semantics of the two sets a complex can be
+# seeded from. They exist because the difference was assumed rather
+# than checked, and assumed wrongly: the observed region looks like a
+# superset of the visited one (you must see a cell to stand on it) and
+# is neither -- it is cleared every reset, and sight is occluded.
+
+def _walked_env(steps: int = 400, resets: int = 3):
+    import gymnasium as gym
+
+
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_holes=1, n_chambers=1, n_decoys=0,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    for index in range(steps):
+        _, _, terminated, truncated, _ = env.step(
+            env.action_space.sample())
+        if terminated or truncated:
+            env.reset(seed=index % max(1, resets))
+    return env
+
+
+def test_observed_region_is_episode_scoped_but_visits_are_not():
+    """``_observed_free`` is cleared on reset; the visit history is
+    not. Any code that treats the observed region as run-level
+    knowledge is reading one episode's visibility.
+
+    Framed as "returns to the opening view" rather than "shrinks":
+    the same seed gives the same start and therefore the same first
+    observation, which makes the check exact instead of dependent on
+    how much the previous episode happened to see.
+    """
+    import gymnasium as gym
+
+
+    env = gym.make("TopoGym/Grid2D-v0", base="square", size=15,
+                   n_holes=1, n_chambers=1, n_decoys=0,
+                   layout_seed=3).unwrapped
+    env.reset(seed=0)
+    opening_view = set(env._observed_free)
+    assert opening_view, "the first observation recorded nothing"
+
+    for _ in range(60):
+        _, _, terminated, truncated, _ = env.step(
+            env.action_space.sample())
+        if terminated or truncated:
+            break
+    grown = set(env._observed_free)
+    visited_before = set(env.lifetime_visit_counts)
+    assert grown > opening_view, "walking revealed nothing new"
+
+    env.reset(seed=0)
+    assert set(env._observed_free) == opening_view, (
+        "observed region did not reset to the opening view")
+    assert set(env.lifetime_visit_counts) >= visited_before, (
+        "lifetime visits were lost across a reset")
+    env.close()
+
+
+def test_observed_is_not_a_superset_of_visited():
+    """Sight is occluded and range-limited, and the observed set is
+    per-episode, so the two sets cross rather than nest -- in either
+    direction."""
+    env = _walked_env()
+    visited = set(env.lifetime_visit_counts)
+    observed = set(env._observed_free)
+    assert visited - observed, "expected cells stood on but not now seen"
+    assert not observed <= visited or not visited <= observed
+    env.close()
+
+
+def test_from_env_sources_seed_different_complexes():
+    from topogym.tda import VisitedComplex
+
+    env = _walked_env()
+    visited = VisitedComplex.from_env(env, source="visited")
+    observed = VisitedComplex.from_env(env, source="observed")
+    assert set(visited.points) == set(map(tuple,
+                                          env.lifetime_visit_counts))
+    assert set(observed.points) == set(map(tuple, env._observed_free))
+    assert set(visited.points) != set(observed.points)
+    env.close()
+
+
+def test_from_env_rejects_an_unknown_source():
+    import pytest
+
+    from topogym.tda import VisitedComplex
+
+    env = _walked_env(steps=10)
+    with pytest.raises(ValueError, match="source must be one of"):
+        VisitedComplex.from_env(env, source="everything")
+    env.close()
