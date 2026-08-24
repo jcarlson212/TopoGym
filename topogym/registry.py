@@ -35,7 +35,15 @@ from topogym.generation.rooms import SHAPE_CODES
 _EPIC_ARC = 120
 
 #: Chamber counts EpicChase is registered at.
-_EPIC_CHAMBERS = (4, 8)
+#:
+#: A sweep rather than two points, because the family exists to
+#: exhibit a scaling law: chambers sit an episode apart, so entering
+#: all k of them is a conjunction of k independent-ish events, and the
+#: theory separates methods by how the probability of that conjunction
+#: falls with k. Two values cannot show a curve. Adding names here
+#: never touches a published benchmark -- ``benchmarks.json`` is the
+#: sole authority on membership and lists EpicChase as standalone.
+_EPIC_CHAMBERS = (1, 2, 3, 4, 6, 8, 12)
 
 #: EpicChase corridor width. Wide enough to move around in -- a
 #: width-1 spiral is a queue, not a hallway -- and odd, so the arms

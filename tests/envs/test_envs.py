@@ -614,7 +614,14 @@ def test_epic_chase_admits_exactly_one_new_chamber_per_episode(env_id, seed):
 
     first = chambers[0][1]
     assert first <= budget, f"chamber 1 unreachable: {first} > {budget}"
-    assert chambers[1][1] > budget, "a fresh episode reaches two chambers"
+    if len(chambers) > 1:
+        # Vacuous at k = 1, which the sweep registers as the anchor
+        # point where the chain is a single link and the methods
+        # should not differ. Guarded rather than dropped: the clause
+        # is the family's premise wherever there *is* a second
+        # chamber, and silently skipping it for every k would retire
+        # the check that matters.
+        assert chambers[1][1] > budget, "a fresh episode reaches two chambers"
 
     inside = [sorted(interior)[0] for interior, _ in chambers]
     for here, nxt in zip(inside, inside[1:]):
