@@ -52,6 +52,11 @@ topogym/baselines/**/concrete_baselines/_private_*.py
 tests/baselines/**/test_private_*.py
 scripts/benchmarks/_private_*.py
 benchmarks/**/private/
+# EpicChase is the standalone certificate family: its whole tree is
+# committed locally (never pushed until the method is published); the
+# private/ split inside it only exists because the runner writes there.
+!benchmarks/epicchase/private/
+!benchmarks/epicchase/private/**
 benchmarks/private/
 runs/**/private/
 runs/private/
