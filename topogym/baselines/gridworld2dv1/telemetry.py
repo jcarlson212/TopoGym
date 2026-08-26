@@ -70,6 +70,11 @@ EPISODE_FIELDS = (
     "chambers_entered", "chambers_total", "decoys_entered",
     "decoys_total", "observed_h0", "observed_h1", "observed_frac",
     "archive_reset", "reset_cell",
+    # Which parallel exploration stream produced the row: null for
+    # single-env methods, ``worker_index * 100 + env_index`` for rows
+    # streamed out of RLlib env-runners, whose ``interactions``
+    # counters are per stream rather than global.
+    "runner",
 )
 
 
@@ -95,7 +100,7 @@ FIELD_TYPES = {
     "decoys_entered": "int64", "decoys_total": "int64",
     "observed_h0": "int64", "observed_h1": "int64",
     "observed_frac": "float64", "archive_reset": "bool_",
-    "reset_cell": "string",
+    "reset_cell": "string", "runner": "int64",
     "instance": "string", "family": "string", "size": "int64",
     "seed": "int64",
 }

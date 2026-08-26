@@ -137,7 +137,7 @@ class PPOBaseline(Baseline):
 
         register_env("topogym_split", SplitEnv)
         params = {**self.defaults, **values}
-        return (
+        config = (
             PPOConfig()
             .rl_module(rl_module_spec=self.policy_module_spec())
             .environment(
@@ -165,6 +165,18 @@ class PPOBaseline(Baseline):
             )
             .debugging(log_level="ERROR")
         )
+        # Training telemetry, when a run bound a destination: the same
+        # per-episode rows the archive methods record, streamed from
+        # each env-runner (see runner_telemetry). Tuning never binds
+        # one, so candidate sweeps stay uninstrumented.
+        telemetry = getattr(self, "_telemetry", None)
+        if telemetry:
+            from topogym.baselines.gridworld2dv1.concrete_baselines.\
+                runner_telemetry import telemetry_callbacks
+            config = config.callbacks(
+                callbacks_class=telemetry_callbacks(
+                    telemetry[0], self.name))
+        return config
 
     # -- the protocol -------------------------------------------------
 
