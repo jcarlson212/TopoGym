@@ -140,6 +140,19 @@ def evaluate_instance(row: dict, policy: Callable, episodes: int = 5,
     }
     step_rows: list = []
     episode_rows: list = []
+    # ``step`` counts *within* an episode, so a stride at or above the
+    # horizon matches nothing and the steps table comes out empty --
+    # silently, since the episodes table fills in normally and the run
+    # looks healthy. That is never what a caller asking for telemetry
+    # meant, so say so and record something.
+    horizon_here = int(getattr(core, "_max_steps", 0) or 0)
+    if telemetry is not None and horizon_here and step_stride >= horizon_here:
+        clamped = max(1, horizon_here // 8)
+        logger.warning(
+            "step_stride %d >= horizon %d: no step would ever be "
+            "recorded; using %d instead",
+            step_stride, horizon_here, clamped)
+        step_stride = clamped
     n_free = max(1, len(core.layout.free_cells) if core.layout else 1)
     n_chambers = 0
     info: dict = {}

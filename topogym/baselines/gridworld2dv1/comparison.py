@@ -24,6 +24,10 @@ Three quantitative figures and one qualitative one:
 - :func:`exploration_grid` -- what the exploration actually looked
   like, method by method on representative worlds. The numbers say a
   method solved more; this says what it did differently.
+- :func:`chamber_grid` -- the same picture with each chamber tinted by
+  whether the method ever got inside it, for the families whose whole
+  point is the chamber count. The panels that stay amber are the rooms
+  a method never opened.
 
 Censoring is explicit throughout. A world whose goal was never reached
 has no steps-to-goal, and dropping those worlds would flatter whichever
@@ -39,7 +43,7 @@ import pathlib
 logger = logging.getLogger("topogym")
 
 __all__ = ["first_goal_steps", "plot_solve_profile", "plot_family_deltas",
-           "plot_paired_scatter", "exploration_grid"]
+           "plot_paired_scatter", "exploration_grid", "chamber_grid"]
 
 #: Bootstrap resamples for every interval drawn here.
 BOOTSTRAP = 2000
@@ -331,6 +335,14 @@ def plot_paired_scatter(root, baseline: str, method: str, out=None,
 VISIT_COLOR = (214, 39, 140)
 VISIT_STRENGTH = 0.85
 
+#: Chamber tints for :func:`chamber_grid`, from the Okabe-Ito palette
+#: the rest of the figures use: blue for a chamber the method got
+#: into, amber for one it never entered. The pair has to survive both
+#: colour-blind rendering and the magenta visit tint sitting under it.
+CHAMBER_FOUND = (0, 114, 178)
+CHAMBER_MISSED = (230, 159, 0)
+CHAMBER_STRENGTH = 0.8
+
 
 def exploration_grid(root, units: list, algorithms: list, out=None,
                      labels: dict | None = None, row_labels: dict | None = None,
@@ -453,7 +465,15 @@ def exploration_grid(root, units: list, algorithms: list, out=None,
                     axis.set_ylabel((row_labels or {}).get(unit, unit),
                                     fontsize=6.5, rotation=0,
                                     ha="right", va="center", labelpad=6)
-        figure.subplots_adjust(wspace=0.04, hspace=0.04)
+        # The budget belongs *in* the figure. Two grids cut at
+        # different points are otherwise indistinguishable once the
+        # filename is gone -- which is exactly how a reader ends up
+        # comparing a 150k panel against a full-budget one.
+        figure.suptitle(
+            f"Cells stood on by {at_step:,} steps" if at_step is not None
+            else "Cells stood on over the full training budget",
+            fontsize=8, y=0.995)
+        figure.subplots_adjust(wspace=0.04, hspace=0.04, top=0.965)
         written = _save(figure, out or (pathlib.Path(root) / "plots"
                                         / "exploration_grid"),
                         tight=False)
@@ -470,4 +490,202 @@ def _save(figure, stem, tight: bool = True) -> list:
         figure.savefig(path, bbox_inches="tight" if tight else None)
         written.append(path)
     logger.info("wrote %s", written[-1])
+    return written
+
+
+def chamber_grid(root, units: list, algorithms: list, out=None,
+                 labels: dict | None = None,
+                 row_labels: dict | None = None,
+                 split: str = "single-train", width: float = DOUBLE,
+                 at_step: int | None = None):
+    """Which chambers each method got into, world by world.
+
+    :func:`exploration_grid` with the thing the chamber families are
+    actually about painted on top: every chamber interior tinted blue
+    where the method reached it and amber where it never did, over the
+    magenta of the cells it stood on. On a family that varies the
+    chamber count this turns the claim into something visible -- the
+    panels that stay amber are the chambers a method never opened.
+
+    Two honesty notes, both about where the numbers come from:
+
+    * The blue/amber split is computed from *recorded* positions, and
+      the step table is written at ``--step-stride``, so a chamber
+      entered only between two samples can be drawn amber. The tint is
+      therefore indicative.
+    * The per-panel count is not. It is read from the episode table's
+      ``chambers_entered``, which the environment maintains exactly, so
+      the annotation is the authoritative figure even where the tint
+      undercounts it.
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    from topogym.baselines.gridworld2dv1.instances import make_instance
+    from topogym.baselines.gridworld2dv1.single_layout import layout_row
+    from topogym.rendering import tiles
+    from topogym.rendering.rgb import render_rgb_2d
+
+    logging.getLogger("matplotlib").setLevel(logging.WARNING)
+    style, _ = _style()
+    panels: dict = {}
+    counts: dict = {}
+    for unit in units:
+        row = None
+        for base in _roots(root):
+            candidate = base / unit / "results"
+            if candidate.is_dir():
+                import json
+
+                for path in sorted(candidate.glob("*.json")):
+                    payload = json.loads(path.read_text())
+                    row = payload.get("row") or layout_row(
+                        payload["env_id"], int(payload.get("seed", 0)))
+                    break
+            if row:
+                break
+        if not row:
+            logger.warning("no result row for %s; skipping", unit)
+            continue
+        env = make_instance(row, reveal_hidden=True, flatten=False)
+        core = env.unwrapped
+        core.reset(seed=int(row["seed"]))
+        base_map = core.layout.base
+        chamber_of = dict(core._chamber_of)
+        coords = [base_map.layout_coords(tuple(c))
+                  for c in core.layout.free_cells]
+        pad = 2
+        width_cells, height_cells = base_map.layout_size()
+        x0 = max(0, min(c[0] for c in coords) - pad)
+        x1 = min(width_cells - 1, max(c[0] for c in coords) + pad)
+        y0 = max(0, min(c[1] for c in coords) - pad)
+        y1 = min(height_cells - 1, max(c[1] for c in coords) + pad)
+        tile = max(2, 420 // max(x1 - x0 + 1, y1 - y0 + 1))
+        canvas = render_rgb_2d(core, tile=tile)[y0 * tile:(y1 + 1) * tile,
+                                                x0 * tile:(x1 + 1) * tile]
+        env.close()
+
+        visited: dict = {}
+        for base in _roots(root):
+            source = base / unit / "telemetry" / "steps"
+            if not source.exists():
+                continue
+            try:
+                frame = pd.read_parquet(source)
+            except Exception:
+                continue
+            if "split" in frame.columns:
+                frame = frame[frame["split"] == split]
+            if at_step is not None and "interaction" in frame.columns:
+                frame = frame[frame["interaction"] <= at_step]
+            for name, rows_ in frame.groupby("algorithm", observed=True):
+                if name in algorithms:
+                    visited.setdefault(name, set()).update(
+                        zip(rows_["x"].astype(int), rows_["y"].astype(int)))
+            # The exact count, from the table the environment fills in.
+            episodes = base / unit / "telemetry" / "episodes"
+            if episodes.exists():
+                try:
+                    eframe = pd.read_parquet(
+                        episodes, columns=["algorithm", "split",
+                                           "interactions",
+                                           "chambers_entered",
+                                           "chambers_total"])
+                except Exception:
+                    eframe = None
+                if eframe is not None:
+                    eframe = eframe[eframe["split"] == split]
+                    if at_step is not None:
+                        eframe = eframe[eframe["interactions"] <= at_step]
+                    for name, rows_ in eframe.groupby("algorithm",
+                                                      observed=True):
+                        if name in algorithms and len(rows_):
+                            counts[(unit, name)] = (
+                                int(rows_["chambers_entered"].max()),
+                                int(rows_["chambers_total"].max()))
+
+        for name in algorithms:
+            picture = canvas.copy()
+            stood = visited.get(name, set())
+
+            def _paint(cell, colour):
+                col, rowpix = base_map.layout_coords(tuple(cell))
+                col, rowpix = col - x0, rowpix - y0
+                if 0 <= col <= x1 - x0 and 0 <= rowpix <= y1 - y0:
+                    tiles.tint(picture[rowpix * tile:(rowpix + 1) * tile,
+                                       col * tile:(col + 1) * tile],
+                               colour, CHAMBER_STRENGTH)
+
+            for cell in stood:
+                col, rowpix = base_map.layout_coords(tuple(cell))
+                col, rowpix = col - x0, rowpix - y0
+                if 0 <= col <= x1 - x0 and 0 <= rowpix <= y1 - y0:
+                    tiles.tint(picture[rowpix * tile:(rowpix + 1) * tile,
+                                       col * tile:(col + 1) * tile],
+                               VISIT_COLOR, VISIT_STRENGTH)
+            # Chambers last, so they read over the trail rather than
+            # under it: the question the figure answers is which ones
+            # were opened, not which cells were walked.
+            entered = {index for cell, index in chamber_of.items()
+                       if cell in stood}
+            for cell, index in chamber_of.items():
+                _paint(cell, CHAMBER_FOUND if index in entered
+                       else CHAMBER_MISSED)
+            panels[(unit, name)] = picture
+
+    rows = [u for u in units if any((u, a) in panels for a in algorithms)]
+    if not rows:
+        logger.warning("no panels to draw")
+        return []
+    with plt.rc_context(style):
+        figure, axes = plt.subplots(
+            len(rows), len(algorithms), squeeze=False,
+            figsize=(width, width * len(rows) / max(1, len(algorithms))))
+        for r, unit in enumerate(rows):
+            for c, name in enumerate(algorithms):
+                axis = axes[r][c]
+                axis.set_xticks([])
+                axis.set_yticks([])
+                for spine in axis.spines.values():
+                    spine.set_linewidth(0.4)
+                    spine.set_color("0.75")
+                picture = panels.get((unit, name))
+                if picture is not None:
+                    axis.imshow(picture, interpolation="nearest")
+                got = counts.get((unit, name))
+                if got:
+                    axis.set_xlabel(f"{got[0]}/{got[1]} chambers",
+                                    fontsize=6, labelpad=2)
+                if r == 0:
+                    axis.set_title((labels or {}).get(name, name),
+                                   fontsize=7, pad=3)
+                if c == 0:
+                    axis.set_ylabel((row_labels or {}).get(unit, unit),
+                                    fontsize=6.5, rotation=0,
+                                    ha="right", va="center", labelpad=6)
+        import matplotlib.patches as mpatches
+
+        figure.legend(
+            handles=[
+                mpatches.Patch(color=[v / 255 for v in CHAMBER_FOUND],
+                               label="chamber entered"),
+                mpatches.Patch(color=[v / 255 for v in CHAMBER_MISSED],
+                               label="chamber never entered"),
+                mpatches.Patch(color=[v / 255 for v in VISIT_COLOR],
+                               label="cells stood on"),
+            ],
+            loc="lower center", ncol=3, frameon=False, fontsize=7,
+            bbox_to_anchor=(0.5, -0.012))
+        figure.suptitle(
+            f"Chambers reached by {at_step:,} steps" if at_step is not None
+            else "Chambers reached over the full training budget",
+            fontsize=8, y=0.995)
+        figure.subplots_adjust(wspace=0.04, hspace=0.16, top=0.965,
+                               bottom=0.045)
+        written = _save(figure, out or (pathlib.Path(root) / "plots"
+                                        / "chamber_grid"), tight=False)
+        plt.close(figure)
     return written
