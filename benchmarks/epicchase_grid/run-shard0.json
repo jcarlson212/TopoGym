@@ -1,0 +1,66 @@
+{
+  "argv": [
+    "scripts/benchmarks/run_single_layout.py",
+    "--baselines",
+    "go-explore-phase1",
+    "--layouts",
+    "TopoGym/EpicChase4-90-v0",
+    "TopoGym/EpicChase6-110-v0",
+    "TopoGym/EpicChase8-120-v0",
+    "TopoGym/EpicChase12-150-v0",
+    "--layout-seeds",
+    "0",
+    "--tune-split",
+    "tune",
+    "--tune-seeds-per-unit",
+    "1",
+    "--step-stride",
+    "20",
+    "--shard-count",
+    "8",
+    "--shard-index",
+    "0",
+    "--keep-going",
+    "--only-missing",
+    "--artifacts",
+    "benchmarks/epicchase_grid"
+  ],
+  "commit": "334f3c722050134c502e030ddac2028b5382ce7e",
+  "started": "2026-08-27T18:10:06.448800-04:00",
+  "algorithms": [
+    "go-explore-phase1"
+  ],
+  "layouts": [
+    "TopoGym/EpicChase4-90-v0",
+    "TopoGym/EpicChase6-110-v0",
+    "TopoGym/EpicChase8-120-v0",
+    "TopoGym/EpicChase12-150-v0"
+  ],
+  "private_algorithms": 3,
+  "layout_seeds": [
+    0
+  ],
+  "algorithm_seed": 0,
+  "plan": {
+    "tune": {
+      "steps": 100000,
+      "episodes": null
+    },
+    "test": {
+      "steps": 1000000,
+      "episodes": null
+    }
+  },
+  "eval_episodes": 100,
+  "eval_archive": false,
+  "tuning": {
+    "split": "tune",
+    "per_slice": 1,
+    "steps": 100000,
+    "episodes": 25
+  },
+  "shard": {
+    "index": 0,
+    "count": 8
+  }
+}

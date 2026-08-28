@@ -389,10 +389,15 @@ def test_published_artifacts_are_filed_under_the_benchmark_version():
     assert not stray, f"unversioned artefacts: {stray}"
     # And every published result must sit under a version directory.
     for path in (root / "benchmarks").rglob("*.json"):
-        # single_layout is a different study, not a benchmark version:
-        # one world and a step budget rather than a hold-out sweep, so
-        # it is filed beside the versions rather than inside one.
-        if path.relative_to(root / "benchmarks").parts[0] == "single_layout":
+        # single_layout and the epicchase studies are different
+        # studies, not benchmark versions: fixed worlds and step
+        # budgets rather than hold-out sweeps, so they are filed beside
+        # the versions rather than inside one. epicchase_grid is the
+        # chamber-grid companion to epicchase -- a separate tree
+        # because it is run at its own step stride, not a variant of
+        # the same artefacts.
+        if path.relative_to(root / "benchmarks").parts[0] in (
+                "single_layout", "epicchase", "epicchase_grid"):
             continue
         assert path.relative_to(root / "benchmarks").parts[0] \
             == "gridworld2dv1", path
