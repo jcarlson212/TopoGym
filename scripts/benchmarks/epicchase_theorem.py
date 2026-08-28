@@ -15,7 +15,11 @@ IS the exploration artefact this family measures, so the certificate
 is what training entered, not what a naked replay policy can repeat.
 
 Reads benchmarks/epicchase/{,private/}*/telemetry, writes
-benchmarks/epicchase/figures/theorem_ksweep.{png,pdf}.
+benchmarks/epicchase/figures/legacy/theorem_ksweep.{png,pdf}.
+
+Superseded by ``epicchase_suite.py``, whose theorem_pall_ci is this
+figure with confidence intervals over 30 seeds. Kept, and filed under
+legacy/, because published claims were made against it.
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ import pandas as pd
 from topogym.baselines.gridworld2dv1.report import FIGURE_STYLE, PALETTE
 
 ROOT = os.path.join("benchmarks", "epicchase")
-OUT = os.path.join(ROOT, "figures")
+OUT = os.path.join(ROOT, "figures", "legacy")
 
 #: Display order fixes color assignment (never cycled by arrival order).
 #: Style separates curves that coincide (ricci and both overlap

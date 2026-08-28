@@ -57,6 +57,12 @@ benchmarks/**/private/
 # private/ split inside it only exists because the runner writes there.
 !benchmarks/epicchase/private/
 !benchmarks/epicchase/private/**
+# EnlargedChamberCount is the same family with the door separation
+# guaranteed instead of incidental, and gets the same treatment for
+# the same reason: the arms under private/ are the comparison, so a
+# tree committed without them records only the control.
+!benchmarks/ecc/private/
+!benchmarks/ecc/private/**
 benchmarks/private/
 runs/**/private/
 runs/private/

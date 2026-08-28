@@ -27,8 +27,10 @@ randomness -- which is the probability space the theorem quantifies
 over. CIs here are therefore over algorithm randomness in a fixed
 adversarial world, not over worlds.
 
-Writes benchmarks/epicchase/figures/ and a tidy CSV of every
-statistic plotted.
+Writes benchmarks/epicchase/figures/theorem/ and a tidy CSV of
+every statistic plotted. Figures are subfoldered by kind so that a
+study's theorem figures never sit beside another study's: the suite
+emits the same filenames for every k-sweep family it is pointed at.
 """
 
 from __future__ import annotations
@@ -48,7 +50,7 @@ import pandas as pd
 from topogym.baselines.gridworld2dv1.report import FIGURE_STYLE, PALETTE
 
 ROOT = os.path.join("benchmarks", "epicchase")
-OUT = os.path.join(ROOT, "figures")
+OUT = os.path.join(ROOT, "figures", "theorem")
 STEP_BUDGET = 1_000_000
 BOOT = 2000
 RNG = np.random.default_rng(0)
