@@ -9,6 +9,13 @@ TopoGym/ChamberCount1-200-v0,GridWorld2D,ChamberCount,TG-GridWorld2D-S200-C1-D0-
 TopoGym/ChamberCount2-200-v0,GridWorld2D,ChamberCount,TG-GridWorld2D-S200-C2-D0-cs8-ds8-sep2-shpSq-per-sc-open-slip0-seed0,0,200,600,197,40000,39946,1 0 0,3 2 0,H0=Z; H1=0; H2=0
 TopoGym/ChamberCount4-200-v0,GridWorld2D,ChamberCount,TG-GridWorld2D-S200-C4-D0-cs8-ds8-sep2-shpSq-per-sc-open-slip0-seed0,0,200,620,206,40000,39892,1 0 0,5 4 0,H0=Z; H1=0; H2=0
 TopoGym/ChamberCount8-200-v0,GridWorld2D,ChamberCount,TG-GridWorld2D-S200-C8-D0-cs8-ds8-sep2-shpSq-per-sc-open-slip0-seed0,0,200,630,207,40000,39784,1 0 0,9 8 0,H0=Z; H1=0; H2=0
+TopoGym/EnlargedChamberCount2-60-v0,GridWorld2D,EnlargedChamberCount,TG-GridWorld2D-S60-C2-D0-cs8-ds8-sep2-shpSq-per-sc-j4-open-slip0-seed0,0,60,60,48,3600,3546,1 0 0,3 2 0,H0=Z; H1=0; H2=0
+TopoGym/EnlargedChamberCount3-60-v0,GridWorld2D,EnlargedChamberCount,TG-GridWorld2D-S60-C3-D0-cs8-ds8-sep2-shpSq-per-sc-j4-open-slip0-seed0,0,60,60,49,3600,3519,1 0 0,4 3 0,H0=Z; H1=0; H2=0
+TopoGym/EnlargedChamberCount4-80-v0,GridWorld2D,EnlargedChamberCount,TG-GridWorld2D-S80-C4-D0-cs8-ds8-sep2-shpSq-per-sc-j4-open-slip0-seed0,0,80,60,85,6400,6292,1 0 0,5 4 0,H0=Z; H1=0; H2=0
+TopoGym/EnlargedChamberCount5-100-v0,GridWorld2D,EnlargedChamberCount,TG-GridWorld2D-S100-C5-D0-cs8-ds8-sep2-shpSq-per-sc-j4-open-slip0-seed0,0,100,60,92,10000,9865,1 0 0,6 5 0,H0=Z; H1=0; H2=0
+TopoGym/EnlargedChamberCount6-120-v0,GridWorld2D,EnlargedChamberCount,TG-GridWorld2D-S120-C6-D0-cs8-ds8-sep2-shpSq-per-sc-j4-open-slip0-seed0,0,120,60,75,14400,14238,1 0 0,7 6 0,H0=Z; H1=0; H2=0
+TopoGym/EnlargedChamberCount8-150-v0,GridWorld2D,EnlargedChamberCount,TG-GridWorld2D-S150-C8-D0-cs8-ds8-sep2-shpSq-per-sc-j4-open-slip0-seed0,0,150,60,143,22500,22284,1 0 0,9 8 0,H0=Z; H1=0; H2=0
+TopoGym/EnlargedChamberCount10-180-v0,GridWorld2D,EnlargedChamberCount,TG-GridWorld2D-S180-C10-D0-cs8-ds8-sep2-shpSq-per-sc-j4-open-slip0-seed0,0,180,60,156,32400,32130,1 0 0,11 10 0,H0=Z; H1=0; H2=0
 TopoGym/Decoys0-50-v0,GridWorld2D,Decoys,TG-GridWorld2D-S50-C1-D0-cs8-ds8-sep2-shpSq-ctr-ring-bl-open-slip0-seed0,0,50,180,60,2500,2473,1 0 0,2 1 0,H0=Z; H1=0; H2=0
 TopoGym/Decoys1-50-v0,GridWorld2D,Decoys,TG-GridWorld2D-S50-C1-D1-cs8-ds8-sep2-shpSq-ctr-ring-bl-open-slip0-seed0,0,50,180,60,2500,2409,1 1 0,2 2 0,H0=Z; H1=Z; H2=0
 TopoGym/Decoys2-50-v0,GridWorld2D,Decoys,TG-GridWorld2D-S50-C1-D2-cs8-ds8-sep2-shpSq-ctr-ring-bl-open-slip0-seed0,0,50,180,60,2500,2345,1 2 0,2 3 0,H0=Z; H1=Z^2; H2=0

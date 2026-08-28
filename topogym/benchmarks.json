@@ -26,7 +26,8 @@
     "while an intentional omission does not."
   ],
   "standalone": {
-    "EpicChase": "Chambers sit a full episode apart along one spiral corridor, so no single episode can reach the goal. It grades archive-based methods rather than policies, and scores incomparably to the graded families -- a stress test, kept out of every roster on purpose."
+    "EpicChase": "Breaks the property every rostered family holds: that the goal lies within one episode horizon L of the start, so a policy alone can reach it. Here the goal sits beyond L, so only a method that chains episodes through an archive can ever arrive, and a policy-only baseline scores zero by construction rather than by being bad. That makes these instruments for archival methods specifically -- niche, and without a roster home. EpicChase spaces k chambers one episode apart along a spiral, so entering all k costs at least k chained episodes.",
+    "EnlargedChamberCount": "Breaks the property every rostered family holds: that the goal lies within one episode horizon L of the start, so a policy alone can reach it. Here the goal sits beyond L, so only a method that chains episodes through an archive can ever arrive, and a policy-only baseline scores zero by construction rather than by being bad. That makes these instruments for archival methods specifically -- niche, and without a roster home. EnlargedChamberCount does the same without the spiral: door separation is guaranteed at generation time, which isolates the chamber count from the corridor depth it is confounded with in EpicChase, at the cost of a world that grows with k."
   },
   "default": "gridworld2d-v1",
   "benchmarks": {

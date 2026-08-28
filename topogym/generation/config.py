@@ -61,6 +61,19 @@ class TopoGenConfig2D:
     decoy_shape: str = "square"  # area-matched at equal side (never
     # confounds shape with size)
     min_sep: int = 2  # minimum pairwise Chebyshev separation between walls
+    #: Minimum graph distance, over free cells, between any two chamber
+    #: doors -- and with it a guarantee that no two doors touch. Zero
+    #: leaves placement unconstrained, which is every family that does
+    #: not care. A positive value makes the *separation* the specimen's
+    #: defining property rather than a by-product of wherever the
+    #: placement policy happened to put things: it is enforced by
+    #: rejecting attempts, so chambers can be placed at random (seeds
+    #: vary the arrangement) while the guarantee holds for every seed
+    #: that generates at all. Set it above an episode horizon and no
+    #: single episode can reach two doors -- the premise a chamber-count
+    #: experiment needs if the count is to be isolated from the geometry
+    #: around it.
+    min_door_distance: int = 0
 
     # -- doors ---------------------------------------------------------------
     door_kind: str = "bump"  # "bump" (hidden, opens after tries) | "open"

@@ -34,6 +34,17 @@ from topogym.generation.rooms import SHAPE_CODES
 #: the basis of the family's episode budget.
 _EPIC_ARC = 120
 
+#: EnlargedChamberCount's episode budget. Doors are generated more than
+#: this far apart, so no episode reaches two of them.
+_ECC_HORIZON = 60
+
+#: k -> world side. Measured rather than chosen: the smallest side at
+#: which six consecutive seeds all place k chambers with doors above
+#: the horizon, so a family member exists for every seed a split asks
+#: for. k stops at 10 because 12 needs a world large enough that a
+#: million-step study on it costs more than the point it makes.
+_ECC_SIZES = {2: 60, 3: 60, 4: 80, 5: 100, 6: 120, 8: 150, 10: 180}
+
 #: Chamber counts EpicChase is registered at.
 #:
 #: A sweep rather than two points, because the family exists to
@@ -99,6 +110,23 @@ def _build_registry() -> dict:
         add(f"ChamberCount{k}-200", _open_cfg(
             200, n_chambers=k, chamber_placement="perimeter",
             start_placement="center"))
+    # EnlargedChamberCount: ChamberCount with the separation made a
+    # guarantee instead of an accident. Every pair of doors is more than
+    # _ECC_HORIZON apart over the free-cell graph, so no episode reaches
+    # two of them and "entered j chambers" costs at least j chained
+    # episodes -- the premise a chamber-count claim needs, and the one
+    # ChamberCount cannot make because its doors land wherever the
+    # perimeter policy happens to put them.
+    #
+    # The world grows with k because the guarantee demands it: a fixed
+    # size would shrink the separation instead, which is the confound
+    # this family exists to remove. Growth makes the task harder for
+    # every method equally, so it favours none of them.
+    for k, side in _ECC_SIZES.items():
+        add(f"EnlargedChamberCount{k}-{side}", _open_cfg(
+            side, n_chambers=k, chamber_placement="perimeter",
+            placement_jitter=4, start_placement="center",
+            min_door_distance=_ECC_HORIZON + 1))
     # Decoys: one chamber among k sealed decoys.
     for k in (0, 1, 2, 4, 8):
         add(f"Decoys{k}-50", _open_cfg(
@@ -159,6 +187,16 @@ EXTRA_KWARGS: dict = {
     for name in REGISTRY
     if name.startswith("EpicChase")
 }
+#: EnlargedChamberCount inverts it the same way, and more strictly: the
+#: budget is fixed at _ECC_HORIZON for every k, and generation
+#: guarantees the doors sit further apart than that. Deriving the
+#: horizon from the layout instead would let it grow with the world and
+#: quietly dissolve the premise at large k.
+EXTRA_KWARGS.update({
+    name: {"max_steps": _ECC_HORIZON}
+    for name in REGISTRY
+    if name.startswith("EnlargedChamberCount")
+})
 
 #: The Top slice of TopoGym-v1: registry name -> topology.
 TOP_TOPOLOGIES = {

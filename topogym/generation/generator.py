@@ -516,6 +516,9 @@ def _finalize_layout(cfg: TopoGenConfig2D, base: BaseMap2D, cells: list,
     if reachable_from(adj, start) != free_set:
         raise _RetryAttempt("free space not fully reachable from start")
 
+    if cfg.min_door_distance > 0:
+        _enforce_door_separation(cfg, adj, features)
+
     goal = _pick_goal(cfg, rng, adj, start, doors, features, interiors)
     cell_types[goal] = GOAL
 
@@ -523,6 +526,61 @@ def _finalize_layout(cfg: TopoGenConfig2D, base: BaseMap2D, cells: list,
         dim=2, base=base, cell_types=cell_types, doors=doors,
         start=start, goal=goal, features=list(features), free_cells=free,
     )
+
+
+def door_separation(adj: dict, features: list) -> int | None:
+    """Smallest graph distance between any two chamber doors, or
+    ``None`` when there are fewer than two.
+
+    Over the free-cell graph, so it measures what an agent must walk
+    rather than how far apart the doors look: two doors on opposite
+    sides of one wall are adjacent in the plane and a corridor apart in
+    here, and the second number is the one an episode budget is spent
+    against.
+    """
+    cells = [tuple(spec.cell)
+             for f in features if f.kind == "chamber"
+             for spec in f.doors]
+    if len(cells) < 2:
+        return None
+    smallest = None
+    for index, source in enumerate(cells):
+        if source not in adj:
+            continue
+        distances = bfs_distances(adj, [source])
+        for other in cells[index + 1:]:
+            reach = distances.get(other)
+            if reach is None:      # disconnected: no episode crosses it
+                continue
+            smallest = reach if smallest is None else min(smallest, reach)
+    return smallest
+
+
+def _enforce_door_separation(cfg: TopoGenConfig2D, adj: dict,
+                             features: list) -> None:
+    """Reject an attempt whose doors sit closer than the config asks.
+
+    Rejection rather than repair: nudging a chamber to fix a violation
+    would bias placement toward the arrangements the nudge produces,
+    and the point of the constraint is that the *seed* chooses the
+    arrangement and the constraint only says yes or no.
+    """
+    cells = [tuple(spec.cell)
+             for f in features if f.kind == "chamber"
+             for spec in f.doors]
+    for index, one in enumerate(cells):
+        for other in cells[index + 1:]:
+            # Touching is checked in the plane as well as in the graph:
+            # two doors can be diagonal neighbours -- adjacent to the
+            # eye, and not adjacent in a 4-connected free-cell graph.
+            if (abs(one[0] - other[0]) <= 1
+                    and abs(one[1] - other[1]) <= 1):
+                raise _RetryAttempt("chamber doors touch")
+    separation = door_separation(adj, features)
+    if separation is not None and separation < cfg.min_door_distance:
+        raise _RetryAttempt(
+            f"chamber doors {separation} apart, "
+            f"min_door_distance is {cfg.min_door_distance}")
 
 
 def _pick_goal(cfg: TopoGenConfig2D, rng: np.random.Generator, adj: dict,
@@ -606,6 +664,13 @@ def _finalize_metadata(cfg: TopoGenConfig2D, layout: Layout,
         )
     if raw.betti_z2[0] != 1:
         raise _RetryAttempt("free space disconnected")
+    # Only worth the walk when there are two doors to be apart.
+    door_gap = None
+    if sum(1 for f in layout.features
+           if f.kind == "chamber" for _ in f.doors) > 1:
+        door_gap = door_separation(
+            build_adjacency(set(free), layout.base.neighbors),
+            layout.features)
     betti_z2 = summary.betti_z2
     if full_free:
         betti_q, torsion = base_info.betti_q, base_info.h1_torsion
@@ -643,7 +708,15 @@ def _finalize_metadata(cfg: TopoGenConfig2D, layout: Layout,
         betti_q=betti_q,
         betti_q_expected=betti_q,
         h1_torsion=torsion,
-        connectivity=connectivity_block(set(free), layout.base.neighbors),
+        connectivity={
+            **connectivity_block(set(free), layout.base.neighbors),
+            # Measured, not assumed: a family that asks for separated
+            # doors publishes what it actually got, so the guarantee is
+            # auditable from the metadata alone rather than by trusting
+            # that generation enforced it.
+            **({"min_door_distance": door_gap}
+               if door_gap is not None else {}),
+        },
         n_partitions=len(partitions),
         certified={
             "betti_z2": True,

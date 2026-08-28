@@ -1602,6 +1602,80 @@ install: \texttt{pip install topogym[benchmarks]} pulls the extras
 (Ray~\cite{moritz18} for distributed runs, \texttt{rliable} for the
 aggregate statistics); the core library never depends on them.
 
+\section{Extra environments}
+\label{sec:extra-envs}
+
+Two families are registered but deliberately excluded from every
+split. They are not held-out data and not a difficulty rung; they
+break a property every rostered family holds.
+
+That property is that the goal lies within one episode horizon $L$ of
+the start, so a policy alone can reach it and a score measures how
+well a method explores. Both families here place the goal
+\emph{beyond} $L$. No episode starting at the origin can arrive, so
+only a method that chains episodes through an archive --- resuming
+from a remembered cell rather than restarting --- ever reaches the
+goal at all, and a policy-only baseline scores zero by construction
+rather than by being bad. Mixing that into a split would make the
+aggregate a statement about which methods carry archives, not about
+exploration quality.
+
+They are therefore instruments for archival methods specifically:
+useful, niche, and without a roster home. Each is declared in
+\texttt{benchmarks.json} under \texttt{standalone} with its reason, so
+"left out on purpose" stays distinguishable from "forgotten" when the
+roster and registry are checked against each other.
+
+\subsection{EpicChase}
+
+A rectangular spiral with $k$ chambers spaced one episode apart along
+the corridor. The episode budget is the \emph{premise} rather than a
+derived quantity: it is fixed at $1.5\times$ the arc between
+consecutive chambers and the world is sized to fit, so a single
+episode reaches at most one chamber it has not already seen. Entering
+all $k$ therefore costs at least $k$ archive-chained episodes, and the
+probability of managing it within a budget is a scaling law in $k$ ---
+which is what the family exists to exhibit. Registered at
+$k \in \{1,2,3,4,6,8,12\}$.
+
+The cost of the construction is that $k$ is confounded with corridor
+depth: a chamber deeper in the spiral is both further from the start
+and later in the sequence, so a method that merely penetrates further
+scores better without any chamber-specific behaviour.
+EnlargedChamberCount removes exactly that confound.
+
+\subsection{EnlargedChamberCount}
+
+ChamberCount with the separation promoted from accident to guarantee.
+Chambers are placed by the perimeter policy under seed jitter, and an
+attempt is \emph{rejected} unless every pair of chamber doors is more
+than the episode horizon apart over the free-cell graph, with no two
+doors touching --- checked in the plane as well as in the graph, since
+two doors can be diagonal neighbours and still be non-adjacent over
+4-connected cells. Rejection rather than repair: nudging a chamber to
+satisfy the bound would bias placement toward the arrangements the
+nudge produces, and the constraint should say only yes or no while the
+seed chooses the arrangement.
+
+The horizon is fixed at $60$ for every $k$ --- deriving it from the
+layout would let it grow with the world and quietly dissolve the
+premise at large $k$ --- and the world side grows with $k$ instead,
+because a fixed side would shrink the separation, which is the
+confound the family exists to remove. Growth makes the task harder for
+every method equally. Registered at $k \in \{2,3,4,5,6,8,10\}$ with
+sides $60$ to $180$, each the smallest side at which six consecutive
+seeds all admit $k$ chambers at the required separation; $k=12$ is
+omitted because the world it needs costs more to study than the point
+it makes.
+
+The achieved separation is measured at generation time and published
+in \texttt{metadata.connectivity.min\_door\_distance}, so the
+guarantee is auditable from the artefact rather than taken on trust.
+\texttt{scripts/soak\_door\_separation.py} re-derives it from the
+geometry over thousands of seeds. The constraint itself is
+\texttt{min\_door\_distance} on the 2D generator config, available to
+any family that wants it.
+
 \begin{thebibliography}{99}
 \itemsep0pt
 
