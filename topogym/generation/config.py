@@ -50,6 +50,7 @@ class TopoGenConfig2D:
     # sides, goal cell, shapes). Set ``placement="random"`` to drop the
     # whole arrangement back into the sampled tier.
     chamber_placement: str = "random"  # "random" | "center" | "perimeter"
+    # | "around" (ring about the grid center, evenly spaced by angle)
     decoy_placement: str = "random"  # "random" | "around" (ring about
     # the grid center, evenly spaced by angle)
     start_placement: str = "random"  # "random" | "bottom_left" | "center"
@@ -74,6 +75,17 @@ class TopoGenConfig2D:
     #: experiment needs if the count is to be isolated from the geometry
     #: around it.
     min_door_distance: int = 0
+    #: Radius of the "around" ring, in cells. Zero keeps the historical
+    #: behaviour -- the largest radius that still fits inside the margin,
+    #: which pins the ring to the world's edge and makes the two grow
+    #: together. A positive value decouples them: the ring stays put
+    #: while the world around it can be made as large as wanted, so the
+    #: boundary can be pushed beyond anything a step budget reaches.
+    #: That is the difference between a family where following the wall
+    #: leads you from one chamber to the next and one where the wall is
+    #: never seen, and only the structure the agent has encircled is
+    #: there to be exploited.
+    ring_radius: int = 0
 
     # -- doors ---------------------------------------------------------------
     door_kind: str = "bump"  # "bump" (hidden, opens after tries) | "open"

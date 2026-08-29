@@ -41,7 +41,7 @@
       "description": "One record per pinned environment id.",
       "contentUrl": "https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/manifest.csv",
       "encodingFormat": "text/csv",
-      "sha256": "584470d04d3fba788939297be08cf9a57b44bf1697bea8ab442ea266aa866851"
+      "sha256": "1953f763968985e458d96d401d03a1ebdde042be5280fa62485cf2396c699738"
     },
     {
       "@type": "cr:FileObject",

@@ -45,6 +45,29 @@ _ECC_HORIZON = 60
 #: million-step study on it costs more than the point it makes.
 _ECC_SIZES = {2: 60, 3: 60, 4: 80, 5: 100, 6: 120, 8: 150, 10: 180}
 
+#: OpenFieldChamberCount's episode budget. Fixed at EnlargedChamber-
+#: Count's so the two families are read against each other: same
+#: horizon, same door guarantee, and the only thing that changes is
+#: whether the world's edge is somewhere the agent can get to.
+_OFCC_HORIZON = 60
+
+#: k -> ring radius. The chambers sit evenly by angle on this ring, so
+#: the arc between neighbours is 2*R*sin(pi/k) and the radius has to
+#: grow with k to keep consecutive doors more than a horizon apart --
+#: the same guarantee EnlargedChamberCount makes, stated on a circle.
+#: Rejection still enforces it; these values only make the enforcement
+#: likely to succeed rather than spin.
+_OFCC_RINGS = {2: 40, 3: 45, 4: 50, 5: 55, 6: 65, 8: 85, 10: 105}
+
+#: Free cells between the ring and the wall, on every side. This is the
+#: whole point of the family, and it is a measured quantity rather than
+#: a taste: it must exceed the furthest any method gets from the start
+#: inside the step budget, so that the boundary is never reached and
+#: cannot be followed from one chamber to the next. Measured in
+#: EnlargedChamberCount, every arm is pinned against the wall by 500k
+#: of a 1M budget -- which is what this family exists to prevent.
+_OFCC_MARGIN = 200
+
 #: Chamber counts EpicChase is registered at.
 #:
 #: A sweep rather than two points, because the family exists to
@@ -127,6 +150,24 @@ def _build_registry() -> dict:
             side, n_chambers=k, chamber_placement="perimeter",
             placement_jitter=4, start_placement="center",
             min_door_distance=_ECC_HORIZON + 1))
+    # OpenFieldChamberCount: EnlargedChamberCount with the wall moved
+    # out of reach. The k chambers ride a ring about the start rather
+    # than the world's perimeter, and _OFCC_MARGIN cells of open floor
+    # sit between that ring and the boundary.
+    #
+    # The point is what it removes. When chambers sit on the perimeter,
+    # a method that finds the wall can follow it from one chamber to the
+    # next, and the score partly measures how efficiently it sweeps a
+    # boundary. Here the boundary is never reached, so the only
+    # exploitable structure is the ring the agent has itself encircled
+    # -- which is the thing a topological signal claims to see.
+    for k, radius in _OFCC_RINGS.items():
+        side = 2 * (radius + _OFCC_MARGIN)
+        add(f"OpenFieldChamberCount{k}-{side}", _open_cfg(
+            side, n_chambers=k, chamber_placement="around",
+            ring_radius=radius, placement_jitter=4,
+            start_placement="center",
+            min_door_distance=_OFCC_HORIZON + 1))
     # Decoys: one chamber among k sealed decoys.
     for k in (0, 1, 2, 4, 8):
         add(f"Decoys{k}-50", _open_cfg(
@@ -187,6 +228,15 @@ EXTRA_KWARGS: dict = {
     for name in REGISTRY
     if name.startswith("EpicChase")
 }
+#: OpenFieldChamberCount takes the same fixed budget, so that a result
+#: on it and one on EnlargedChamberCount differ in the boundary and in
+#: nothing else.
+EXTRA_KWARGS.update({
+    name: {"max_steps": _OFCC_HORIZON}
+    for name in REGISTRY
+    if name.startswith("OpenFieldChamberCount")
+})
+
 #: EnlargedChamberCount inverts it the same way, and more strictly: the
 #: budget is fixed at _ECC_HORIZON for every k, and generation
 #: guarantees the doors sit further apart than that. Deriving the
@@ -288,8 +338,14 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
         extras += f"-br{cfg.braid}"
 
     placement = ""
-    placement += {"center": "-ctr", "perimeter": "-per"}.get(
-        cfg.chamber_placement, "")
+    placement += {"center": "-ctr", "perimeter": "-per",
+                  "around": "-rng"}.get(cfg.chamber_placement, "")
+    # A ring pinned to the world edge and one held at a fixed radius are
+    # different specimens even at equal size, so the radius is part of
+    # the key whenever it is not the historical fit-the-margin default.
+    if cfg.ring_radius and (cfg.chamber_placement == "around"
+                            or cfg.decoy_placement == "around"):
+        placement += f"-rr{cfg.ring_radius}"
     placement += "-ring" if cfg.decoy_placement == "around" else ""
     placement += {"bottom_left": "-bl", "center": "-sc"}.get(
         cfg.start_placement, "")

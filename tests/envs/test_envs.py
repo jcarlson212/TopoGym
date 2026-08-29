@@ -395,27 +395,53 @@ def test_episode_length_is_predetermined():
 
 
 def test_every_registry_goal_is_reachable_with_buffer():
-    """No environment may ship a goal the horizon cannot accommodate:
-    every layout leaves at least the slack factor of room.
+    """No rostered environment may ship a goal the horizon cannot
+    accommodate: every layout leaves at least the slack factor of room.
 
-    EpicChase is the deliberate exception -- its goal is meant to sit
-    several episodes away -- and carries its own, stricter invariant in
-    ``test_epic_chase_*`` instead of an exemption on trust."""
-    from topogym import registry
+    The standalone families are exempt, because they exist to put the
+    goal beyond one episode. The exemption is by declaration rather
+    than by ``style == "spiral"``, which is what it used to test and
+    which silently stopped covering EnlargedChamberCount the day that
+    family was added.
+
+    Exemption is not blanket trust: a standalone family must actually
+    reach the regime it claims, so at least one member of each has to
+    put the goal beyond a single episode. It is per family and not per
+    member on purpose -- these are k-sweeps that begin in the easy
+    regime and scale out of it, and their small-k members really are
+    one-episode reachable (EpicChase's goal rides at depth 151 against
+    a 180-step horizon until k=8). The sweep is the point; the claim
+    is about where it ends up.
+    """
+    from topogym import benchmarks, registry
     from topogym.envs.core import HORIZON_SLACK
 
+    beyond: dict = {}
     for env_id in registry.registry_ids():
         env = gym.make(env_id, seed=0).unwrapped
         env.reset(seed=0)
-        if getattr(env.layout.metadata, "style", None) == "spiral":
-            env.close()
-            continue
         optimal = env.optimal_actions()
         if optimal is None:
             assert not env.goal_exists or env.layout.goal is None
+            env.close()
             continue
-        assert optimal * HORIZON_SLACK <= env._max_steps, env_id
+        # Not registry._normalize: the Top slice is registered by its
+        # own mechanism and is absent from REGISTRY, so a lookup there
+        # raises on ids this loop legitimately visits.
+        name = env_id.removeprefix("TopoGym/").removesuffix("-v0")
+        if benchmarks.is_standalone(name):
+            family = benchmarks.family_of(name)
+            beyond[family] = beyond.get(family, False) or (
+                optimal > env._max_steps)
+        else:
+            assert optimal * HORIZON_SLACK <= env._max_steps, env_id
         env.close()
+
+    assert beyond, "no standalone family was seen"
+    for family, reached in sorted(beyond.items()):
+        assert reached, (
+            f"{family} is declared standalone for putting its goal "
+            f"beyond one episode, but no member of it does")
 
 
 def test_teleport_reset():

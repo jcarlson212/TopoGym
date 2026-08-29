@@ -63,6 +63,11 @@ benchmarks/**/private/
 # tree committed without them records only the control.
 !benchmarks/ecc/private/
 !benchmarks/ecc/private/**
+# OpenFieldChamberCount is the third of the same lineage -- the same
+# guarantee with the boundary moved out of reach -- and its arms live
+# under private/ for the same reason.
+!benchmarks/ofcc/private/
+!benchmarks/ofcc/private/**
 benchmarks/private/
 runs/**/private/
 runs/private/

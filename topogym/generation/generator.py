@@ -312,12 +312,20 @@ def _perimeter_target(w: int, h: int, bw: int, bh: int, index: int,
 
 
 def _ring_target(w: int, h: int, bw: int, bh: int, index: int,
-                 count: int, margin: int) -> tuple:
+                 count: int, margin: int, radius: int = 0) -> tuple:
     """Bounding-box top-left for the ``index``-th of ``count`` features
     evenly spaced by angle on a ring about the grid center, starting due
-    north and going clockwise. The radius is the largest that keeps every
-    feature inside the margin, which also clears a centered chamber."""
-    radius = min(w, h) / 2 - max(bw, bh) / 2 - margin
+    north and going clockwise.
+
+    ``radius`` of zero asks for the largest ring that keeps every feature
+    inside the margin, which also clears a centered chamber. A positive
+    ``radius`` is used as given -- clamped to what fits, so an oversized
+    request degrades to the old behaviour rather than placing features
+    out of bounds -- which is what lets the ring stay fixed while the
+    world around it grows.
+    """
+    fits = min(w, h) / 2 - max(bw, bh) / 2 - margin
+    radius = min(radius, fits) if radius > 0 else fits
     if radius <= 0 or count <= 0:
         return (w - bw) // 2, (h - bh) // 2
     theta = 2 * math.pi * index / count
@@ -356,7 +364,8 @@ def _policy_anchor(cfg: TopoGenConfig2D, base: BaseMap2D,
     elif policy == "perimeter":
         target = _perimeter_target(w, h, bw, bh, index, count, margin)
     elif policy == "around":
-        target = _ring_target(w, h, bw, bh, index, count, margin)
+        target = _ring_target(w, h, bw, bh, index, count, margin,
+                              cfg.ring_radius)
     else:
         raise GenerationError(f"unknown placement policy {policy!r}")
     if cfg.placement_jitter:
