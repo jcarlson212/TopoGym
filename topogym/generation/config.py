@@ -86,6 +86,19 @@ class TopoGenConfig2D:
     #: never seen, and only the structure the agent has encircled is
     #: there to be exploited.
     ring_radius: int = 0
+    #: Mark every chamber door with the door texture slot, the way the
+    #: Texture scenarios do. Off leaves a world with no local signal at
+    #: all, which is what the chamber-count families were built as: the
+    #: only thing telling an agent a door is there is having walked
+    #: into it. On makes "this cell is a door" observable, so a method
+    #: carrying a door-gated score has something to read.
+    #:
+    #: It is a separate specimen rather than a setting, because it
+    #: changes what the family measures -- topology alone becomes
+    #: topology plus a local cue -- and both questions are worth
+    #: asking. Applied after generation, so a textured world and its
+    #: plain twin share a layout cell for cell.
+    door_textures: bool = False
 
     # -- doors ---------------------------------------------------------------
     door_kind: str = "bump"  # "bump" (hidden, opens after tries) | "open"

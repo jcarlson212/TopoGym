@@ -86,6 +86,14 @@ DEFAULT_BENCHMARK: str = _ROSTER["default"]
 #: meaningful once deliberate omissions exist.
 STANDALONE: dict = _ROSTER.get("standalone", {})
 
+#: Study directories under ``benchmarks/``. A study is not a benchmark
+#: version -- fixed worlds and a step budget rather than a hold-out
+#: sweep -- so it is filed beside the versions rather than inside one.
+#: Declared here rather than listed in the test that enforces it,
+#: because that list went stale twice without anyone noticing: the
+#: commit gate tolerates 10% failures, and two studies sat in it.
+STUDIES: dict = _ROSTER.get("studies", {})
+
 
 def is_standalone(name: str) -> bool:
     """Whether ``name`` belongs to a family declared registry-only."""

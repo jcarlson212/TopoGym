@@ -30,6 +30,13 @@
     "EnlargedChamberCount": "Breaks the property every rostered family holds: that the goal lies within one episode horizon L of the start, so a policy alone can reach it. Here the goal sits beyond L, so only a method that chains episodes through an archive can ever arrive, and a policy-only baseline scores zero by construction rather than by being bad. That makes these instruments for archival methods specifically -- niche, and without a roster home. EnlargedChamberCount does the same without the spiral: door separation is guaranteed at generation time, which isolates the chamber count from the corridor depth it is confounded with in EpicChase, at the cost of a world that grows with k.",
     "OpenFieldChamberCount": "Breaks the property every rostered family holds: that the goal lies within one episode horizon L of the start, so a policy alone can reach it. Here the goal sits beyond L, so only a method that chains episodes through an archive can ever arrive, and a policy-only baseline scores zero by construction rather than by being bad. That makes these instruments for archival methods specifically -- niche, and without a roster home. OpenFieldChamberCount keeps EnlargedChamberCount's guaranteed door separation but moves the chambers off the world's perimeter onto a ring about the start, with open floor between that ring and the boundary. It exists because of a measurement: in EnlargedChamberCount every method is pinned against the wall by half its step budget, after which the boundary is a rail leading from one chamber to the next, so the score partly measures boundary sweeping. Here the wall is never reached and the only exploitable structure is the ring the agent has itself encircled."
   },
+  "studies": {
+    "single_layout": "One world, a long budget, every algorithm -- the question Go-Explore was designed for, which the hold-out protocol answers least well.",
+    "epicchase": "The EpicChase k-sweep: chambers an episode apart along a spiral, 30 method seeds at the k the dichotomy turns on.",
+    "epicchase_grid": "The chamber-grid companion to epicchase, re-run at a fine step stride so a chamber entry can be placed on the budget axis. Its own tree because the stride, not the world, is what differs.",
+    "ecc": "The EnlargedChamberCount k-sweep: the same claim with the door separation guaranteed instead of incidental, so chamber count is not confounded with corridor depth.",
+    "ofcc": "The OpenFieldChamberCount k-sweep: the same guarantee with the world's boundary moved beyond reach, so a method cannot follow a wall from one chamber to the next."
+  },
   "default": "gridworld2d-v1",
   "benchmarks": {
     "gridworld2d-v1": {

@@ -418,6 +418,16 @@ def test_every_registry_goal_is_reachable_with_buffer():
 
     beyond: dict = {}
     for env_id in registry.registry_ids():
+        # A door-textured twin is its plain original cell for cell --
+        # the marking runs after generation and moves nothing -- so its
+        # optimal route and horizon are the original's by construction.
+        # Generating both would double this test's cost to re-derive a
+        # number we already have; test_door_texture_twins.py is what
+        # holds the twins to that identity.
+        plain = registry.REGISTRY.get(
+            env_id.removeprefix("TopoGym/").removesuffix("-v0"))
+        if plain is not None and plain.door_textures:
+            continue
         env = gym.make(env_id, seed=0).unwrapped
         env.reset(seed=0)
         optimal = env.optimal_actions()

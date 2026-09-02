@@ -27,7 +27,7 @@ from typing import Callable
 import numpy as np
 
 from topogym.core.basemap import BaseMap2D, BaseMapInfo, make_base_map_2d
-from topogym.core.constants import DOOR, GOAL, HOLE, WALL
+from topogym.core.constants import DOOR, GOAL, HOLE, TEX_DOOR, WALL
 from topogym.core.homology import analyze_2d
 from topogym.core.metadata import TopologyMetadata, homology_strings
 from topogym.generation import controls, modes, rooms, shapes
@@ -151,6 +151,22 @@ def _solve_target_2d(cfg: TopoGenConfig2D, base_info: BaseMapInfo,
 _PRESETS_2D = {"annulus": "square", "x_holes": "square"}
 
 
+def _apply_door_textures(layout: Layout) -> None:
+    """Mark every door cell with the door texture slot.
+
+    Applied after the layout is built and its metadata finalized, so it
+    consumes no randomness and moves nothing: a textured world and its
+    plain twin agree cell for cell, and differ only in what is
+    observable at a door. Existing slots on a cell are preserved, since
+    a scenario may already have marked it.
+    """
+    textures = dict(layout.extras.get("textures") or {})
+    for cell in sorted(layout.doors):
+        textures[cell] = tuple(
+            sorted(set(textures.get(cell, ())) | {TEX_DOOR}))
+    layout.extras = {**(layout.extras or {}), "textures": textures}
+
+
 def generate_2d(cfg: TopoGenConfig2D, seed: int) -> Layout:
     rng = np.random.default_rng(seed)
     last_error = None
@@ -158,6 +174,8 @@ def generate_2d(cfg: TopoGenConfig2D, seed: int) -> Layout:
         try:
             layout = _attempt_2d(cfg, rng)
             layout.metadata = _finalize_metadata(cfg, layout, seed)
+            if cfg.door_textures:
+                _apply_door_textures(layout)
         except _RetryAttempt as exc:
             last_error = exc
             continue

@@ -25,6 +25,7 @@ registry ids are aliases for canonical strings.
 from __future__ import annotations
 
 import dataclasses
+import re
 
 from topogym.generation.config import TopoGenConfig2D
 from topogym.generation.modes import spiral_side
@@ -215,8 +216,31 @@ def _build_registry() -> dict:
     return entries
 
 
+#: The three standalone chamber families, and their textured twins.
+#: A twin is the same configuration with the door slot switched on, so
+#: it is the same world cell for cell and differs only in whether "this
+#: is a door" is observable. Built by copying rather than by repeating
+#: the definitions, because a twin that drifted from its original would
+#: silently stop being a controlled comparison.
+_DOOR_TWIN_FAMILIES = ("EpicChase", "EnlargedChamberCount",
+                       "OpenFieldChamberCount")
+
+
+def _add_door_twins(entries: dict) -> None:
+    for name in [n for n in list(entries)
+                 if n.startswith(_DOOR_TWIN_FAMILIES)]:
+        match = re.match(r"([A-Za-z]+?)(\d+-\d+)$", name)
+        if not match:
+            continue
+        family, rest = match.groups()
+        entries[f"{family}Doors{rest}"] = dataclasses.replace(
+            entries[name], door_textures=True)
+
+
+
 #: name -> frozen generator configuration (the registry itself).
 REGISTRY: dict = _build_registry()
+_add_door_twins(REGISTRY)
 
 #: name -> extra ``gym.make`` kwargs. The horizon is normally derived
 #: from the layout (side length, or slack over the optimal path), but
@@ -347,6 +371,9 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
                             or cfg.decoy_placement == "around"):
         placement += f"-rr{cfg.ring_radius}"
     placement += "-ring" if cfg.decoy_placement == "around" else ""
+    # A textured twin shares every other field with its plain original,
+    # so without this the two would reproduce to the same key.
+    placement += "-dtex" if cfg.door_textures else ""
     placement += {"bottom_left": "-bl", "center": "-sc"}.get(
         cfg.start_placement, "")
     placement += f"-j{cfg.placement_jitter}" if cfg.placement_jitter else ""
