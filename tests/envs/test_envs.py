@@ -1,5 +1,7 @@
 """Gymnasium API compliance and door mechanics."""
 
+import re
+
 import gymnasium as gym
 import numpy as np
 import pytest
@@ -646,7 +648,11 @@ def test_epic_chase_admits_exactly_one_new_chamber_per_episode(env_id, seed):
     env.reset(seed=seed)
     budget = env._max_steps
     chambers = _epic_chambers(env)
-    assert len(chambers) == int(env_id.split("EpicChase")[1].split("-")[0])
+    # The Doors twins share the family name with a texture suffix, so
+    # the chamber count is the first number after the family, not the
+    # first thing after it.
+    assert len(chambers) == int(
+        re.search(r"EpicChase(?:Doors)?(\d+)-", env_id).group(1))
 
     first = chambers[0][1]
     assert first <= budget, f"chamber 1 unreachable: {first} > {budget}"

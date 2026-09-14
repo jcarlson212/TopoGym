@@ -327,8 +327,8 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
                      p_slip: float = 0.0) -> str:
     """The canonical configuration string: the run-log key.
 
-    ``TG-GridWorld2D-S{size}-C{c}-D{d}-cs{n}-ds{n}-sep{n}-shp{..}-{mode}
-    -slip{p}-seed{n}``
+    ``TG-GridWorld2D-S{size}-C{c}-D{d}-cs{n}-ds{n}-sep{n}-shp{..}[-mdd{n}]
+    -{mode}-slip{p}-seed{n}``
     """
     size = cfg.size if isinstance(cfg.size, int) else max(cfg.size)
     shp = SHAPE_CODES.get(cfg.chamber_shape, "Sq")
@@ -360,6 +360,11 @@ def canonical_string(cfg: TopoGenConfig2D, seed: int,
         extras += f"-arc{cfg.spiral_arc}-sw{cfg.spiral_width}"
     if cfg.style == "maze" and getattr(cfg, "braid", 0):
         extras += f"-br{cfg.braid}"
+    # A guaranteed door separation is the defining constraint of the
+    # EnlargedChamberCount and OpenFieldChamberCount families; without
+    # it the key could not tell a guaranteed layout from a lucky one.
+    if cfg.min_door_distance > 0:
+        extras += f"-mdd{cfg.min_door_distance}"
 
     placement = ""
     placement += {"center": "-ctr", "perimeter": "-per",

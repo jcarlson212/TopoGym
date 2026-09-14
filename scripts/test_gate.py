@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Commit gate: require at least --min-pass of the unit tests to pass.
 
-    python scripts/test_gate.py --min-pass 0.9
+    python scripts/test_gate.py --min-pass 1.0
+
+The default is every test. A ratio below 1.0 exists for triage only:
+at 0.9 the gate let a 21-test regression through for days because
+21 of 815 is under the line.
 
 Runs the suite quietly and exits nonzero when the pass ratio falls
 below the threshold (or when nothing ran at all).
@@ -32,7 +36,7 @@ class _Counter:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--min-pass", type=float, default=0.9)
+    ap.add_argument("--min-pass", type=float, default=1.0)
     args = ap.parse_args()
     counter = _Counter()
     pytest.main(["-q", "--no-header", "-p", "no:cacheprovider", "tests"],

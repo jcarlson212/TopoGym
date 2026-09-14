@@ -18,8 +18,8 @@ repos:
         pass_filenames: false
         always_run: true
       - id: test-gate
-        name: unit tests (>= 90% must pass)
-        entry: python3 scripts/test_gate.py --min-pass 0.9
+        name: unit tests (all must pass)
+        entry: python3 scripts/test_gate.py --min-pass 1.0
         language: system
         pass_filenames: false
         always_run: true

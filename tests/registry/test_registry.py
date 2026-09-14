@@ -196,6 +196,19 @@ def test_canonical_string_shape():
                  "-open-slip0-seed7")
 
 
+def test_canonical_string_names_the_door_guarantee():
+    # EnlargedChamberCount's defining constraint is a guaranteed door
+    # separation; the reproduction key has to show it, and a family
+    # without the guarantee must not pick up the field at its default.
+    cfg = registry.get_config("TopoGym/EnlargedChamberCount2-60-v0")
+    assert cfg.min_door_distance > 0
+    s = registry.canonical_string(cfg, seed=0)
+    assert f"-mdd{cfg.min_door_distance}-" in s
+    plain = registry.get_config("TopoGym/ShapeCi-50-v0")
+    assert plain.min_door_distance == 0
+    assert "-mdd" not in registry.canonical_string(plain, seed=0)
+
+
 def test_manifest_rows():
     rows = registry.manifest(seed=0, ids=[
         "TopoGym/Dilution-50-v0", "TopoGym/Nested2-50-v0",
