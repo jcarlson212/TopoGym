@@ -311,6 +311,11 @@ class TrajectoryResetFactory:
 
 
 class GoExplorePhase12Baseline(PPOBaseline):
+    #: Whose tuning this arm inherits. The three archive weights are
+    #: phase 1's, and searching them again under a phase 2 objective
+    #: picks a different exploration setting -- so a comparison
+    #: between the arms would measure the tuning, not the handoff.
+    tuning_source = "go-explore-phase1"
     """Explore and archive, then robustify the best trajectory.
 
     Inherits PPO wholesale -- phase 2 *is* "an ordinary RL algorithm",
@@ -642,7 +647,12 @@ class GoExplorePhase12Baseline(PPOBaseline):
         self.bind_telemetry(telemetry_root, step_stride)
         self.apply_step_budget(step_budget, horizon)
 
-        cap = total_episodes // 2
+        # With a fixed phase 2 budget, phase 1 may use the whole step
+        # budget to find its route, exactly as the one-phase arm does;
+        # otherwise the two phases share it and phase 1 is capped at
+        # half so the split cannot starve phase 2 on every world.
+        cap = (total_episodes if self.config.phase2_steps
+               else total_episodes // 2)
         chunk = max(1, cap // 10)
         demonstration, spent = (), 0
         while spent < cap and not demonstration:
@@ -674,14 +684,40 @@ class GoExplorePhase12Baseline(PPOBaseline):
         self._demonstration = demonstration
 
         remaining = max(0, total_episodes - spent)
-        outcome = self.robustify(
-            [row], demonstration, values,
-            max(1, self.config.max_iterations), self.config.seed,
-        ) if demonstration else {
-            "stages": [], "reached_start": False,
-            "why": "phase 1 never reached the goal within its half of "
-                   "the budget",
-        }
+        # Phase 2's length is derived from a step budget, never from
+        # the iteration default: either the stated phase2_steps or
+        # what phase 1 left unspent. Under the old iteration cap a run
+        # whose phase 1 spent everything still robustified for 200
+        # iterations, and the two-phase arm quietly outspent the one
+        # it was being compared with.
+        phase2_steps = (int(self.config.phase2_steps)
+                        if self.config.phase2_steps
+                        else remaining * horizon)
+        per_iteration = int(self.steps_per_iteration() or 0)
+        phase2_iterations = (phase2_steps // per_iteration
+                             if per_iteration else 0)
+        logger.info(
+            "[%s] phase 2 budget %d steps / %d per iteration = %d "
+            "iterations (%s)", self.name, phase2_steps, per_iteration,
+            phase2_iterations,
+            "fixed" if self.config.phase2_steps else "phase 1's remainder",
+        )
+        if not demonstration:
+            outcome = {
+                "stages": [], "reached_start": False,
+                "why": "phase 1 never reached the goal within its "
+                       "budget",
+            }
+        elif phase2_iterations < 1:
+            outcome = {
+                "stages": [], "reached_start": False,
+                "why": "phase 1 left no budget for phase 2",
+            }
+        else:
+            outcome = self.robustify(
+                [row], demonstration, values, phase2_iterations,
+                self.config.seed,
+            )
 
         self.config.eval_episodes = eval_episodes
         # Evaluation measures the policy phase 2 built, so it takes no
@@ -720,6 +756,9 @@ class GoExplorePhase12Baseline(PPOBaseline):
             training={
                 "phase1_episodes": spent,
                 "phase2_episodes_available": remaining,
+                "phase2_steps": phase2_steps,
+                "phase2_iterations": phase2_iterations,
+                "tuning_inherited_from": self.tuning_source,
                 "demonstration_cells": len(demonstration),
                 **outcome,
             },

@@ -60,6 +60,12 @@ class BaselineConfig:
     #: Training iterations per candidate during hyperparameter search.
     tune_iterations: int = 2
     max_iterations: int = 200
+    #: Environment steps phase 2 of a two-phase method may spend on
+    #: robustification. None means "whatever phase 1 left of the step
+    #: budget", so the two phases together never exceed a one-phase
+    #: run; a value makes phase 2's budget fixed and stated, and lets
+    #: phase 1 explore up to the whole step budget first.
+    phase2_steps: int | None = None
     #: Consecutive validation checks without improvement before stopping.
     patience: int = 5
     val_every: int = 5

@@ -463,6 +463,77 @@ def test_a_found_route_still_leaves_phase_two_its_budget():
     assert result.training["demonstration_cells"] == len(route)
 
 
+def _budget_run(config, step_budget, spend_all=False):
+    """Run the two-phase protocol with a stubbed phase 1 and a phase 2
+    that records the iterations it was handed."""
+    from topogym.baselines.gridworld2dv1.single_layout import (
+        episodes_for,
+        layout_row,
+    )
+
+    row = layout_row("TopoGym/EpicChase8-120-v0", 0)
+    baseline = get_baseline("go-explore-phase1and2")(config)
+    total = episodes_for(step_budget, int(row["horizon"]))
+    route = ((1, 1), (1, 2), (1, 3))
+    spent, handed = [], []
+
+    def explore(rows, episodes, seed):
+        spent.append(episodes)
+        found = sum(spent) >= total if spend_all else True
+        return [], (route if found else ())
+
+    baseline.explore = explore
+    baseline.robustify = lambda rows, demo, values, iterations, seed: (
+        handed.append(iterations),
+        {"stages": [], "reached_start": True, "why": "stubbed"})[1]
+    result = baseline.single_layout_train_test_run(
+        row, step_budget=step_budget, eval_episodes=2)
+    return result, row, total, sum(spent), handed
+
+
+def test_phase_two_is_sized_by_what_phase_one_left():
+    """No iteration default: phase 2 gets the unspent steps, converted
+    at PPO's batch size, so the two phases together stay within the
+    one-phase budget they are compared against."""
+    config = BaselineConfig(seed=0, max_iterations=200,
+                            train_batch_size=1000)
+    result, row, total, spent, handed = _budget_run(config, 120_000)
+    remaining_steps = (total - spent) * int(row["horizon"])
+    assert handed == [remaining_steps // 1000]
+    assert result.training["phase2_steps"] == remaining_steps
+    assert result.training["phase2_iterations"] == handed[0]
+
+
+def test_a_phase_one_that_spends_everything_leaves_phase_two_nothing():
+    config = BaselineConfig(seed=0, max_iterations=200,
+                            train_batch_size=1000)
+    result, _, total, spent, handed = _budget_run(
+        config, 120_000, spend_all=True)
+    assert spent == total
+    assert handed == [], "phase 2 ran on a budget it did not have"
+    assert result.training["phase2_iterations"] == 0
+    assert "no budget" in result.training["why"]
+
+
+def test_a_fixed_phase_two_budget_frees_phase_one_to_use_it_all():
+    """With phase2_steps stated, phase 1 may explore up to the whole
+    step budget -- exactly the one-phase arm's allowance -- and phase
+    2's length comes from the stated figure alone."""
+    config = BaselineConfig(seed=0, max_iterations=200,
+                            train_batch_size=1000, phase2_steps=50_000)
+    result, _, total, spent, handed = _budget_run(
+        config, 120_000, spend_all=True)
+    assert spent == total, "phase 1 was capped below the budget"
+    assert handed == [50]
+    assert result.training["phase2_steps"] == 50_000
+
+
+def test_it_inherits_phase_ones_tuning():
+    cls = get_baseline("go-explore-phase1and2")
+    assert cls.tuning_source == "go-explore-phase1"
+    assert get_baseline(cls.tuning_source) is not cls
+
+
 def test_it_tunes_the_archive_grid_not_ppos():
     """Inheriting PPOBaseline's grid would search a learning rate that
     only matters once phase 1 has found a route, while leaving the

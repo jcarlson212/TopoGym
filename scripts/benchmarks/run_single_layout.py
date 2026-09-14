@@ -202,6 +202,13 @@ def tuned_hyperparameters(name: str, args) -> dict | None:
     """
     if args.no_tune:
         return None
+    # A two-phase arm inherits its phase 1 twin's tuning: same cache
+    # file, same search, so the only thing that differs between the
+    # arms is what happens after the route is found.
+    source = getattr(get_baseline(name), "tuning_source", None)
+    if source:
+        logger.info("[%s] inherits tuning from %s", name, source)
+        return tuned_hyperparameters(source, args)
     tune_steps = args.plan.for_split("tune").steps
     if args.tune_split:
         # "lex1" names the ranking semantics (the lexicographic
@@ -250,6 +257,7 @@ def _config(args) -> BaselineConfig:
         num_envs_per_runner=args.envs_per_runner,
         eval_workers=1,  # one layout: nothing to shard across
         max_iterations=args.max_iterations,
+        phase2_steps=args.phase2_steps,
         # A single layout is the whole training set, so the contiguous
         # run on it *is* the run -- an archive has nowhere else to
         # accumulate.
@@ -556,6 +564,10 @@ def main() -> int:
     parser.add_argument("--num-env-runners", type=int, default=8)
     parser.add_argument("--envs-per-runner", type=int, default=4)
     parser.add_argument("--max-iterations", type=int, default=200)
+    parser.add_argument("--phase2-steps", type=int, default=None,
+                        help="fixed step budget for phase 2 of a "
+                             "two-phase method; default: whatever "
+                             "phase 1 left of --steps")
     parser.add_argument("--train-chunk", type=int, default=50,
                         help="consecutive training episodes per visit "
                              "to the layout")
