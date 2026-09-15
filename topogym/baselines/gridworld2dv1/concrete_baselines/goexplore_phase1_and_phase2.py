@@ -85,7 +85,21 @@ BACKUP_STRIDE = 8
 #: start from. Sampling rather than fixing the restart cell is the
 #: diversity term of Algorithm 1; without it a stage learns one
 #: position rather than a stretch of the trajectory.
-LOCAL_START_WINDOW = 4
+#:
+#: It also has to be wider than the retreat, and that is what makes
+#: the curriculum a curriculum: when tau moves back, the new window
+#: must still contain starts the policy already finishes from, so the
+#: batch keeps earning reward while the new prefix is learned. At a
+#: window of 4 and a retreat of 13, consecutive windows did not touch;
+#: a stage whose all-new starts sat off the policy's learned heading
+#: earned nothing, and with nothing to reinforce it stayed at zero for
+#: 196 iterations, 61 cells from a goal it reached at 100% from 48.
+LOCAL_START_WINDOW = 24
+
+#: The most tau retreats in one pass: half the window, so that at
+#: least half of every stage's starts were mastered in the stage
+#: before it.
+MAX_RETREAT = LOCAL_START_WINDOW // 2
 
 #: Salimans and Chen also prime the policy by replaying K demonstration
 #: actions before each rollout, with those steps masked out of the
@@ -601,7 +615,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
             # an easy pass earns a longer retreat, a bare one a shorter.
             retreat = max(1, round(BACKUP_STRIDE * success
                                    / max(SUCCESS_THRESHOLD, 1e-9)))
-            tau = max(0, tau - min(retreat, 4 * BACKUP_STRIDE))
+            tau = max(0, tau - min(retreat, MAX_RETREAT))
             stage += 1
         return {"stages": log, "reached_start": reached_start,
                 "iterations_budget": max(0, int(iterations)),

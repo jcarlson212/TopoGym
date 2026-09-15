@@ -369,14 +369,15 @@ def test_each_stage_samples_a_local_start_from_a_window():
     )
 
     baseline = get_baseline("go-explore-phase1and2")()
-    demonstration = tuple((i, 0) for i in range(30))
+    demonstration = tuple((i, 0) for i in range(3 * LOCAL_START_WINDOW))
+    tau = 2 * LOCAL_START_WINDOW
 
-    window = baseline.local_starts(demonstration, 20)
-    assert window[-1] == demonstration[20]         # tau itself
+    window = baseline.local_starts(demonstration, tau)
+    assert window[-1] == demonstration[tau]         # tau itself
     assert len(window) == LOCAL_START_WINDOW + 1
     # Only ever backward: never a position the curriculum has not
     # reached, which would leak progress it has not earned.
-    assert all(cell in demonstration[:21] for cell in window)
+    assert all(cell in demonstration[:tau + 1] for cell in window)
 
 
 def test_the_window_is_clipped_at_the_start_of_the_demonstration():
@@ -641,6 +642,29 @@ def test_the_curriculum_budget_is_one_pool_not_a_per_stage_ration():
     assert outcome["iterations_used"] == sum(s["iterations"] for s in stages)
     assert outcome["iterations_used"] <= outcome["iterations_budget"]
     assert built == len(stages)
+
+
+def test_consecutive_stage_windows_overlap_by_at_least_half():
+    """The new window must contain starts the policy already finishes
+    from, or a stage can earn no reward at all and never learn: the
+    retreat is capped at half the window."""
+    from topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1_and_phase2 import (  # noqa: E501
+        LOCAL_START_WINDOW,
+        MAX_RETREAT,
+    )
+
+    assert MAX_RETREAT * 2 <= LOCAL_START_WINDOW
+    outcome, _ = _curriculum([1.0] * 40, iterations=40, route_len=120)
+    assert outcome["reached_start"]
+    windows = [set(map(tuple, s["start_window"]))
+               for s in outcome["stages"]]
+    assert len(windows) >= 5
+    for before, after in zip(windows, windows[1:]):
+        # The last window is clipped at the layout start and may be a
+        # single cell; it still has to be one the stage before ran.
+        assert len(before & after) >= min(LOCAL_START_WINDOW // 2,
+                                          len(after)), (
+            "a stage started with no mastered start in its window")
 
 
 def test_the_curriculum_stops_when_the_pool_runs_dry_and_says_so():
