@@ -35,7 +35,8 @@
     "epicchase": "The EpicChase k-sweep: chambers an episode apart along a spiral, 30 method seeds at the k the dichotomy turns on.",
     "epicchase_grid": "The chamber-grid companion to epicchase, re-run at a fine step stride so a chamber entry can be placed on the budget axis. Its own tree because the stride, not the world, is what differs.",
     "ecc": "The EnlargedChamberCount k-sweep: the same claim with the door separation guaranteed instead of incidental, so chamber count is not confounded with corridor depth.",
-    "ofcc": "The OpenFieldChamberCount k-sweep: the same guarantee with the world's boundary moved beyond reach, so a method cannot follow a wall from one chamber to the next."
+    "ofcc": "The OpenFieldChamberCount k-sweep: the same guarantee with the world's boundary moved beyond reach, so a method cannot follow a wall from one chamber to the next.",
+    "ofcc-phase2": "Phase 2 on the open field at k=6: the same exploration as ofcc, then robustification of the route it found into a policy that runs from the start -- the study that gives an archive method a frozen-evaluation score."
   },
   "default": "gridworld2d-v1",
   "benchmarks": {

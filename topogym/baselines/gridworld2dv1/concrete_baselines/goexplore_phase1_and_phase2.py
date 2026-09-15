@@ -465,9 +465,17 @@ class GoExplorePhase12Baseline(PPOBaseline):
         rollouts -- the paper's "same or better reward than the example
         trajectory", which under a sparse goal is simply reaching it --
         and ``tau`` then retreats at a speed set by how easily it
-        passed. A stage that exhausts its iteration budget stops the
-        curriculum and says so, rather than backing up to a position
-        the agent has not earned.
+        passed.
+
+        ``iterations`` is one budget for the whole curriculum, spent
+        stage by stage: a stage passed in one iteration leaves the rest
+        to the harder stages behind it. It used to be split evenly over
+        the planned stages, which on a route of several hundred cells
+        handed each stage one or two iterations -- and the curriculum
+        stopped at the first stage that needed three, reporting a
+        budget it had barely touched. A batch in which no episode
+        finished (``nan``) is no evidence either way and does not end
+        a stage; only the budget does.
         """
         from topogym.baselines.gridworld2dv1.concrete_baselines.ppo import (
             mean_return,
@@ -477,14 +485,13 @@ class GoExplorePhase12Baseline(PPOBaseline):
             return {"stages": [], "reached_start": False,
                     "why": "no goal trajectory to robustify"}
 
-        planned = max(1, len(self.backward_stages(demonstration)))
-        per_stage = max(1, iterations // planned)
+        pool = max(0, int(iterations))
         log: list = []
         tau = len(demonstration) - 1
         reached_start = False
         stage = 0
         carried_state = None
-        while tau >= 0:
+        while tau >= 0 and pool > 0:
             window = self.local_starts(demonstration, tau)
             config = self.algorithm_config(rows, values, seed + stage)
             config.env_config["start_cells"] = [tuple(c) for c in window]
@@ -503,10 +510,12 @@ class GoExplorePhase12Baseline(PPOBaseline):
                 algorithm.learner_group.set_state(carried_state)
                 algorithm.env_runner_group.sync_weights(
                     from_worker_or_learner_group=algorithm.learner_group)
-            success, iteration = 0.0, 0
+            success, used = float("nan"), 0
             try:
-                for iteration in range(1, per_stage + 1):
+                while pool > 0:
                     success = mean_return(algorithm.train())
+                    pool -= 1
+                    used += 1
                     if success >= SUCCESS_THRESHOLD:
                         break
                 carried_state = algorithm.learner_group.get_state()
@@ -523,15 +532,15 @@ class GoExplorePhase12Baseline(PPOBaseline):
                 "stage": stage, "tau": tau,
                 "start_window": [list(c) for c in window],
                 "cells_from_goal": len(demonstration) - 1 - tau,
-                "iterations": iteration, "success_rate": success,
+                "iterations": used, "success_rate": success,
                 "passed": passed,
             })
             logger.info(
                 "[%s] phase 2 stage %d at tau=%d (%d from the goal), "
-                "window of %d: %.2f after %d iterations (%s)",
+                "window of %d: %.2f after %d iterations (%s; %d left)",
                 self.name, stage + 1, tau, len(demonstration) - 1 - tau,
-                len(window), success, iteration,
-                "passed" if passed else "budget exhausted",
+                len(window), success, used,
+                "passed" if passed else "budget exhausted", pool,
             )
             if not passed:
                 # Backing up to a position the agent has not earned
@@ -547,6 +556,8 @@ class GoExplorePhase12Baseline(PPOBaseline):
             tau = max(0, tau - min(retreat, 4 * BACKUP_STRIDE))
             stage += 1
         return {"stages": log, "reached_start": reached_start,
+                "iterations_budget": max(0, int(iterations)),
+                "iterations_used": max(0, int(iterations)) - pool,
                 "why": ("robustified all the way to the start"
                         if reached_start else
                         "curriculum stopped before the layout's start")}

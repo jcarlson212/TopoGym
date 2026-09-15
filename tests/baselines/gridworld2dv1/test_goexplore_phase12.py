@@ -528,6 +528,90 @@ def test_a_fixed_phase_two_budget_frees_phase_one_to_use_it_all():
     assert result.training["phase2_steps"] == 50_000
 
 
+class _FakeAlgorithm:
+    """Stands in for an RLlib algorithm: train() returns preset
+    success rates in order, everything else is a no-op."""
+
+    def __init__(self, successes):
+        self._successes = list(successes)
+
+        class _Group:
+            def get_state(self_inner):
+                return {"weights": 1}
+
+            def set_state(self_inner, state):
+                pass
+
+            def sync_weights(self_inner, **kwargs):
+                pass
+
+        self.learner_group = _Group()
+        self.env_runner_group = _Group()
+
+    def train(self):
+        value = self._successes.pop(0) if self._successes else 1.0
+        return {"env_runners": {"episode_return_mean": value}}
+
+    def stop(self):
+        pass
+
+
+def _curriculum(successes, iterations, route_len=40):
+    """Run robustify with a fake learner; return its outcome and the
+    number of algorithms built (one per stage)."""
+    baseline = get_baseline("go-explore-phase1and2")(BaselineConfig(seed=0))
+    algorithm = _FakeAlgorithm(successes)
+    built = []
+
+    class _Config:
+        env_config: dict = {}
+
+        def build_algo(self):
+            built.append(1)
+            return algorithm
+
+    baseline.algorithm_config = lambda rows, values, seed: _Config()
+    baseline._checkpoint = lambda: None
+    demonstration = tuple((i, 0) for i in range(route_len))
+    return baseline.robustify([], demonstration, {}, iterations), len(built)
+
+
+def test_the_curriculum_budget_is_one_pool_not_a_per_stage_ration():
+    """A stage passed in one iteration leaves its share to the stages
+    behind it. Under the old even split a 40-cell route with 6
+    iterations gave each of its 6 stages one, and the first stage that
+    needed two ended the curriculum."""
+    # Stage 1 passes at once; stage 2 needs three iterations; the rest
+    # pass at once again.
+    outcome, built = _curriculum(
+        [1.0, 0.0, 0.2, 1.0, 1.0, 1.0, 1.0, 1.0], iterations=12)
+    assert outcome["reached_start"], outcome["why"]
+    stages = outcome["stages"]
+    assert stages[1]["iterations"] == 3
+    assert outcome["iterations_used"] == sum(s["iterations"] for s in stages)
+    assert outcome["iterations_used"] <= outcome["iterations_budget"]
+    assert built == len(stages)
+
+
+def test_the_curriculum_stops_when_the_pool_runs_dry_and_says_so():
+    outcome, _ = _curriculum([1.0, 0.0, 0.0, 0.0, 0.0], iterations=4)
+    assert not outcome["reached_start"]
+    assert outcome["iterations_used"] == 4
+    assert outcome["stages"][-1]["passed"] is False
+    assert outcome["why"].startswith("curriculum stopped")
+
+
+def test_a_batch_with_no_finished_episode_does_not_end_a_stage():
+    """nan is 'no episode finished in this batch', which is common on
+    a long horizon and is not a failed stage."""
+    nan = float("nan")
+    outcome, _ = _curriculum([nan, nan, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                             iterations=20)
+    assert outcome["stages"][0]["iterations"] == 3
+    assert outcome["stages"][0]["passed"] is True
+    assert outcome["reached_start"]
+
+
 def test_it_inherits_phase_ones_tuning():
     cls = get_baseline("go-explore-phase1and2")
     assert cls.tuning_source == "go-explore-phase1"
