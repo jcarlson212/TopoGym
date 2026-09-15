@@ -274,6 +274,35 @@ def test_a_route_resumed_from_a_cell_with_no_route_stands_alone():
 
 # -- TrajectoryArchive: choosing the demonstration --------------------
 
+def test_a_goal_route_that_does_not_begin_at_the_start_is_not_a_demonstration():
+    """A segment from an archive restart may reach the goal, and may
+    even be the shortest goal route in the archive; it is still not
+    something a policy can be trained to run from the start."""
+    archive = TrajectoryArchive({}, seed=0, adjacency={})
+    rooted = ((0, 0), (1, 0), (2, 0), (3, 0), (4, 0))
+    archive.observe(set(rooted), trajectory=rooted, reached_goal=True)
+    segment = ((7, 7), (4, 0))
+    archive.observe(set(segment), chosen_from=(7, 7), trajectory=segment,
+                    reached_goal=True)
+    # The shorter segment does not displace the rooted route to the
+    # goal cell, and the start filter refuses what is left unrooted.
+    assert archive.cells[(4, 0)]["trajectory"] == rooted
+    assert archive.best_goal_trajectory(start=(0, 0)) == rooted
+    assert archive.best_goal_trajectory(start=(9, 9)) == ()
+
+
+def test_a_rooted_route_replaces_an_unrooted_one_whatever_its_length():
+    archive = TrajectoryArchive({}, seed=0, adjacency={})
+    archive.observe({(7, 7)}, trajectory=())
+    segment = ((7, 7), (8, 7))
+    archive.observe(set(segment), chosen_from=(7, 7), trajectory=segment)
+    assert archive.cells[(8, 7)]["rooted"] is False
+    long_way = tuple((i, 7) for i in range(9))
+    archive.observe(set(long_way), trajectory=long_way)
+    assert archive.cells[(8, 7)]["trajectory"] == long_way
+    assert archive.cells[(8, 7)]["rooted"] is True
+
+
 def test_the_shortest_of_several_goal_routes_wins():
     """A shorter demonstration is a shorter curriculum, and phase 2
     pays one training stage per stride along it."""

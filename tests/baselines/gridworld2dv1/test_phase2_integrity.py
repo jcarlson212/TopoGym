@@ -70,9 +70,14 @@ def test_chunked_exploration_roots_every_route_at_the_start():
         session = baseline.phase1_probe()
         start = tuple(env.unwrapped.layout.start)
         routes = [entry["trajectory"]
-                  for entry in session.archive.cells.values()
-                  if entry.get("trajectory")]
+                  for entry in session.archive.cells.values()]
         assert routes, "exploration stored no routes at all"
+        # Every cell, not just the ones that happen to have a route:
+        # the cell an episode ended on used to have none, and a restart
+        # chosen there began a route from nowhere.
+        unrouted = [cell for cell, entry in session.archive.cells.items()
+                    if not entry.get("trajectory")]
+        assert not unrouted, f"archive cells without a route: {unrouted}"
         assert all(tuple(route[0]) == start for route in routes)
     finally:
         env.close()

@@ -128,9 +128,17 @@ class TrajectoryArchive(LayoutArchive):
         if not trajectory:
             return count
         prefix = ()
+        # A route is rooted when it begins at the layout start: an
+        # episode from the start, or one resumed at a cell whose own
+        # route is rooted. A segment resumed at a cell with no route
+        # stands alone, and stays second-class: it never replaces a
+        # rooted route, however much shorter, because phase 2 can only
+        # robustify a route back to where evaluation starts from.
+        rooted = chosen_from is None
         if chosen_from is not None:
             entry = self.cells.get(tuple(chosen_from))
             prefix = tuple(entry.get("trajectory") or ()) if entry else ()
+            rooted = bool(prefix) and bool(entry.get("rooted", True))
             # The resumed episode starts *at* the cell the prefix ends
             # on -- restoring to a point of a trajectory is being at
             # that point, not stepping to it again -- so the join must
@@ -149,8 +157,13 @@ class TrajectoryArchive(LayoutArchive):
                 continue
             route = prefix + tuple(map(tuple, trajectory[:index + 1]))
             current = entry.get("trajectory") or ()
-            if not current or len(route) < len(current):
+            current_rooted = bool(entry.get("rooted", False))
+            if (not current
+                    or (rooted and not current_rooted)
+                    or (rooted == current_rooted
+                        and len(route) < len(current))):
                 entry["trajectory"] = route
+                entry["rooted"] = rooted
         if reached_goal and trajectory:
             # The episode ended on the goal, so the last cell of the
             # path is it. Marking the cell rather than storing the
@@ -161,16 +174,27 @@ class TrajectoryArchive(LayoutArchive):
                 goal["reached_goal"] = True
         return count
 
-    def best_goal_trajectory(self) -> tuple:
+    def best_goal_trajectory(self, start: tuple | None = None) -> tuple:
         """The shortest recorded route to a goal cell, or ``()``.
 
         Phase 2 needs one demonstration, not the archive: the whole
         point is to turn a single lucky trajectory into a reliable
-        policy.
+        policy. With ``start`` given, only routes that begin there
+        qualify: a route from an archive restart is a segment, and
+        robustifying a segment back to its first cell leaves a policy
+        that has never once run from where evaluation puts it.
         """
         routes = [tuple(entry["trajectory"])
                   for entry in self.cells.values()
                   if entry.get("reached_goal") and entry.get("trajectory")]
+        if start is not None:
+            rooted = [r for r in routes if tuple(r[0]) == tuple(start)]
+            if len(rooted) < len(routes):
+                logger.warning(
+                    "%d goal route(s) do not begin at the layout start "
+                    "%s and are not demonstrations",
+                    len(routes) - len(rooted), tuple(start))
+            routes = rooted
         return min(routes, key=len) if routes else ()
 
 
@@ -192,6 +216,7 @@ class _Session:
         self.trajectory: list = []
         self.chosen_from = None
         self._layout = None
+        self.start: tuple | None = None
         self._rng = np.random.default_rng(seed)
 
     def _ensure(self, env) -> None:
@@ -206,8 +231,19 @@ class _Session:
             self.archive = TrajectoryArchive(
                 self.params, self.seed, neighbors=layout.base.neighbors)
             self._layout = fingerprint
+            self.start = tuple(layout.start)
             self.chosen_from = None
             self.trajectory = []
+
+    def _record_final_cell(self, env) -> None:
+        """Append the cell the agent stands on now, if it is new."""
+        core = getattr(env, "unwrapped", env) if env is not None else None
+        state = getattr(core, "_state", None)
+        if state is None:
+            return
+        cell = tuple(state.cell)
+        if not self.trajectory or self.trajectory[-1] != cell:
+            self.trajectory.append(cell)
 
     # -- the policy side ----------------------------------------------
 
@@ -223,15 +259,16 @@ class _Session:
     def choose_reset(self, env, info: dict):
         self._ensure(env)
         reached = bool(info.get("goal_reached"))
-        if reached:
-            # ``act`` records the cell it stands on *before* each
-            # action, so the step onto the goal is never followed by
-            # another act and the goal cell goes unrecorded. A
-            # demonstration one cell short of the goal hands phase 2 a
-            # curriculum whose first stage does not contain the reward.
-            cell = tuple(env._state.cell)
-            if not self.trajectory or self.trajectory[-1] != cell:
-                self.trajectory.append(cell)
+        # ``act`` records the cell it stands on *before* each action,
+        # so the cell an episode ends on is never followed by another
+        # act and goes unrecorded -- the goal when the episode reached
+        # it, and otherwise the frontier cell the horizon cut it off
+        # at. Both are in the archive as visited; without this neither
+        # had a route. A restart chosen at such a cell (and the
+        # frontier is exactly what selection favours) then began a
+        # route from nowhere, and phase 2 "reached the start" of a
+        # demonstration that never touched the layout's start.
+        self._record_final_cell(env)
         self.archive.observe(env._visited, self.chosen_from,
                              trajectory=tuple(self.trajectory),
                              reached_goal=reached)
@@ -262,10 +299,7 @@ class _Session:
                 and getattr(core, "_state", None) is not None
                 and core.goal_exists
                 and tuple(core._state.cell) == tuple(core.layout.goal))
-            if reached:
-                cell = tuple(core._state.cell)
-                if self.trajectory[-1] != cell:
-                    self.trajectory.append(cell)
+            self._record_final_cell(core)
             self.archive.observe(visited, self.chosen_from,
                                  trajectory=tuple(self.trajectory),
                                  reached_goal=reached)
@@ -420,7 +454,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
             step_stride=stride, split="single-train",
         )
         demonstrations = [
-            session.archive.best_goal_trajectory()
+            session.archive.best_goal_trajectory(start=session.start)
         ] if session.archive else []
         demonstrations = [d for d in demonstrations if d]
         best = min(demonstrations, key=len) if demonstrations else ()
