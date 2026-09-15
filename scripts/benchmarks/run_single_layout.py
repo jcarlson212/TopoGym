@@ -258,6 +258,7 @@ def _config(args) -> BaselineConfig:
         eval_workers=1,  # one layout: nothing to shard across
         max_iterations=args.max_iterations,
         phase2_steps=args.phase2_steps,
+        phase2_actions=args.phase2_actions,
         # A single layout is the whole training set, so the contiguous
         # run on it *is* the run -- an archive has nowhere else to
         # accumulate.
@@ -568,6 +569,11 @@ def main() -> int:
                         help="fixed step budget for phase 2 of a "
                              "two-phase method; default: whatever "
                              "phase 1 left of --steps")
+    parser.add_argument("--phase2-actions", default=None,
+                        choices=["fourway", "egocentric"],
+                        help="action space for phase 2 and for the "
+                             "evaluation of its policy; default: the "
+                             "baseline's own. Phase 1 is unaffected.")
     parser.add_argument("--train-chunk", type=int, default=50,
                         help="consecutive training episodes per visit "
                              "to the layout")

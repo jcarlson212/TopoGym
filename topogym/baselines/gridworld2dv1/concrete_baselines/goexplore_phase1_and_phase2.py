@@ -407,6 +407,20 @@ class GoExplorePhase12Baseline(PPOBaseline):
         self._demonstration: tuple = ()
         self._env = None
         self._phase2_horizon: int | None = None
+        self._phase2_active = False
+
+    def env_options(self) -> dict:
+        """Phase 1's options, and once phase 2 has begun, phase 2's.
+
+        Everything after phase 1 -- the stage environments, the frozen
+        evaluation, the GIF -- sees the same options, so the policy is
+        measured on the action space it was trained on.
+        """
+        options = dict(super().env_options())
+        actions = getattr(self.config, "phase2_actions", None)
+        if self._phase2_active and actions:
+            options["actions"] = actions
+        return options
 
     def bind_env(self, env) -> None:
         """Phase 1 explores in the study's own world, so the archive
@@ -593,6 +607,11 @@ class GoExplorePhase12Baseline(PPOBaseline):
                     finished += episodes_completed(result)
                     pool -= 1
                     used += 1
+                    logger.info(
+                        "[%s] phase 2 stage %d iter %d: success %.2f "
+                        "over %d finished episodes (%d left)",
+                        self.name, stage + 1, used, success, finished,
+                        pool)
                     if (finished >= MIN_STAGE_EPISODES
                             and success >= SUCCESS_THRESHOLD):
                         break
@@ -774,6 +793,12 @@ class GoExplorePhase12Baseline(PPOBaseline):
             if demonstration else "no route found",
         )
         self._demonstration = demonstration
+        phase1_options = self.env_options()
+        self._phase2_active = True
+        if self.env_options() != phase1_options:
+            logger.info("[%s] phase 2 and evaluation use env options %s "
+                        "(phase 1 used %s)", self.name, self.env_options(),
+                        phase1_options)
 
         remaining = max(0, total_episodes - spent)
         # Phase 2's length is derived from a step budget, never from
@@ -850,6 +875,8 @@ class GoExplorePhase12Baseline(PPOBaseline):
                 "phase2_episodes_available": remaining,
                 "phase2_steps": phase2_steps,
                 "phase2_iterations": phase2_iterations,
+                "phase1_env_options": phase1_options,
+                "phase2_env_options": self.env_options(),
                 "tuning_inherited_from": self.tuning_source,
                 "demonstration_cells": len(demonstration),
                 **outcome,

@@ -707,6 +707,21 @@ def test_a_batch_with_no_finished_episode_does_not_end_a_stage():
     assert outcome["reached_start"]
 
 
+def test_phase_two_may_act_on_a_different_action_space_than_phase_one():
+    """Phase 1 explores as it always did; from the moment phase 2
+    begins, every environment the baseline builds -- stages,
+    evaluation, GIF -- uses the phase 2 action space."""
+    baseline = get_baseline("go-explore-phase1and2")(
+        BaselineConfig(seed=0, phase2_actions="fourway"))
+    assert baseline.env_options().get("actions", "egocentric") \
+        == "egocentric"
+    baseline._phase2_active = True
+    assert baseline.env_options()["actions"] == "fourway"
+    plain = get_baseline("go-explore-phase1and2")(BaselineConfig(seed=0))
+    plain._phase2_active = True
+    assert plain.env_options().get("actions", "egocentric") == "egocentric"
+
+
 def test_it_inherits_phase_ones_tuning():
     cls = get_baseline("go-explore-phase1and2")
     assert cls.tuning_source == "go-explore-phase1"

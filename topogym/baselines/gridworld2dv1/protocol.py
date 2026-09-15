@@ -66,6 +66,16 @@ class BaselineConfig:
     #: run; a value makes phase 2's budget fixed and stated, and lets
     #: phase 1 explore up to the whole step budget first.
     phase2_steps: int | None = None
+    #: Action space for phase 2 of a two-phase method and for the
+    #: evaluation of the policy it produces: None inherits the
+    #: baseline's own (egocentric by default), "fourway" gives the
+    #: robustified policy absolute moves. The observation carries the
+    #: agent's position but not its heading, and on an open field --
+    #: no wall in the 7x7 patch -- heading is unobservable, so a
+    #: memoryless egocentric policy cannot know which way "forward"
+    #: is. Phase 1 is unaffected: the archive explores as it always
+    #: did, and a route is a list of cells whichever way it was walked.
+    phase2_actions: str | None = None
     #: Consecutive validation checks without improvement before stopping.
     patience: int = 5
     val_every: int = 5
