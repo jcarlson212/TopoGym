@@ -556,24 +556,45 @@ class _FakeAlgorithm:
         pass
 
 
-def _curriculum(successes, iterations, route_len=40):
+def _curriculum(successes, iterations, route_len=40, horizon=None,
+                configs=None):
     """Run robustify with a fake learner; return its outcome and the
     number of algorithms built (one per stage)."""
     baseline = get_baseline("go-explore-phase1and2")(BaselineConfig(seed=0))
+    baseline._phase2_horizon = horizon
     algorithm = _FakeAlgorithm(successes)
     built = []
 
     class _Config:
-        env_config: dict = {}
+        def __init__(self):
+            self.env_config = {"env_options": {"teleport": True}}
 
         def build_algo(self):
             built.append(1)
             return algorithm
 
-    baseline.algorithm_config = lambda rows, values, seed: _Config()
+    def make_config(rows, values, seed):
+        config = _Config()
+        if configs is not None:
+            configs.append(config)
+        return config
+
+    baseline.algorithm_config = make_config
     baseline._checkpoint = lambda: None
     demonstration = tuple((i, 0) for i in range(route_len))
     return baseline.robustify([], demonstration, {}, iterations), len(built)
+
+
+def test_phase_two_trains_at_the_evaluation_horizon():
+    """Phase 1's horizon is pinned below the route length by design;
+    a policy trained under it can never finish from far back."""
+    configs = []
+    _curriculum([1.0] * 10, iterations=10, horizon=310, configs=configs)
+    assert configs, "no stage was configured"
+    for config in configs:
+        assert config.env_config["env_options"]["max_steps"] == 310
+        assert config.env_config["env_options"]["teleport"] is True
+        assert config.env_config["start_cells"]
 
 
 def test_the_curriculum_budget_is_one_pool_not_a_per_stage_ration():

@@ -346,6 +346,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
         self._archive_params = dict(DEFAULTS)
         self._demonstration: tuple = ()
         self._env = None
+        self._phase2_horizon: int | None = None
 
     def bind_env(self, env) -> None:
         """Phase 1 explores in the study's own world, so the archive
@@ -496,6 +497,19 @@ class GoExplorePhase12Baseline(PPOBaseline):
             config = self.algorithm_config(rows, values, seed + stage)
             config.env_config["start_cells"] = [tuple(c) for c in window]
             config.env_config["demonstration"] = tuple(demonstration)
+            if self._phase2_horizon:
+                # Phase 1's horizon is pinned short on purpose -- one
+                # episode must not reach two chambers, which is what
+                # forces an archive. Phase 2 has no archive; its job is
+                # a policy that runs the whole route from the start,
+                # and that route is longer than the pinned horizon by
+                # construction. Train at the horizon the policy is
+                # evaluated on, or every stage further from the goal
+                # than one pinned episode is unwinnable and the
+                # curriculum spends its budget proving it.
+                options = dict(config.env_config.get("env_options") or {})
+                options["max_steps"] = int(self._phase2_horizon)
+                config.env_config["env_options"] = options
             algorithm = config.build_algo()
             if carried_state is not None:
                 # One policy, fine-tuned backward: the Backward
@@ -653,6 +667,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
         # the study's world up itself -- and forgetting to left phase
         # 1's archive stranded in an environment nobody kept.
         horizon_for_eval = eval_horizon(row)
+        self._phase2_horizon = horizon_for_eval
         env = StatsRecorder(make_instance(row, **self.env_options()))
         self.bind_env(env)
         self.bind_telemetry(telemetry_root, step_stride)
