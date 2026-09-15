@@ -1,0 +1,20 @@
+# OpenFieldChamberCount6-530@4
+
+A single episode from the start reaches at most **2.5%** of this world. Anything above that line has provably used the archive to leave the region one episode can cover; anything below it may simply be a good walker.
+
+| algorithm | cells | coverage | chambers | archive resets |
+|---|---:|---:|---:|---:|
+| `go-explore-phase1` | 1263 | 0.45% | 0 | 0 |
+
+A **†** marks a method that adapts within the layout rather than transferring a fixed policy.
+
+## How this was run
+
+- **environment**: `TopoGym/OpenFieldChamberCount6-530-v0` at **layout seed 4**
+- **algorithm seed**: 0
+- **budget**: 2,000,000 environment steps of training, 33333 episodes
+- **evaluation**: 100 episodes at a horizon of 290 (without archive resets)
+
+| algorithm | hyperparameters |
+|---|---|
+| `go-explore-phase1` | `{'w_a': 0.3, 'p_a': 0.5, 'w_n': 3.0}` |

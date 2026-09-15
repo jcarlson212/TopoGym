@@ -1,0 +1,76 @@
+{
+  "argv": [
+    "scripts/benchmarks/run_single_layout.py",
+    "--baselines",
+    "go-explore-phase1",
+    "--layouts",
+    "TopoGym/OpenFieldChamberCount4-500-v0",
+    "TopoGym/OpenFieldChamberCount6-530-v0",
+    "TopoGym/OpenFieldChamberCount8-570-v0",
+    "TopoGym/OpenFieldChamberCount10-610-v0",
+    "--layout-seeds",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "--tune-split",
+    "tune",
+    "--tune-seeds-per-unit",
+    "1",
+    "--steps",
+    "2000000",
+    "--step-stride",
+    "20",
+    "--shard-count",
+    "8",
+    "--shard-index",
+    "7",
+    "--keep-going",
+    "--only-missing",
+    "--artifacts",
+    "benchmarks/ofcc"
+  ],
+  "commit": "ce1a94e0d6c2eb9295741b7ca7bfb66d48e7418c",
+  "started": "2026-09-05T01:25:17.990709+02:00",
+  "algorithms": [
+    "go-explore-phase1"
+  ],
+  "layouts": [
+    "TopoGym/OpenFieldChamberCount4-500-v0",
+    "TopoGym/OpenFieldChamberCount6-530-v0",
+    "TopoGym/OpenFieldChamberCount8-570-v0",
+    "TopoGym/OpenFieldChamberCount10-610-v0"
+  ],
+  "private_algorithms": 3,
+  "layout_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "algorithm_seed": 0,
+  "plan": {
+    "tune": {
+      "steps": 100000,
+      "episodes": null
+    },
+    "test": {
+      "steps": 2000000,
+      "episodes": null
+    }
+  },
+  "eval_episodes": 100,
+  "eval_archive": false,
+  "tuning": {
+    "split": "tune",
+    "per_slice": 1,
+    "steps": 100000,
+    "episodes": 25
+  },
+  "shard": {
+    "index": 7,
+    "count": 8
+  }
+}
