@@ -96,6 +96,18 @@ BACKUP_STRIDE = 8
 #: 196 iterations, 61 cells from a goal it reached at 100% from 48.
 LOCAL_START_WINDOW = 24
 
+#: Finished episodes a stage must have before its success rate counts.
+#: RLlib's episode return mean is over *completed* episodes, and an
+#: iteration hands each env fewer steps than the horizon -- so after
+#: one or two iterations the only episodes that have finished are the
+#: quick successes, while every failure is still running toward its
+#: time limit. A stage 72 cells from the goal "passed at 1.00 after 1
+#: iteration" on exactly that survivor sample, tau retreated on success
+#: it had not earned, and two stages later the curriculum sat at zero
+#: for the rest of its budget. The number matches RLlib's smoothing
+#: window, so the rate is over a full window of finished episodes.
+MIN_STAGE_EPISODES = 100
+
 #: The most tau retreats in one pass: half the window, so that at
 #: least half of every stage's starts were mastered in the stage
 #: before it.
@@ -527,6 +539,7 @@ class GoExplorePhase12Baseline(PPOBaseline):
         a stage; only the budget does.
         """
         from topogym.baselines.gridworld2dv1.concrete_baselines.ppo import (
+            episodes_completed,
             mean_return,
         )
 
@@ -572,13 +585,16 @@ class GoExplorePhase12Baseline(PPOBaseline):
                 algorithm.learner_group.set_state(carried_state)
                 algorithm.env_runner_group.sync_weights(
                     from_worker_or_learner_group=algorithm.learner_group)
-            success, used = float("nan"), 0
+            success, used, finished = float("nan"), 0, 0
             try:
                 while pool > 0:
-                    success = mean_return(algorithm.train())
+                    result = algorithm.train()
+                    success = mean_return(result)
+                    finished += episodes_completed(result)
                     pool -= 1
                     used += 1
-                    if success >= SUCCESS_THRESHOLD:
+                    if (finished >= MIN_STAGE_EPISODES
+                            and success >= SUCCESS_THRESHOLD):
                         break
                 carried_state = algorithm.learner_group.get_state()
                 previous = self._algorithm
@@ -589,19 +605,21 @@ class GoExplorePhase12Baseline(PPOBaseline):
             finally:
                 if algorithm is not self._algorithm:
                     algorithm.stop()
-            passed = success >= SUCCESS_THRESHOLD
+            passed = (finished >= MIN_STAGE_EPISODES
+                      and success >= SUCCESS_THRESHOLD)
             log.append({
                 "stage": stage, "tau": tau,
                 "start_window": [list(c) for c in window],
                 "cells_from_goal": len(demonstration) - 1 - tau,
-                "iterations": used, "success_rate": success,
-                "passed": passed,
+                "iterations": used, "episodes": finished,
+                "success_rate": success, "passed": passed,
             })
             logger.info(
                 "[%s] phase 2 stage %d at tau=%d (%d from the goal), "
-                "window of %d: %.2f after %d iterations (%s; %d left)",
+                "window of %d: %.2f over %d episodes after %d iterations "
+                "(%s; %d left)",
                 self.name, stage + 1, tau, len(demonstration) - 1 - tau,
-                len(window), success, used,
+                len(window), success, finished, used,
                 "passed" if passed else "budget exhausted", pool,
             )
             if not passed:

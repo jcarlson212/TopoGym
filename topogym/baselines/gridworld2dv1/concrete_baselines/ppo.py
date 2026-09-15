@@ -32,6 +32,19 @@ from topogym.baselines.gridworld2dv1.protocol import (
 logger = logging.getLogger("topogym")
 
 
+def episodes_completed(result: dict) -> int:
+    """Episodes that *finished* in this training iteration, across API
+    stacks; 0 when the result does not say."""
+    for section_name in ("env_runners", "sampler_results"):
+        section = result.get(section_name) or {}
+        for key in ("num_episodes", "episodes_this_iter"):
+            value = section.get(key)
+            if value is not None:
+                return int(value)
+    value = result.get("episodes_this_iter")
+    return int(value) if value is not None else 0
+
+
 def mean_return(result: dict) -> float:
     """RLlib's mean episode return, across API-stack spellings.
 

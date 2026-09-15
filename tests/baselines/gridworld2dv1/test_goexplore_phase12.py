@@ -562,8 +562,9 @@ class _FakeAlgorithm:
     """Stands in for an RLlib algorithm: train() returns preset
     success rates in order, everything else is a no-op."""
 
-    def __init__(self, successes):
+    def __init__(self, successes, episodes_per_iteration=100):
         self._successes = list(successes)
+        self._episodes = episodes_per_iteration
 
         class _Group:
             def get_state(self_inner):
@@ -580,19 +581,20 @@ class _FakeAlgorithm:
 
     def train(self):
         value = self._successes.pop(0) if self._successes else 1.0
-        return {"env_runners": {"episode_return_mean": value}}
+        return {"env_runners": {"episode_return_mean": value,
+                                "num_episodes": self._episodes}}
 
     def stop(self):
         pass
 
 
 def _curriculum(successes, iterations, route_len=40, horizon=None,
-                configs=None):
+                configs=None, episodes_per_iteration=100):
     """Run robustify with a fake learner; return its outcome and the
     number of algorithms built (one per stage)."""
     baseline = get_baseline("go-explore-phase1and2")(BaselineConfig(seed=0))
     baseline._phase2_horizon = horizon
-    algorithm = _FakeAlgorithm(successes)
+    algorithm = _FakeAlgorithm(successes, episodes_per_iteration)
     built = []
 
     class _Config:
@@ -665,6 +667,25 @@ def test_consecutive_stage_windows_overlap_by_at_least_half():
         assert len(before & after) >= min(LOCAL_START_WINDOW // 2,
                                           len(after)), (
             "a stage started with no mastered start in its window")
+
+
+def test_a_stage_cannot_pass_on_a_handful_of_finished_episodes():
+    """After one iteration the only finished episodes are the quick
+    successes -- the failures are still running toward the horizon --
+    so a perfect rate over a few episodes is survivor bias, not a
+    pass. The stage keeps training until a full window has finished."""
+    from topogym.baselines.gridworld2dv1.concrete_baselines.goexplore_phase1_and_phase2 import (  # noqa: E501
+        MIN_STAGE_EPISODES,
+    )
+
+    per_iteration = 10
+    needed = -(-MIN_STAGE_EPISODES // per_iteration)
+    outcome, _ = _curriculum([1.0] * 200, iterations=200, route_len=20,
+                             episodes_per_iteration=per_iteration)
+    assert outcome["reached_start"]
+    for stage in outcome["stages"]:
+        assert stage["iterations"] == needed, stage
+        assert stage["episodes"] >= MIN_STAGE_EPISODES
 
 
 def test_the_curriculum_stops_when_the_pool_runs_dry_and_says_so():
