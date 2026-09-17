@@ -32,6 +32,20 @@ method faces it on the same terms:
    policy runs fixed evaluation episodes in a fresh copy of the same
    world, and that is the headline number.
 
+One asymmetry in how that budget was spent must be read alongside
+every gradient-method number. The RLlib arms (`ppo`, `rnd-ppo`,
+`icm-ppo`) train with early stopping -- `patience` validation checks
+without improvement end the run -- and on this benchmark every one of
+their 570 runs stopped early: the median run spent 20% (ppo), 22%
+(rnd-ppo) and 32% (icm-ppo) of its 1,000,000 steps, the least 12% and
+the most 98%. The archive methods spend the whole budget by
+construction. The gradient methods were therefore not given less than
+the archive methods; they declined the rest, because their own
+validation signal had flattened. A re-run with early stopping off
+(`patience` is a run-config field) is the honest way to close the
+question; until then, their numbers are lower bounds on what the full
+budget would buy, and the archive-over-gradient gap is an upper bound.
+
 The numbers therefore measure *exploration within a world* — how much
 of one world a method uncovers, and whether it reaches the goal, given
 a fixed budget in it — not whether a trained policy transfers to

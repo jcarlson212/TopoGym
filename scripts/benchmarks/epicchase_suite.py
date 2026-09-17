@@ -59,7 +59,10 @@ METHODS = (
     ("go-explore-phase1", "Go-Explore", PALETTE[1], "-", "o"),
     ("topoexplore-phase1-none", "TE (none)", PALETTE[0], "--", "s"),
     ("topoexplore-phase1-ricci", "TE (ricci)", PALETTE[2], "-", "^"),
-    ("topoexplore-phase1-both", "TE (both)", PALETTE[3], ":", "D"),
+    # No "both" arm: these worlds have no texture slots, so the
+    # animation term reads nothing and both equals ricci on every seed
+    # (checked across the ecc and ofcc trees). Drawing it would plot
+    # one curve twice under two names.
 )
 
 
