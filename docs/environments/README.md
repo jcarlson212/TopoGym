@@ -5,6 +5,20 @@ One page per family; ids are stable across releases.
 - [Dilution](Dilution.md) — One chamber in an otherwise open world; difficulty scales purely with world size.
 - [Chambers2](Chambers2.md) — Two chambers with fixed geometry; the world-scaling family (50 through 400).
 - [ChamberCount](ChamberCount.md) — k separated chambers at fixed world size; the count axis of the discrimination regime.
+- [EnlargedChamberCount2-60](EnlargedChamberCount2-60.md) — 
+- [EnlargedChamberCount3-60](EnlargedChamberCount3-60.md) — 
+- [EnlargedChamberCount4-80](EnlargedChamberCount4-80.md) — 
+- [EnlargedChamberCount5-100](EnlargedChamberCount5-100.md) — 
+- [EnlargedChamberCount6-120](EnlargedChamberCount6-120.md) — 
+- [EnlargedChamberCount8-150](EnlargedChamberCount8-150.md) — 
+- [EnlargedChamberCount10-180](EnlargedChamberCount10-180.md) — 
+- [OpenFieldChamberCount2-480](OpenFieldChamberCount2-480.md) — 
+- [OpenFieldChamberCount3-490](OpenFieldChamberCount3-490.md) — 
+- [OpenFieldChamberCount4-500](OpenFieldChamberCount4-500.md) — 
+- [OpenFieldChamberCount5-510](OpenFieldChamberCount5-510.md) — 
+- [OpenFieldChamberCount6-530](OpenFieldChamberCount6-530.md) — 
+- [OpenFieldChamberCount8-570](OpenFieldChamberCount8-570.md) — 
+- [OpenFieldChamberCount10-610](OpenFieldChamberCount10-610.md) — 
 - [Decoys](Decoys.md) — One true chamber among k sealed decoys — structures that look identical from outside and enclose nothing.
 - [Shape](Shape.md) — Area-matched chamber shapes (square, circle, triangle, star): shape is never confounded with size.
 - [Nested](Nested.md) — Concentric shells around an innermost chamber, one door each on offset sides: entry forces traversing them in order.
@@ -12,6 +26,20 @@ One page per family; ids are stable across releases.
 - [Bottleneck](Bottleneck.md) — A tree of rooms joined by width-1 corridors: zero homology signal, pure bottleneck difficulty.
 - [Maze](Maze.md) — A seeded perfect maze (simply connected); the braid knob opens loops, each adding one H1 class.
 - [EpicChase](EpicChase.md) — Chambers spaced a full episode apart along one long spiral corridor: no single episode can reach the goal, so progress requires resuming where the last one stopped.
+- [EnlargedChamberCountDoors2-60](EnlargedChamberCountDoors2-60.md) — 
+- [EnlargedChamberCountDoors3-60](EnlargedChamberCountDoors3-60.md) — 
+- [EnlargedChamberCountDoors4-80](EnlargedChamberCountDoors4-80.md) — 
+- [EnlargedChamberCountDoors5-100](EnlargedChamberCountDoors5-100.md) — 
+- [EnlargedChamberCountDoors6-120](EnlargedChamberCountDoors6-120.md) — 
+- [EnlargedChamberCountDoors8-150](EnlargedChamberCountDoors8-150.md) — 
+- [EnlargedChamberCountDoors10-180](EnlargedChamberCountDoors10-180.md) — 
+- [OpenFieldChamberCountDoors2-480](OpenFieldChamberCountDoors2-480.md) — 
+- [OpenFieldChamberCountDoors3-490](OpenFieldChamberCountDoors3-490.md) — 
+- [OpenFieldChamberCountDoors4-500](OpenFieldChamberCountDoors4-500.md) — 
+- [OpenFieldChamberCountDoors5-510](OpenFieldChamberCountDoors5-510.md) — 
+- [OpenFieldChamberCountDoors6-530](OpenFieldChamberCountDoors6-530.md) — 
+- [OpenFieldChamberCountDoors8-570](OpenFieldChamberCountDoors8-570.md) — 
+- [OpenFieldChamberCountDoors10-610](OpenFieldChamberCountDoors10-610.md) — 
 - [TopPlane](TopPlane.md) — The canonical corner-chamber layout on the walled plane — the control for the Top slice.
 - [TopCylinder](TopCylinder.md) — Corner chambers on a cylinder: one wrapping axis.
 - [TopMobius](TopMobius.md) — Corner chambers on a Möbius band: crossing the seam mirrors orientation.
