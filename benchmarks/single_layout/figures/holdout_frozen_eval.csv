@@ -1,0 +1,10 @@
+alg,worlds,worlds_with_success,mean_success
+go-explore-phase1,189,0,0.0
+icm-ppo,189,15,0.0626
+ppo,189,0,0.0
+random,189,0,0.0
+rnd-ppo,189,7,0.0256
+topoexplore-phase1-animation,189,0,0.0
+topoexplore-phase1-both,189,0,0.0
+topoexplore-phase1-none,189,0,0.0
+topoexplore-phase1-ricci,189,0,0.0

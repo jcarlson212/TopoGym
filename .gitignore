@@ -71,3 +71,7 @@ benchmarks/**/private/
 benchmarks/private/
 runs/**/private/
 runs/private/
+
+# Claude Code scratch notes: session state, handoffs, todo lists.
+# Not part of the repository; never committed.
+.claudenotes/

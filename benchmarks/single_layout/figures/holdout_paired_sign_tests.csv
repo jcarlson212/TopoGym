@@ -1,0 +1,5 @@
+arm,te_found,ge_found,te_only,ge_only,n,sign_p
+topoexplore-phase1-animation,168,152,17,1,189,0.00014495849609375
+topoexplore-phase1-both,169,152,19,2,189,0.00022125244140625
+topoexplore-phase1-none,167,152,16,1,189,0.000274658203125
+topoexplore-phase1-ricci,168,152,19,3,189,0.0008554458618164062
