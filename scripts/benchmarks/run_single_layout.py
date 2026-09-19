@@ -259,6 +259,13 @@ def _config(args) -> BaselineConfig:
         num_envs_per_runner=args.envs_per_runner,
         eval_workers=1,  # one layout: nothing to shard across
         max_iterations=args.max_iterations,
+        # Early stopping is on by default (patience=5 validation checks).
+        # --patience 0 disables it so a run spends its whole step budget:
+        # needed to answer whether the gradient baselines' numbers are a
+        # property of the method or of the stopping rule, without changing
+        # anything else about the protocol.
+        patience=(10**9 if args.patience == 0 else args.patience),
+        checkpoint_every=args.checkpoint_every,
         phase2_steps=args.phase2_steps,
         phase2_actions=args.phase2_actions,
         # A single layout is the whole training set, so the contiguous
@@ -557,6 +564,14 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--num-env-runners", type=int, default=8)
     parser.add_argument("--envs-per-runner", type=int, default=4)
+    parser.add_argument("--checkpoint-every", type=int, default=0,
+                        help="save resumable state every N training "
+                             "iterations; 0 disables (default). Needed to "
+                             "run on spot capacity, and doubles as a "
+                             "progress signal for monitoring")
+    parser.add_argument("--patience", type=int, default=5,
+                        help="validation checks without improvement before "
+                             "stopping; 0 disables early stopping entirely")
     parser.add_argument("--max-iterations", type=int, default=200)
     parser.add_argument("--phase2-steps", type=int, default=None,
                         help="fixed step budget for phase 2 of a "

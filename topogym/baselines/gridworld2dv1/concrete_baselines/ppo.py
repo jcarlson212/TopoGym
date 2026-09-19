@@ -17,7 +17,12 @@ never pulls them in.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import pathlib
+import shutil
+import tempfile
 from collections.abc import Callable
 
 import numpy as np
@@ -280,8 +285,25 @@ class PPOBaseline(Baseline):
         report = TrainingReport()
         best = {"return": -float("inf"), "coverage": -float("inf")}
         first, stale, moved = None, 0, False
+
+        # Resume support. Entirely inert unless checkpoint_every > 0, which
+        # is the default, so the published runs' code path is unchanged.
+        resume_dir, start = None, 1
+        if self.config.checkpoint_every and self.config.run_dir is not None:
+            resume_dir = pathlib.Path(self.config.run_dir) / f"{self.name}-resume"
+            resume_dir.mkdir(parents=True, exist_ok=True)
+            state = self._load_resume(resume_dir)
+            if state is not None:
+                start = int(state["iteration"]) + 1
+                report.history = state["history"]
+                best = {k: (-float("inf") if v is None else v)
+                        for k, v in state["best"].items()}
+                first, stale, moved = (state["first"], int(state["stale"]),
+                                       bool(state["moved"]))
+                logger.info("[%s] resumed at iteration %d of %d",
+                            self.name, start, self.config.max_iterations)
         try:
-            for iteration in range(1, self.config.max_iterations + 1):
+            for iteration in range(start, self.config.max_iterations + 1):
                 entry = {"iteration": iteration,
                          "train_return":
                              mean_return(self._algorithm.train())}
@@ -318,6 +340,10 @@ class PPOBaseline(Baseline):
                     )
                 report.history.append(entry)
                 report.iterations = iteration
+                if (resume_dir is not None
+                        and iteration % self.config.checkpoint_every == 0):
+                    self._save_resume(resume_dir, iteration, report,
+                                      best, first, stale, moved)
                 if moved and stale >= self.config.patience:
                     report.stopped_early = True
                     report.stopped_because = (
@@ -342,6 +368,60 @@ class PPOBaseline(Baseline):
                                     if np.isfinite(best["coverage"])
                                     else None)
         return report
+
+    def _load_resume(self, directory) -> dict | None:
+        """Read a resume point, or None if there is not a usable one.
+
+        A corrupt or partial checkpoint must never abort the study: losing
+        the resume and starting fresh costs time, while resuming into an
+        inconsistent state would silently corrupt a published number.
+        """
+        marker = directory / "progress.json"
+        if not marker.exists():
+            return None
+        try:
+            with open(marker, encoding="utf-8") as handle:
+                state = json.load(handle)
+            self._algorithm.restore_from_path(str(directory / "algo"))
+            return state
+        except Exception as exc:                       # noqa: BLE001
+            logger.warning("[%s] checkpoint at %s unusable (%s); "
+                           "starting this study from scratch",
+                           self.name, directory, exc)
+            return None
+
+    def _save_resume(self, directory, iteration, report, best, first,
+                     stale, moved) -> None:
+        """Persist algorithm state and the loop's own bookkeeping.
+
+        Written atomically -- new directory, then rename; temp file, then
+        os.replace -- because a spot box can be reclaimed mid-write, and a
+        half-written progress.json that still parses is worse than none.
+        A checkpoint failure is logged and swallowed: it costs a resume
+        point, not the study.
+        """
+        try:
+            algo, tmp = directory / "algo", directory / "algo.tmp"
+            shutil.rmtree(tmp, ignore_errors=True)
+            self._algorithm.save_to_path(str(tmp))
+            shutil.rmtree(algo, ignore_errors=True)
+            tmp.rename(algo)
+            state = {
+                "iteration": iteration,
+                "history": report.history,
+                # json has no -inf; None round-trips through _load_resume.
+                "best": {k: (None if not np.isfinite(v) else float(v))
+                         for k, v in best.items()},
+                "first": first, "stale": stale, "moved": moved,
+            }
+            fd, path = tempfile.mkstemp(dir=str(directory), suffix=".json")
+            with os.fdopen(fd, "w") as handle:
+                json.dump(state, handle)
+            os.replace(path, directory / "progress.json")
+            logger.info("[%s] checkpoint at iteration %d", self.name, iteration)
+        except Exception as exc:                       # noqa: BLE001
+            logger.warning("[%s] checkpoint failed at iteration %d: %s",
+                           self.name, iteration, exc)
 
     def _checkpoint(self) -> str | None:
         if self.config.run_dir is None:

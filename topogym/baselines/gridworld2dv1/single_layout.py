@@ -354,6 +354,11 @@ def run_single_layout(baseline, row: dict, *,
     # single-layout study; recording only evaluation would leave the
     # coverage curve invisible exactly where it was earned.
     baseline.bind_telemetry(telemetry_root, step_stride)
+    # Checkpoints live beside the study's telemetry, so a study is still one
+    # self-contained directory. Only for local paths: a gs:// or s3:// root
+    # is not something RLlib's checkpoint writer can rename atomically.
+    if baseline.config.checkpoint_every and "://" not in str(telemetry_root):
+        baseline.config.run_dir = pathlib.Path(telemetry_root).parent
     # One call sets both halves of the budget -- the episode count for
     # methods training episode by episode, the iteration cap for those
     # counted in iterations -- so none can honour one and forget the

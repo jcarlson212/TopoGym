@@ -1,5 +1,7 @@
 """PPO's glue around RLlib. Skipped unless the extra is installed."""
 
+import pathlib
+
 import pytest
 
 ray = pytest.importorskip("ray", reason="needs topogym[benchmarks]")
@@ -14,6 +16,9 @@ from topogym.baselines.gridworld2dv1.concrete_baselines.ppo import (  # noqa: E4
 )
 from topogym.baselines.gridworld2dv1.instances import load_split  # noqa: E402
 from topogym.baselines.gridworld2dv1.multitask import SplitEnv  # noqa: E402
+from topogym.baselines.gridworld2dv1.protocol import (  # noqa: E402
+    TrainingReport,
+)
 
 
 def test_mean_return_reads_both_api_spellings():
@@ -252,3 +257,93 @@ def test_every_gradient_baseline_evaluates_stochastically():
     for name in ("ppo", "icm-ppo", "rnd-ppo"):
         assert get_baseline(name)().stochastic_evaluation is True
         assert get_baseline(name)().steps_per_iteration() == 4000
+
+
+# -- resume: checkpoint_every, and what a half-written one must not do -
+
+
+class _StubAlgorithm:
+    """Stands in for RLlib's algorithm: records what it was asked to
+    save or restore, and can be told to refuse a restore."""
+
+    def __init__(self, restorable: bool = True):
+        self.restorable = restorable
+        self.saved_to = None
+        self.restored_from = None
+
+    def save_to_path(self, path):
+        self.saved_to = path
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+        (pathlib.Path(path) / "weights").write_text("state")
+
+    def restore_from_path(self, path):
+        if not self.restorable:
+            raise RuntimeError("checkpoint is from another algorithm")
+        self.restored_from = path
+
+
+def _resume_baseline(tmp_path, restorable=True):
+    baseline = PPOBaseline(BaselineConfig(checkpoint_every=2))
+    baseline._algorithm = _StubAlgorithm(restorable)
+    return baseline, pathlib.Path(tmp_path)
+
+
+def test_a_resume_point_round_trips_including_an_unset_best(tmp_path):
+    """``best`` starts at -inf, which JSON cannot hold; it goes out as
+    null and must come back as -inf, or a resumed study would treat its
+    first mediocre iteration as an improvement over nothing."""
+    baseline, directory = _resume_baseline(tmp_path)
+    report = TrainingReport()
+    report.history = [{"iteration": 1, "train_return": 0.5}]
+    best = {"return": -float("inf"), "coverage": 0.25}
+
+    baseline._save_resume(directory, 4, report, best, None, 3, True)
+    assert (directory / "progress.json").exists()
+    assert (directory / "algo" / "weights").exists()
+    assert not (directory / "algo.tmp").exists(), "temp left behind"
+
+    state = baseline._load_resume(directory)
+    assert state["iteration"] == 4
+    assert state["history"] == report.history
+    assert state["best"]["return"] is None      # restored to -inf by fit()
+    assert state["best"]["coverage"] == 0.25
+    assert state["first"] is None
+    assert state["stale"] == 3 and state["moved"] is True
+    assert baseline._algorithm.restored_from == str(directory / "algo")
+
+
+def test_no_resume_point_is_not_an_error(tmp_path):
+    baseline, directory = _resume_baseline(tmp_path)
+    assert baseline._load_resume(directory) is None
+
+
+def test_an_unusable_checkpoint_starts_the_study_over_rather_than_failing(
+        tmp_path):
+    """Losing a resume point costs time; resuming into an inconsistent
+    state would silently corrupt a published number."""
+    baseline, directory = _resume_baseline(tmp_path, restorable=False)
+    report = TrainingReport()
+    baseline._save_resume(directory, 2, report, {"return": 0.0}, None, 0,
+                          False)
+    assert baseline._load_resume(directory) is None
+
+    (directory / "progress.json").write_text("{not json")
+    baseline._algorithm.restorable = True
+    assert baseline._load_resume(directory) is None
+
+
+def test_a_failed_checkpoint_does_not_abort_the_study(tmp_path):
+    baseline, directory = _resume_baseline(tmp_path)
+
+    def explode(path):
+        raise OSError("no space left on device")
+
+    baseline._algorithm.save_to_path = explode
+    baseline._save_resume(directory, 2, TrainingReport(),
+                          {"return": 0.0}, None, 0, False)
+    assert not (directory / "progress.json").exists()
+
+
+def test_checkpointing_is_off_by_default():
+    """The published runs' code path is the one without it."""
+    assert BaselineConfig().checkpoint_every == 0

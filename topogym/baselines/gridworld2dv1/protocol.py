@@ -76,6 +76,13 @@ class BaselineConfig:
     #: is. Phase 1 is unaffected: the archive explores as it always
     #: did, and a route is a list of cells whichever way it was walked.
     phase2_actions: str | None = None
+    #: Save algorithm state and loop bookkeeping every N iterations, so an
+    #: interrupted study resumes near where it stopped instead of restarting.
+    #: 0 (the default) disables it and leaves the training loop byte-identical
+    #: to what produced the published runs. Needed to run the gradient
+    #: baselines on spot capacity, where a box can be reclaimed mid-study,
+    #: and it doubles as the progress signal a monitor can read.
+    checkpoint_every: int = 0
     #: Consecutive validation checks without improvement before stopping.
     patience: int = 5
     val_every: int = 5
