@@ -92,7 +92,7 @@ def collect() -> tuple:
         ROOT, "**", "telemetry", "episodes", "algorithm=*",
         "split=single-train", "*.parquet")
     for path in glob.glob(pattern, recursive=True):
-        m = re.search(r"EpicChase(\d+)-\d+(?:@(\d+))?/telemetry", path)
+        m = re.search(r"EpicChase/?(\d+)-\d+(?:@(\d+))?/telemetry", path)
         if not m:
             continue
         alg = re.search(r"algorithm=([^/]+)/", path).group(1)

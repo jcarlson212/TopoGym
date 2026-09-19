@@ -40,6 +40,8 @@ from __future__ import annotations
 import logging
 import pathlib
 
+from topogym.baselines.gridworld2dv1.single_layout import resolve_unit_dir
+
 logger = logging.getLogger("topogym")
 
 __all__ = ["first_goal_steps", "plot_solve_profile", "plot_family_deltas",
@@ -54,8 +56,12 @@ DOUBLE = 6.875
 
 
 def _roots(root) -> list:
-    """The artefact roots to read: the public tree and, when present,
-    the private one beside it."""
+    """The artefact roots to read.
+
+    One tree per study now: every method writes into it. A ``private/``
+    tree beside it is an artefact of the days when one method's results
+    were filed apart, and is still read where one survives.
+    """
     root = pathlib.Path(root)
     found = [root]
     if (root / "private").is_dir():
@@ -380,7 +386,7 @@ def exploration_grid(root, units: list, algorithms: list, out=None,
     for unit in units:
         row = None
         for base in _roots(root):
-            candidate = base / unit / "results"
+            candidate = resolve_unit_dir(base, unit) / "results"
             if candidate.is_dir():
                 import json
 
@@ -413,7 +419,7 @@ def exploration_grid(root, units: list, algorithms: list, out=None,
 
         visited: dict = {}
         for base in _roots(root):
-            source = base / unit / "telemetry" / "steps"
+            source = resolve_unit_dir(base, unit) / "telemetry" / "steps"
             if not source.exists():
                 continue
             try:
@@ -536,7 +542,7 @@ def chamber_grid(root, units: list, algorithms: list, out=None,
     for unit in units:
         row = None
         for base in _roots(root):
-            candidate = base / unit / "results"
+            candidate = resolve_unit_dir(base, unit) / "results"
             if candidate.is_dir():
                 import json
 
@@ -570,7 +576,7 @@ def chamber_grid(root, units: list, algorithms: list, out=None,
 
         visited: dict = {}
         for base in _roots(root):
-            source = base / unit / "telemetry" / "steps"
+            source = resolve_unit_dir(base, unit) / "telemetry" / "steps"
             if not source.exists():
                 continue
             try:
@@ -586,7 +592,7 @@ def chamber_grid(root, units: list, algorithms: list, out=None,
                     visited.setdefault(name, set()).update(
                         zip(rows_["x"].astype(int), rows_["y"].astype(int)))
             # The exact count, from the table the environment fills in.
-            episodes = base / unit / "telemetry" / "episodes"
+            episodes = resolve_unit_dir(base, unit) / "telemetry" / "episodes"
             if episodes.exists():
                 try:
                     eframe = pd.read_parquet(

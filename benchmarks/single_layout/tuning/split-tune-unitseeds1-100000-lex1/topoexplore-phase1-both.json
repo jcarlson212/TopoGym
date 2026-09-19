@@ -1,0 +1,25 @@
+{
+  "values": {
+    "w_a": 0.3,
+    "p_a": 0.5,
+    "w_n": 3.0,
+    "w_topo": 4.5969216804215725,
+    "p_u": 0.29342639919512753,
+    "u_max": 8,
+    "w_ricci": 115.9805985319774,
+    "w_wormhole": 1.8509575957101916,
+    "w_water": 0.367617772455099,
+    "w_drop_adjacent": 1.8509575957101916,
+    "w_ladder": 0.05662546199482796,
+    "w_bridge": 0.056380703538766355,
+    "w_door": 19.90613840511903,
+    "w_hallway": 0.5594374127122355
+  },
+  "score": null,
+  "signal": "optuna-staged",
+  "searched": [],
+  "protocol": "staged TPE (Optuna) on GE's tuned base; stage A from GE's 63-world sweep, B topo on Decoys8+ChamberCount8, C ricci on Bottleneck6, D animation per texture family",
+  "objective": "lexicographic ladder as return*1e6 + chambers*1e3 + coverage",
+  "tune_steps": 250000,
+  "phase1and2_note": "phase-1and2 arms use GE12's base with mechanism weights transplanted from the phase-1 stages, not re-tuned in that context"
+}

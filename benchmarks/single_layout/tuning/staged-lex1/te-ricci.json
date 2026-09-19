@@ -1,0 +1,83 @@
+{
+  "values": {
+    "p_a": 0.5,
+    "w_a": 10.0,
+    "w_n": 0.3,
+    "p_u": 0.5,
+    "u_max": 4,
+    "w_topo": 0.1,
+    "w_ricci": 10.0
+  },
+  "score": 0.5264868999808758,
+  "signal": "coverage",
+  "searched": [
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_ricci": 0.3,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.4698795180722892
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_ricci": 1.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.3993115318416523
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_ricci": 3.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.46222987186842607
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_ricci": 10.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.5264868999808758
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_ricci": 30.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.5078408873589596
+    }
+  ],
+  "rows": [
+    "Bottleneck6-100@1000",
+    "Bottleneck6-100@1001",
+    "Bottleneck6-100@1002",
+    "Bottleneck6-200@1000",
+    "Bottleneck6-200@1001",
+    "Bottleneck6-200@1002"
+  ]
+}

@@ -254,6 +254,53 @@ def _family_of(name: str) -> str:
     return benchmarks.family_of(name)
 
 
+def slice_of(name: str) -> str:
+    """The published slice a layout belongs to."""
+    from topogym import registry
+
+    return ("Top" if name.startswith("Top")
+            else "Texture" if name in registry.TEXTURE_SCENARIOS
+            else "GridWorld2D")
+
+
+def unit_path(unit: str) -> str:
+    """The directory a unit's artefacts live in, under a study root.
+
+    ``<slice>/<family>/<leaf>`` -- so one family's sizes and seeds sit
+    together and a slice can be read, copied or archived whole. The
+    leaf drops the family prefix the folder above already carries
+    (``EnlargedChamberCount8-150@3`` under ``EnlargedChamberCount``
+    becomes ``8-150@3``), except where that would leave nothing to
+    name a directory by: a family whose unit *is* its name, like
+    ``BankRobber@4000``, keeps the full unit as its leaf rather than
+    being reduced to a bare seed tag.
+
+    Flat ``<unit>/`` paths predate this and are what every artefact
+    tree written before 2026-09 used; :func:`resolve_unit_dir` reads
+    either.
+    """
+    bare = unit.split("@")[0]
+    family = _family_of(bare)
+    leaf = unit[len(family):].lstrip("-") if unit.startswith(family) else unit
+    if not leaf or leaf.startswith("@"):
+        leaf = unit
+    return f"{slice_of(bare)}/{family}/{leaf}"
+
+
+def resolve_unit_dir(root, unit: str):
+    """``root``'s directory for ``unit``, nested or flat.
+
+    Trees written before the nested layout are still readable: if the
+    nested path is absent and a flat one exists, the flat one wins.
+    New writes always go to the nested path.
+    """
+    nested = pathlib.Path(root) / unit_path(unit)
+    if nested.exists():
+        return nested
+    flat = pathlib.Path(root) / unit
+    return flat if flat.exists() else nested
+
+
 def run_single_layout(baseline, row: dict, *,
                       step_budget: int = DEFAULT_STEP_BUDGET,
                       eval_episodes: int = DEFAULT_EVAL_EPISODES,
@@ -427,7 +474,7 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
         PALETTE,
     )
 
-    source = pathlib.Path(root) / layout / "telemetry" / "episodes"
+    source = resolve_unit_dir(root, layout) / "telemetry" / "episodes"
     if not source.exists():
         logger.warning("no episode telemetry for %s; nothing to plot",
                        layout)
@@ -444,7 +491,7 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
             frame.groupby("algorithm")["reached_goal"]
             .cumsum().astype(float)
         )
-    directory = pathlib.Path(root) / layout / "plots"
+    directory = resolve_unit_dir(root, layout) / "plots"
     directory.mkdir(parents=True, exist_ok=True)
 
     written = []
@@ -489,7 +536,7 @@ def plot_single_layout(root, layout: str, width: float = 3.25) -> list:
         # evaluation it grades the policy the learning produced -- so
         # they get separate axes rather than one line that changes
         # meaning partway.
-        optimal = _optimal_from_results(pathlib.Path(root) / layout)
+        optimal = _optimal_from_results(resolve_unit_dir(root, layout))
         for split, x_key, x_label, stem in (
             ("single-train", "interactions", "cumulative interactions",
              "steps_to_goal_train"),
@@ -551,7 +598,7 @@ def _first_goal_steps(root, units: list, budget: int) -> dict:
 
     per_unit: dict = {}
     for unit in units:
-        source = pathlib.Path(root) / unit / "telemetry" / "episodes"
+        source = resolve_unit_dir(root, unit) / "telemetry" / "episodes"
         if not source.exists():
             continue
         frame = pd.read_parquet(source)
@@ -914,7 +961,7 @@ def write_single_layout_md(root, layout: str):
     another -- merge by writing into the same root. This reads what has
     landed rather than requiring one run to have produced everything.
     """
-    folder = pathlib.Path(root) / layout / "results"
+    folder = resolve_unit_dir(root, layout) / "results"
     if not folder.is_dir():
         logger.warning("no results for %s", layout)
         return None
@@ -993,7 +1040,7 @@ def write_single_layout_md(root, layout: str):
         lines.append(f"| `{row['algorithm']}` | `{row['values']}` |")
     lines.append("")
 
-    path = pathlib.Path(root) / layout / "SUMMARY.md"
+    path = resolve_unit_dir(root, layout) / "SUMMARY.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines))
     logger.info("wrote %s", path)
@@ -1031,8 +1078,9 @@ def coverage_gif(root, layout: str, algorithm: str,
     from topogym.rendering import tiles
     from topogym.rendering.rgb import render_rgb_2d
 
-    source = pathlib.Path(root) / layout / "telemetry" / "steps"
-    results = pathlib.Path(root) / layout / "results" / f"{algorithm}.json"
+    source = resolve_unit_dir(root, layout) / "telemetry" / "steps"
+    results = (resolve_unit_dir(root, layout) / "results"
+               / f"{algorithm}.json")
     if not source.exists() or not results.exists():
         return None
     with open(results, encoding="utf-8") as handle:
@@ -1095,7 +1143,7 @@ def coverage_gif(root, layout: str, algorithm: str,
                        COVERAGE_COLOR, COVERAGE_STRENGTH)
         images.append(picture)
 
-    folder = pathlib.Path(root) / layout / "gifs"
+    folder = resolve_unit_dir(root, layout) / "gifs"
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{algorithm}-coverage.gif"
     duration = max(20, int(COVERAGE_SECONDS * 1000 / max(1, len(images))))
@@ -1107,7 +1155,7 @@ def coverage_gif(root, layout: str, algorithm: str,
 
 def coverage_gifs(root, layout: str) -> list:
     """One coverage animation per algorithm that ran on this layout."""
-    folder = pathlib.Path(root) / layout / "results"
+    folder = resolve_unit_dir(root, layout) / "results"
     if not folder.is_dir():
         return []
     written = []

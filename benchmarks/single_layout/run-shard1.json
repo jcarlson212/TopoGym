@@ -1,73 +1,60 @@
 {
   "argv": [
     "scripts/benchmarks/run_single_layout.py",
+    "--baselines",
+    "topoexplore-phase1-none",
+    "topoexplore-phase1-ricci",
+    "topoexplore-phase1-animation",
+    "topoexplore-phase1-both",
+    "--split",
+    "test",
+    "--tune-split",
+    "tune",
+    "--tune-seeds-per-unit",
+    "1",
+    "--step-stride",
+    "100",
+    "--shard-count",
+    "16",
     "--shard-index",
     "1",
-    "--shard-count",
-    "36",
-    "--baselines",
-    "all",
-    "--layouts",
-    "TopoGym/EpicChase8-120-v0",
-    "TopoGym/EnvironmentalIceShip-v0",
-    "TopoGym/Nested3-50-v0",
-    "TopoGym/Maze-100-v0",
-    "TopoGym/ClownChase-v0",
-    "TopoGym/TopRP2-50-v0",
-    "--layout-seeds",
-    "0",
-    "--steps",
-    "1000000",
-    "--eval-episodes",
-    "50",
-    "--tune-steps",
-    "50000",
-    "--tune-episodes",
-    "15",
-    "--step-stride",
-    "20",
-    "--num-env-runners",
-    "2",
-    "--envs-per-runner",
-    "2",
     "--keep-going",
-    "--only-missing",
-    "--artifacts",
-    "/topogym/benchmarks/experiments/topogym/single_env"
+    "--only-missing"
   ],
-  "commit": "",
-  "started": "2026-08-08T04:05:46.231812+00:00",
+  "commit": "9ce363ccab64a7e2124c54e6fe360962f6862e8e",
+  "started": "2026-08-23T13:20:10.393295-04:00",
   "algorithms": [
-    "go-explore-phase1",
-    "go-explore-phase1and2",
-    "icm-ppo",
-    "ppo",
-    "random",
-    "rnd-ppo"
+    "topoexplore-phase1-none",
+    "topoexplore-phase1-ricci",
+    "topoexplore-phase1-animation",
+    "topoexplore-phase1-both"
   ],
-  "layouts": [
-    "TopoGym/EpicChase8-120-v0",
-    "TopoGym/EnvironmentalIceShip-v0",
-    "TopoGym/Nested3-50-v0",
-    "TopoGym/Maze-100-v0",
-    "TopoGym/ClownChase-v0",
-    "TopoGym/TopRP2-50-v0"
-  ],
+  "layouts": "split:test",
+  "private_algorithms": 4,
   "layout_seeds": [
     0
   ],
   "algorithm_seed": 0,
-  "steps": 1000000,
-  "eval_episodes": 50,
+  "plan": {
+    "tune": {
+      "steps": 100000,
+      "episodes": null
+    },
+    "test": {
+      "steps": 1000000,
+      "episodes": null
+    }
+  },
+  "eval_episodes": 100,
   "eval_archive": false,
   "tuning": {
-    "layout": "TopoGym/DontFall-v0",
-    "seed": 987654321,
-    "steps": 50000,
-    "episodes": 15
+    "split": "tune",
+    "per_slice": 1,
+    "steps": 100000,
+    "episodes": 25
   },
   "shard": {
     "index": 1,
-    "count": 36
+    "count": 16
   }
 }

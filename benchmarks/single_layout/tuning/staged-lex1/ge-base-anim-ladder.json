@@ -1,0 +1,138 @@
+{
+  "values": {
+    "w_a": 0.3,
+    "p_a": 0.5,
+    "w_n": 3.0,
+    "p_u": 0.5,
+    "u_max": 4,
+    "w_topo": 0.001,
+    "w_bridge": 2.0,
+    "w_ladder": 0.125
+  },
+  "score": 2.0,
+  "signal": "return",
+  "searched": [
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 0.125,
+      "w_ladder": 0.125,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.7369477911646586
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 0.125,
+      "w_ladder": 0.5,
+      "return": 0.6666666666666666,
+      "chambers": 0.0,
+      "coverage": 0.750334672021419
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 0.125,
+      "w_ladder": 2.0,
+      "return": 0.6666666666666666,
+      "chambers": 0.0,
+      "coverage": 0.7981927710843374
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 0.5,
+      "w_ladder": 0.125,
+      "return": 0.6666666666666666,
+      "chambers": 0.0,
+      "coverage": 0.7777777777777778
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 0.5,
+      "w_ladder": 0.5,
+      "return": 1.3333333333333333,
+      "chambers": 0.0,
+      "coverage": 0.7218875502008033
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 0.5,
+      "w_ladder": 2.0,
+      "return": 0.3333333333333333,
+      "chambers": 0.0,
+      "coverage": 0.7935073627844712
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 2.0,
+      "w_ladder": 0.125,
+      "return": 2.0,
+      "chambers": 0.0,
+      "coverage": 0.7981927710843374
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 2.0,
+      "w_ladder": 0.5,
+      "return": 0.6666666666666666,
+      "chambers": 0.0,
+      "coverage": 0.8313253012048193
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_bridge": 2.0,
+      "w_ladder": 2.0,
+      "return": 1.3333333333333333,
+      "chambers": 0.0,
+      "coverage": 0.8363453815261043
+    }
+  ],
+  "rows": [
+    "Ladders@1000",
+    "Ladders@1001",
+    "Ladders@1002"
+  ]
+}

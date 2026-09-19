@@ -3,6 +3,9 @@
     "scripts/benchmarks/run_single_layout.py",
     "--baselines",
     "go-explore-phase1",
+    "topoexplore-phase1-none",
+    "topoexplore-phase1-ricci",
+    "topoexplore-phase1-both",
     "--layouts",
     "TopoGym/EpicChase4-90-v0",
     "TopoGym/EpicChase6-110-v0",
@@ -28,7 +31,9 @@
   "commit": "334f3c722050134c502e030ddac2028b5382ce7e",
   "started": "2026-08-27T18:10:06.390505-04:00",
   "algorithms": [
-    "go-explore-phase1"
+    "topoexplore-phase1-none",
+    "topoexplore-phase1-ricci",
+    "topoexplore-phase1-both"
   ],
   "layouts": [
     "TopoGym/EpicChase4-90-v0",

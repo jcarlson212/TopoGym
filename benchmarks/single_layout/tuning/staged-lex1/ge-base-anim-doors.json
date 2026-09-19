@@ -1,0 +1,138 @@
+{
+  "values": {
+    "w_a": 0.3,
+    "p_a": 0.5,
+    "w_n": 3.0,
+    "p_u": 0.5,
+    "u_max": 4,
+    "w_topo": 0.001,
+    "w_door": 2.0,
+    "w_hallway": 1.0
+  },
+  "score": 0.9151624548736462,
+  "signal": "coverage",
+  "searched": [
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 0.25,
+      "w_hallway": 0.25,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.8485258724428398
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 0.25,
+      "w_hallway": 1.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.8753008423586041
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 0.25,
+      "w_hallway": 2.0,
+      "return": 0.0,
+      "chambers": 0.3333333333333333,
+      "coverage": 0.7889590854392298
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 1.0,
+      "w_hallway": 0.25,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.8273164861612514
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 1.0,
+      "w_hallway": 1.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.927496991576414
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 1.0,
+      "w_hallway": 2.0,
+      "return": 0.0,
+      "chambers": 0.6666666666666666,
+      "coverage": 0.8339350180505415
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 2.0,
+      "w_hallway": 0.25,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.8214500601684719
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 2.0,
+      "w_hallway": 1.0,
+      "return": 0.0,
+      "chambers": 0.6666666666666666,
+      "coverage": 0.9151624548736462
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_door": 2.0,
+      "w_hallway": 2.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.8987665463297233
+    }
+  ],
+  "rows": [
+    "BankRobber@1000",
+    "BankRobber@1001",
+    "BankRobber@1002"
+  ]
+}

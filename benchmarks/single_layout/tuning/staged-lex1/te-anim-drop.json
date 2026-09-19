@@ -1,0 +1,56 @@
+{
+  "values": {
+    "p_a": 0.5,
+    "w_a": 10.0,
+    "w_n": 0.3,
+    "p_u": 0.5,
+    "u_max": 4,
+    "w_topo": 0.1,
+    "w_drop_adjacent": 0.5
+  },
+  "score": 8.0,
+  "signal": "chambers",
+  "searched": [
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_drop_adjacent": 0.125,
+      "return": 0.0,
+      "chambers": 6.666666666666667,
+      "coverage": 0.7224889390944177
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_drop_adjacent": 0.5,
+      "return": 0.0,
+      "chambers": 8.0,
+      "coverage": 0.7997740751200227
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_drop_adjacent": 2.0,
+      "return": 0.0,
+      "chambers": 7.666666666666667,
+      "coverage": 0.743763531958957
+    }
+  ],
+  "rows": [
+    "DontFall@1000",
+    "DontFall@1001",
+    "DontFall@1002"
+  ]
+}

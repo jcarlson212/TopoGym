@@ -1,0 +1,59 @@
+{
+  "values": {
+    "w_a": 0.3,
+    "p_a": 0.5,
+    "w_n": 3.0,
+    "p_u": 0.5,
+    "u_max": 4,
+    "w_topo": 0.001,
+    "w_water": 2.0
+  },
+  "score": 0.9262938186231199,
+  "signal": "coverage",
+  "searched": [
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_water": 0.1,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.920111156115393
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_water": 0.5,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.9225040982856075
+    },
+    {
+      "w_a": 0.3,
+      "p_a": 0.5,
+      "w_n": 3.0,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.001,
+      "w_water": 2.0,
+      "return": 0.0,
+      "chambers": 0.0,
+      "coverage": 0.9262938186231199
+    }
+  ],
+  "rows": [
+    "EnvironmentalIceShip@1000",
+    "EnvironmentalIceShip@1001",
+    "EnvironmentalIceShip@1002",
+    "IceShip@1000",
+    "IceShip@1001",
+    "IceShip@1002"
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "argv": [
+    "scripts/benchmarks/run_single_layout.py",
+    "--shard-index",
+    "368",
+    "--shard-count",
+    "380",
+    "--split",
+    "test",
+    "--tune-split",
+    "tune",
+    "--baselines",
+    "ppo",
+    "rnd-ppo",
+    "icm-ppo",
+    "go-explore-phase1and2",
+    "topoexplore-phase1and2-none",
+    "topoexplore-phase1and2-ricci",
+    "topoexplore-phase1and2-animation",
+    "topoexplore-phase1and2-both",
+    "--step-stride",
+    "100",
+    "--num-env-runners",
+    "4",
+    "--envs-per-runner",
+    "2",
+    "--keep-going",
+    "--only-missing",
+    "--artifacts",
+    "/topogym/benchmarks/experiments/topogym/single_env"
+  ],
+  "commit": "",
+  "started": "2026-08-20T02:07:13.211434+00:00",
+  "algorithms": [
+    "topoexplore-phase1and2-none",
+    "topoexplore-phase1and2-ricci",
+    "topoexplore-phase1and2-animation",
+    "topoexplore-phase1and2-both"
+  ],
+  "layouts": "split:test",
+  "private_algorithms": 4,
+  "layout_seeds": [
+    0
+  ],
+  "algorithm_seed": 0,
+  "plan": {
+    "tune": {
+      "steps": 100000,
+      "episodes": null
+    },
+    "test": {
+      "steps": 1000000,
+      "episodes": null
+    }
+  },
+  "eval_episodes": 100,
+  "eval_archive": false,
+  "tuning": {
+    "split": "tune",
+    "per_slice": 1,
+    "steps": 100000,
+    "episodes": 25
+  },
+  "shard": {
+    "index": 368,
+    "count": 380
+  }
+}

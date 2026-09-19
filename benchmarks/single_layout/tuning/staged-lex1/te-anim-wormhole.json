@@ -1,0 +1,56 @@
+{
+  "values": {
+    "p_a": 0.5,
+    "w_a": 10.0,
+    "w_n": 0.3,
+    "p_u": 0.5,
+    "u_max": 4,
+    "w_topo": 0.1,
+    "w_wormhole": 1.0
+  },
+  "score": 3.3333333333333335,
+  "signal": "chambers",
+  "searched": [
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_wormhole": 0.25,
+      "return": 0.0,
+      "chambers": 3.0,
+      "coverage": 0.972814721873693
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_wormhole": 1.0,
+      "return": 0.0,
+      "chambers": 3.3333333333333335,
+      "coverage": 0.9813188345183327
+    },
+    {
+      "p_a": 0.5,
+      "w_a": 10.0,
+      "w_n": 0.3,
+      "p_u": 0.5,
+      "u_max": 4,
+      "w_topo": 0.1,
+      "w_wormhole": 4.0,
+      "return": 0.0,
+      "chambers": 3.0,
+      "coverage": 0.9670988428830336
+    }
+  ],
+  "rows": [
+    "SpaceWarp@1000",
+    "SpaceWarp@1001",
+    "SpaceWarp@1002"
+  ]
+}

@@ -3,6 +3,9 @@
     "scripts/benchmarks/run_single_layout.py",
     "--baselines",
     "go-explore-phase1",
+    "topoexplore-phase1-none",
+    "topoexplore-phase1-ricci",
+    "topoexplore-phase1-both",
     "--layouts",
     "TopoGym/OpenFieldChamberCount4-500-v0",
     "TopoGym/OpenFieldChamberCount6-530-v0",
@@ -34,7 +37,9 @@
   "commit": "ce1a94e0d6c2eb9295741b7ca7bfb66d48e7418c",
   "started": "2026-09-05T01:25:17.990725+02:00",
   "algorithms": [
-    "go-explore-phase1"
+    "topoexplore-phase1-none",
+    "topoexplore-phase1-ricci",
+    "topoexplore-phase1-both"
   ],
   "layouts": [
     "TopoGym/OpenFieldChamberCount4-500-v0",

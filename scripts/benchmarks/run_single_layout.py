@@ -63,8 +63,10 @@ from topogym.baselines.gridworld2dv1.single_layout import (  # noqa: E402
     TUNING_LAYOUT,
     TUNING_SEED,
     layout_row,
+    resolve_unit_dir,
     tune_on_layout,
     tune_on_rows,
+    unit_path,
 )
 from topogym.baselines.utilities import BudgetPlan, SplitBudget  # noqa: E402
 
@@ -132,13 +134,13 @@ def _join(root, *parts: str) -> str:
 def artifact_root(name: str, artifacts) -> str:
     """Where ``name``'s artefacts go.
 
-    Every artefact path carries the algorithm's name, so running an
-    unpublished method writes that name into the working tree whatever
-    .gitignore says about its source file. Anything outside the shipped
-    registry is routed under ``private/``, which is ignored wholesale.
+    Every method writes into the same tree. Results for an unshipped
+    method used to be diverted under ``private/``, which gave one
+    world two directories and meant reading a comparison in two
+    places; the method it was hiding is no longer withheld, so the
+    split has nothing left to buy.
     """
-    return (str(artifacts) if is_public(name)
-            else _join(artifacts, "private"))
+    return str(artifacts)
 
 
 def _split_rows(split: str) -> list:
@@ -279,8 +281,8 @@ def run_one(name: str, row: dict, args) -> dict:
     # Layout first, then artefact kind: one environment's results,
     # figures, GIFs and telemetry sit together, so a study can be read,
     # copied or thrown away as a unit.
-    telemetry_root = args.telemetry or _join(root, row["unit"],
-                                             "telemetry")
+    telemetry_root = args.telemetry or _join(
+        root, unit_path(row["unit"]), "telemetry")
     result = baseline.single_layout_train_test_run(
         row,
         step_budget=args.plan.for_split("test").steps,
@@ -300,7 +302,7 @@ def _publish(result, args, baseline) -> None:
     """Write the JSON summary, then the GIF, under the artifact root."""
     payload = json.dumps(result.to_dict(), indent=2, default=str)
     root = artifact_root(result.algorithm, args.artifacts)
-    target = _join(root, result.layout, "results",
+    target = _join(root, unit_path(result.layout), "results",
                    f"{result.algorithm}.json")
     if _is_uri(args.artifacts):
         import pyarrow.fs as pafs
@@ -324,7 +326,7 @@ def _record_gif(result, args, baseline, root) -> None:
     """One episode of the fitted policy, in the layout it was fitted on."""
     from record_baseline_gifs import record
 
-    folder = (pathlib.Path(root) / result.layout / "gifs")
+    folder = (pathlib.Path(root) / unit_path(result.layout) / "gifs")
     folder.mkdir(parents=True, exist_ok=True)
     try:
         # The *fitted* baseline, not a fresh one: a GIF of an unfitted
@@ -410,15 +412,6 @@ def _write_run_manifest(args, names: list) -> None:
     with open(folder / name, "w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2, default=str)
     logger.info("wrote %s", folder / name)
-    if private:
-        # The private run gets its own record, under the ignored root,
-        # so nothing is lost and nothing is exposed.
-        secret = pathlib.Path(artifact_root(private[0], args.artifacts))
-        secret.mkdir(parents=True, exist_ok=True)
-        with open(secret / name, "w", encoding="utf-8") as handle:
-            json.dump({**manifest, "argv": _sys.argv,
-                       "algorithms": private}, handle, indent=2,
-                      default=str)
 
 
 def _units(args) -> list:
@@ -469,7 +462,7 @@ def _publish_layouts(args) -> None:
         seen_algorithms = sorted({
             path.stem
             for unit in units
-            for path in (pathlib.Path(args.artifacts) / unit
+            for path in (resolve_unit_dir(args.artifacts, unit)
                          / "results").glob("*.json")
         })
         for name in seen_algorithms:
@@ -636,8 +629,9 @@ def main() -> int:
     for index, (name, row) in enumerate(studies, 1):
         unit = row["unit"]
         if args.only_missing and not _is_uri(args.artifacts):
-            existing = (pathlib.Path(artifact_root(name, args.artifacts))
-                        / unit / "results" / f"{name}.json")
+            existing = (resolve_unit_dir(
+                artifact_root(name, args.artifacts), unit)
+                / "results" / f"{name}.json")
             if existing.exists():
                 logger.info("[%d/%d] %s on %s already done; skipping",
                             index, len(studies), name, unit)

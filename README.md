@@ -104,9 +104,18 @@ env.reset(options={"teleport": (12, 40)})  # any previously visited cell
 
 ## Benchmarks
 
-| benchmark | what it tests | manifest | splits | RND+PPO | ICM+PPO | Go-Explore | status |
-|---|---|---|---|---|---|---|---|
-| **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | TBD | TBD | TBD | 🟠 in development |
+| benchmark | what it tests | manifest | splits | RND+PPO | ICM+PPO | Go-Explore | TopoExplore | status |
+|---|---|---|---|---|---|---|---|---|
+| **TopoGym-v1** | topological navigation against decoys, chambers, distractions, and orientation in 2D space | [`croissant.json`](croissant.json) · [`docs/manifest.csv`](docs/manifest.csv) | [`tune`](docs/splits/tune.csv) · [`train`](docs/splits/train.csv) · [`val`](docs/splits/val.csv) · [`test`](docs/splits/test.csv) · [size-extrapolation](docs/splits/size-extrapolation-test.csv) · [family-holdout](docs/splits/family-holdout-test.csv) | 7 / 189 | 15 / 189 | 152 / 189 | **169 / 189** | ✅ published |
+
+Worlds whose goal each method reached, of the 189 hold-out instances.
+Go-Explore and TopoExplore are read on the training side, where their
+archive is live; RND and ICM are read on the frozen evaluation, which
+discards an archive by construction and so scores every archive method
+zero. Paired world by world, every TopoExplore arm beats Go-Explore
+(19 worlds won against 2 lost for the strongest, sign test p < 0.001).
+The numbers, the per-arm sign tests and the frozen-evaluation table are
+in [BENCHMARKS.md](BENCHMARKS.md).
 
 The random floor: across all 189 hold-out instances (50 episodes each, 9,450 episodes) a uniform-random policy reaches the goal **0% of the time** and uncovers **11.0%** of the reachable space. Nothing in this benchmark falls out of undirected exploration, and coverage — not steps-to-goal — is what separates methods until one of them solves something.
 
