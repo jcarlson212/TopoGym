@@ -34,8 +34,10 @@ they are not requested.
 every id, three layout seeds, and every observation and action mode, a
 digest of the registration, the reset observation and info, and 50
 steps of observation, reward, terminated, truncated and info under a
-fixed action sequence. CI's `golden` job replays them all on the oldest
-and newest supported Python.
+fixed action sequence. The `Golden` workflow replays them all whenever a
+change touches code that could alter env behaviour (the envs,
+generation, the core, rendering, the registry) or the fixtures, on
+Python 3.13, and can be run on demand before a release.
 
 A golden failure means the change broke compatibility. It is never
 fixed by re-recording the fixture. The only time a fixture is written is

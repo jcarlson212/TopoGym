@@ -6,7 +6,8 @@ for why a mismatch is a bug in the change, never in the fixture.
 Recorded ids are compared in full. The cost is dominated by generating
 the large worlds, so the rollout comparison is opt-in
 (``TOPOGYM_GOLDEN=1``, optionally ``GOLDEN_SHARD=i/n``) and runs in its
-own CI job; the cheap checks run everywhere. Ids registered after 0.4.2
+own workflow, triggered only by changes that could alter env
+behaviour; the cheap checks run everywhere. Ids registered after 0.4.2
 have no fixture and are not checked here; they get one when they ship.
 """
 
