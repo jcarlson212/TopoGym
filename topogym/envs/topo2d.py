@@ -39,6 +39,12 @@ only:
   plus an agent mask, entirely unoccluded. An oracle view for debugging,
   not a partial-observability setting, and far slower to step.
 
+- ``"canonical"`` — opt-in: egocentric RGB, the instruction, the ego
+  pose and a text rendering of the view, with privileged signals
+  recorded in ``info``. See :mod:`topogym.canonical`; also the default
+  for the ``"words"`` and ``"waypoint"`` action levels, which drive an
+  egocentric body through the same primitives.
+
 Terrain and visibility live in the code channel, semantics in the
 texture block; no texture slot ever means "out of map" or "unseen"
 (those are :data:`~topogym.core.constants.OBS_OUT_OF_WORLD` and
@@ -72,13 +78,30 @@ class TopoGrid2DEnv(TopoEnvCore):
     #: quarter-turns right to face each fourway direction from "up"
     _FOURWAY_TURNS = {MOVE_UP: 0, MOVE_DOWN: 2, MOVE_LEFT: 3, MOVE_RIGHT: 1}
 
+    #: The opt-in canonical layer's adapter (None in every native mode).
+    _canonical = None
+
+    #: The primitive the last step executed, after slip (None = wait).
+    _last_executed = None
+
     def __init__(self, config: TopoGenConfig2D | dict | None = None, *,
-                 actions: str = "egocentric", **kwargs):
-        if actions not in ("fourway", "egocentric"):
+                 actions: str = "egocentric", n_goals: int = 1,
+                 stop_to_succeed: bool = False, image_size: int = 256,
+                 topdown: bool = False, phrasing="canonical", **kwargs):
+        if actions not in ("fourway", "egocentric", "words", "waypoint"):
             raise ValueError(
-                f'actions must be "fourway" or "egocentric", got {actions!r}'
+                'actions must be "fourway", "egocentric", "words" or '
+                f'"waypoint", got {actions!r}'
             )
         self.actions = actions
+        #: How the body moves: the words and waypoint levels drive the
+        #: egocentric primitives.
+        self._motion = "fourway" if actions == "fourway" else "egocentric"
+        self._canonical_opts = {
+            "n_goals": n_goals, "stop_to_succeed": stop_to_succeed,
+            "image_size": image_size, "topdown": topdown,
+            "phrasing": phrasing,
+        }
         self._sight_cache: dict = {}
         self._sight_layout = None
         super().__init__(config, **kwargs)
@@ -90,6 +113,8 @@ class TopoGrid2DEnv(TopoEnvCore):
         return TopoGenConfig2D
 
     def _default_obs_mode(self) -> str:
+        if self.actions in ("words", "waypoint"):
+            return "canonical"
         return "vector" if self.actions == "fourway" else "local"
 
     def _probe_layout(self) -> Layout:
@@ -101,9 +126,41 @@ class TopoGrid2DEnv(TopoEnvCore):
         return probe
 
     def _build_spaces(self) -> None:
-        self.action_space = spaces.Discrete(
-            4 if self.actions == "fourway" else 3
-        )
+        self._n_primitive = 4 if self._motion == "fourway" else 3
+        self.action_space = spaces.Discrete(self._n_primitive)
+        if self.obs_mode == "canonical" or \
+                self.actions in ("words", "waypoint"):
+            self._build_canonical()
+            return
+        defaults = {"n_goals": 1, "stop_to_succeed": False,
+                    "image_size": 256, "topdown": False,
+                    "phrasing": "canonical"}
+        changed = sorted(k for k, v in self._canonical_opts.items()
+                         if v != defaults[k])
+        if changed:
+            raise ValueError(
+                f"{', '.join(changed)} belong(s) to the canonical layer: "
+                'pass obs_mode="canonical" or actions="words"/"waypoint"')
+        self._build_native_spaces()
+
+    def _build_canonical(self) -> None:
+        from topogym.canonical.adapter import CanonicalAdapter
+
+        native_obs = self.obs_mode != "canonical"
+        self._canonical = CanonicalAdapter(
+            self, obs="native" if native_obs else "canonical",
+            actions=(self.actions if self.actions in ("words", "waypoint")
+                     else "native"),
+            **self._canonical_opts)
+        if native_obs:
+            self._build_native_spaces()
+        else:
+            self.observation_space = self._canonical.observation_space()
+        act = self._canonical.action_space()
+        if act is not None:
+            self.action_space = act
+
+    def _build_native_spaces(self) -> None:
         r = self.view_radius
         if self.obs_mode == "dict":
             w, h = self._probe_layout().base.layout_size()
@@ -159,7 +216,7 @@ class TopoGrid2DEnv(TopoEnvCore):
         self._reset_runtime()
         base = self.layout.base
         self._state = base.initial_state(self._resolve_start(options))
-        if self.actions == "egocentric":
+        if self._motion == "egocentric":
             for _ in range(int(self.np_random.integers(4))):
                 self._state = base.turn_left(self._state)
         else:
@@ -172,17 +229,30 @@ class TopoGrid2DEnv(TopoEnvCore):
         self.lifetime_visit_counts[cell] = (
             self.lifetime_visit_counts.get(cell, 0) + 1
         )
+        if self._canonical is not None:
+            return self._canonical.reset(self._obs(), self._reset_info(cell),
+                                         seed=seed, options=options)
         return self._obs(), self._reset_info(cell)
 
-    def step(self, action: int) -> tuple:
+    def step(self, action) -> tuple:
+        if self._canonical is not None:
+            return self._canonical.step(action)
         action = int(action)
         if not self.action_space.contains(action):
             raise ValueError(f"invalid action {action!r}")
-        action = self._maybe_slip(action)
-        if self.actions == "fourway":
-            self._step_fourway(action)
-        else:
-            self._step_egocentric(action)
+        return self._step_primitive(action)
+
+    def _step_primitive(self, action: int | None) -> tuple:
+        """One primitive of the body: a validated action index, or
+        ``None`` to wait (no motion, but time and scenario dynamics
+        advance). The native step is exactly this."""
+        if action is not None:
+            action = self._maybe_slip(action)
+            if self._motion == "fourway":
+                self._step_fourway(action)
+            else:
+                self._step_egocentric(action)
+        self._last_executed = action
         self._post_move_hook()
         reward, terminated, truncated = self._step_outcome(self._state.cell)
         self._episode_return += reward  # the final reward, bonuses included
@@ -226,6 +296,8 @@ class TopoGrid2DEnv(TopoEnvCore):
     def _describe_obs(self, obs: np.ndarray) -> str:
         """A human-readable rendering of the current observation for
         the TOPOGYM_DEBUG stream."""
+        if self.obs_mode == "canonical":
+            return "canonical (built after the step)"
         if self.obs_mode == "vector":
             x, y = int(obs[0]), int(obs[1])
             parts = [f"x={x} y={y}"]
@@ -287,6 +359,12 @@ class TopoGrid2DEnv(TopoEnvCore):
     def _obs(self):
         if self.obs_mode == "global":
             return self._global_obs()
+        if self.obs_mode == "canonical":
+            # The canonical layer builds its observation once per
+            # canonical action (which may be several primitives); the
+            # sight update is what every primitive must still do.
+            self._sight_patch()
+            return None
         patch = self._sight_patch()
         if self.obs_mode == "local":
             return patch

@@ -86,6 +86,14 @@ class TopoEnvCore(gym.Env):
     #: per-step magnitude of the "deceptive" shaping gradient
     DECEPTIVE_SHAPING = 0.01
 
+    #: Goal hooks for the opt-in canonical layer (topogym.canonical).
+    #: At these defaults the goal is the layout's and pays on arrival,
+    #: which is every mode's behaviour; only multi-goal conditioning
+    #: (another goal cell) and stop-to-succeed (no payout on arrival)
+    #: change them.
+    _goal_override = None
+    _auto_goal = True
+
     def __init__(self, config: TopoGenConfig2D | dict | None = None, *,
                  layout: Layout | None = None, layout_seed: int | None = None,
                  seed: int | None = None, obs_mode: str | None = None,
@@ -289,9 +297,11 @@ class TopoEnvCore(gym.Env):
 
     def _maybe_slip(self, action: int) -> int:
         """With probability ``p_slip`` the executed action is resampled
-        uniformly (the spec's slip model)."""
+        uniformly (the spec's slip model) from the primitive actions --
+        the action space itself in every native mode."""
         if self.p_slip > 0.0 and self.np_random.random() < self.p_slip:
-            return int(self.np_random.integers(self.action_space.n))
+            n = getattr(self, "_n_primitive", None) or self.action_space.n
+            return int(self.np_random.integers(n))
         return action
 
     # -- deceptive-reward ground truth --------------------------------------
@@ -695,7 +705,8 @@ class TopoEnvCore(gym.Env):
             self.chamber_entry_steps[chamber] = self._steps
         reward, terminated = 0.0, False
         mode = self.reward_mode
-        at_goal = self.goal_exists and agent_cell == self.layout.goal
+        at_goal = (self.goal_exists and self._auto_goal
+                   and agent_cell == self._goal_cell())
         if mode == "sparse" and at_goal:
             reward, terminated = 1.0, True
         elif mode == "goal" and at_goal:  # legacy step-decayed sparse
@@ -714,6 +725,13 @@ class TopoEnvCore(gym.Env):
         truncated = self._steps >= self._max_steps and not terminated
         return reward, terminated, truncated
 
+    def _goal_cell(self) -> tuple:
+        """The cell that counts as the goal: the layout's, unless the
+        canonical layer's multi-goal conditioning chose another."""
+        if self._goal_override is not None:
+            return self._goal_override
+        return self.layout.goal
+
     def _step_info(self, agent_cell: tuple) -> dict:
         n_free = len(self.layout.free_cells)
         return {
@@ -726,7 +744,7 @@ class TopoEnvCore(gym.Env):
             # goal on 151 of 189 worlds -- and phase 2 of Go-Explore,
             # gated on a recorded goal trajectory, never ran at all.
             "goal_reached": bool(self.goal_exists
-                                 and agent_cell == self.layout.goal),
+                                 and agent_cell == self._goal_cell()),
             "steps": self._steps,
             "coverage": len(self._visited) / n_free,
             # Coverage across the env's lifetime on this layout (all
