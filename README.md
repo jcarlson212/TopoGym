@@ -50,11 +50,30 @@ ActionMode.FOURWAY.actions                  # -> FourwayAction, for code generic
 
 The bare names — `FORWARD`, `TURN_LEFT`, `MOVE_UP`, … — remain importable from `topogym` and are defined *from* the enums, so `FORWARD == EgocentricAction.FORWARD` holds by construction.
 
+### Canonical observations for vision-language agents
+
+Any id can also be driven the way vision-language(-action) policies
+expect: an egocentric RGB image, a language instruction, a named ego
+pose, a text rendering of the view, word or waypoint actions, optional
+multi-goal instructions, and a manifest declaring every stream. It is
+opt-in and leaves every native mode untouched.
+
+```python
+env = gym.make("TopoGym/Dilution-50-v0", obs_mode="canonical", actions="words")
+obs, info = env.reset(seed=0)
+obs["observation.language.instruction"]  # 'Go to the treasure in the room with one door.'
+env.step("move_forward")
+```
+
+See [docs/canonical.md](docs/canonical.md), including per-episode export
+in the LeRobot dataset v3.0 layout.
+
 ## Install
 
 ```bash
 pip install topogym              # deps: gymnasium, numpy, gudhi
 pip install "topogym[play]"      # + pygame, for keyboard play
+pip install "topogym[export]"    # + pyarrow, for LeRobot-layout episode export
 ```
 
 Development: `git clone`, then `pip install -e ".[testing,play,assets]"`.
@@ -271,6 +290,11 @@ python scripts/benchmarks/profiles/step_throughput.py
   Texture/Top constructions. The authority on the benchmark.
 - [docs/environments/](docs/environments/README.md) — per-environment
   pages (spaces, rewards, registered configurations).
+- [docs/canonical.md](docs/canonical.md) — the opt-in canonical
+  layer: image, instruction, ego pose and text observations; word and
+  waypoint actions; multi-goal instructions; manifest; episode export.
+- [COMPATIBILITY.md](COMPATIBILITY.md) — what is frozen across
+  releases, how ids are versioned, and the deprecation policy.
 - [docs/reference.md](docs/reference.md) — library internals: the cell
   complex, the generator, TDA, the metrics interface, and
   `VisitedComplex` — the incremental visited-state topology structure

@@ -66,9 +66,28 @@ Python 3.9 and later. Features that need anything else live in extras
 (`[export]`, `[graph]`, `[play]`, ...) and fail with an install hint
 when the extra is missing, never at import time.
 
-## The canonical observation spec
+## The canonical layer
 
-`topogym.canonical` versions its schema as `CANONICAL_SPEC_VERSION`.
-It changes only in minor releases and only additively: new optional
-keys and new vocabulary entries. Existing keys keep their names,
-shapes, units and frames.
+`obs_mode="canonical"` and `actions="words"`/`"waypoint"` (0.5.0) are
+additive: they exist only when asked for, their kwargs (`n_goals`,
+`stop_to_succeed`, `image_size`, `topdown`, `phrasing`) are rejected
+unless the layer is on, and at their defaults the native env is
+unchanged (the golden suite checks it). Under the layer, single-goal
+dynamics, rewards and native info are those of the native env; the
+layer only adds keys (`instruction`, `privileged`, `canonical`,
+`success`, and `stopped` after `stop`).
+
+`topogym.canonical.spec` versions the schema as
+`CANONICAL_SPEC_VERSION`. It changes only in minor releases and only
+additively: new optional keys, new vocabulary, new categories and
+paraphrase templates appended. Existing keys keep their names, shapes,
+units and frames; existing template indices keep their wording.
+
+Other embodiments may reuse keys with a different sensor behind them
+(`observation.images.head` is a rendered occupancy view here and a
+perspective camera elsewhere); the manifest's `cameras` entry is what
+says which, so consumers must read it rather than assume.
+
+The export format follows the LeRobot dataset v3.0 layout; the version
+it was validated against is recorded in
+[docs/canonical.md](docs/canonical.md).
