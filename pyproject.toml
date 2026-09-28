@@ -30,7 +30,7 @@ classifiers = [
 dependencies = ["gymnasium>=0.29", "numpy>=1.21", "gudhi>=3.8"]
 
 [project.optional-dependencies]
-testing = ["pytest>=7.0", "networkx>=3.0"]
+testing = ["pytest>=7.0", "networkx>=3.0", "pyarrow>=12"]  # pyarrow: export tests
 play = ["pygame>=2.1"]
 assets = ["imageio>=2.31"]  # GIF generation for the docs gallery
 # Baseline/benchmark runs; never core deps. Ray RLlib supplies the
@@ -49,6 +49,11 @@ benchmarks = [
     "matplotlib>=3.7",
 ]
 graph = ["networkx>=3.0"]  # env.graph() as a networkx.Graph
+# Canonical-layer episode export (LeRobot v3.0 layout): parquet only;
+# PNG frames are encoded with the standard library.
+export = ["pyarrow>=12"]
+# MP4 frames for the export instead of embedded PNGs.
+video = ["pyarrow>=12", "av>=12"]
 
 [project.urls]
 Homepage = "https://github.com/jcarlson212/TopoGym"
