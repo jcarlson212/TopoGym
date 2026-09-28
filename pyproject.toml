@@ -67,6 +67,7 @@ topogym = ["benchmarks.json"]
 testpaths = ["tests"]
 markers = [
     "slow: exercises a real training loop; deselect with -m 'not slow'",
+    "golden: every published id against its recorded 0.4.2 rollouts; runs only with TOPOGYM_GOLDEN=1",
 ]
 
 [tool.ruff]
