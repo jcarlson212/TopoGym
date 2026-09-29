@@ -85,6 +85,11 @@ additively: new optional keys, new vocabulary, new categories and
 paraphrase templates appended. Existing keys keep their names, shapes,
 units and frames; existing template indices keep their wording.
 
+Producers extend the goal categories and instruction templates at
+runtime (`register_category`, `register_templates`). Their entries are
+namespaced `<producer>:<key>` and append-only per producer; unprefixed
+keys belong to TopoGym and follow the rule above.
+
 Other embodiments may reuse keys with a different sensor behind them
 (`observation.images.head` is a rendered occupancy view here and a
 perspective camera elsewhere); the manifest's `cameras` entry is what

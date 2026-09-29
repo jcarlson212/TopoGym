@@ -54,6 +54,8 @@ graph = ["networkx>=3.0"]  # env.graph() as a networkx.Graph
 export = ["pyarrow>=12"]
 # MP4 frames for the export instead of embedded PNGs.
 video = ["pyarrow>=12", "av>=12"]
+# JPEG frames for the export.
+jpeg = ["pyarrow>=12", "pillow>=9"]
 
 [project.urls]
 Homepage = "https://github.com/jcarlson212/TopoGym"
