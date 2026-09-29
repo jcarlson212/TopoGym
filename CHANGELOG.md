@@ -3,7 +3,7 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
-## 0.5.1 (unreleased)
+## 0.5.1 (2026-09-29)
 
 ### Fixed
 
