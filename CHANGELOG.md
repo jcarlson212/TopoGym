@@ -19,6 +19,11 @@ are additive, and no existing id changes behaviour.
   `group_by_split=False` keeps the given order and leaves out, with a
   warning, any split whose episodes are not contiguous. Nothing that
   assembled under 0.5.0 fails now.
+- `topogym.canonical.manifest(env)` failed with "'module' object is
+  not callable" on every call after the first (or after anything
+  imported `topogym.canonical.manifest`): importing the submodule
+  rebound the package's name to it. The function is now bound when the
+  package is imported.
 
 ## 0.5.0 (2026-09-29)
 
