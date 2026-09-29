@@ -24,8 +24,14 @@ Nothing here changes an env that does not ask for it.
   units, frames, vocabulary, text grammar, templates, categories);
   standard library only.
 - :func:`wrap`, :func:`manifest`, :func:`describe_goal`.
-- :mod:`topogym.canonical.export` -- per-episode LeRobot v3.0 writer
+- :mod:`topogym.canonical.export` -- the LeRobot v3.0 episode writer
+  (feature-driven, or straight from a grid env) and ``assemble``;
+  :mod:`topogym.canonical.reader` -- its inverse
   (``pip install 'topogym[export]'``).
+- :mod:`topogym.canonical.transforms` -- REP-103/OpenCV frames,
+  quaternions, pose7, intrinsics, depth back-projection (numpy only).
+- :mod:`topogym.canonical.codecs` -- PNG, 16-bit depth and
+  segmentation images, JPEG.
 """
 
 from __future__ import annotations
