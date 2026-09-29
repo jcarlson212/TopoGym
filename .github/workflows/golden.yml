@@ -1,0 +1,55 @@
+name: Golden
+
+# Every published id against its recorded 0.4.2 rollouts
+# (COMPATIBILITY.md). About an hour of CPU, almost all of it generating
+# the large worlds, so it runs only when a change could alter env
+# behaviour -- the envs, generation, the core, rendering, the registry,
+# or the fixtures -- and on one Python. workflow_dispatch runs it on
+# demand (before a release, or on another version by editing the
+# matrix).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "topogym/envs/**"
+      - "topogym/generation/**"
+      - "topogym/core/**"
+      - "topogym/rendering/**"
+      - "topogym/complexes/**"
+      - "topogym/registry.py"
+      - "topogym/spec.py"
+      - "topogym/__init__.py"
+      - "tests/compat/**"
+  pull_request:
+    paths:
+      - "topogym/envs/**"
+      - "topogym/generation/**"
+      - "topogym/core/**"
+      - "topogym/rendering/**"
+      - "topogym/complexes/**"
+      - "topogym/registry.py"
+      - "topogym/spec.py"
+      - "topogym/__init__.py"
+      - "tests/compat/**"
+  workflow_dispatch:
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: pip install -e ".[testing]"
+      - name: Golden rollouts
+        env:
+          TOPOGYM_GOLDEN: "1"
+          GOLDEN_SHARD: ${{ matrix.shard }}/6
+        run: pytest -q tests/compat

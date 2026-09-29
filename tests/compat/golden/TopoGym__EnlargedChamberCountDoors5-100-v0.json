@@ -1,0 +1,1039 @@
+{
+ "env_id": "TopoGym/EnlargedChamberCountDoors5-100-v0",
+ "recorded_with": "0.4.2",
+ "rollouts": {
+  "seed=0|obs=dict|actions=egocentric": {
+   "checkpoints": [
+    "3bb07bd745a4021107b773be4e506108",
+    "385fd291d08d89d9e97b7921e2f61a7c",
+    "285dcf592482b3448258ea1ddaeae1f8",
+    "bacbc6c67820a9630693e14675732ad8",
+    "c33ef0ea789eb5e5b072530a88cec655"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "dce2fe98b71981592986e17a4cfe6c7b",
+   "resets": 0,
+   "spaces": "4e40ff9837d0db40da87f6f8f67fb419"
+  },
+  "seed=0|obs=dict|actions=fourway": {
+   "checkpoints": [
+    "7035d0eeaccaf08f828d9bee0649e684",
+    "5f4a8228e552795ddca2d8da191bfda1",
+    "543124d0efe48db06c8f081402702f4f",
+    "70372ed1977256346fdc3e178e433a31",
+    "b9a0ff61fa0ee2f8c8c63b6ae9dde791"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "dce2fe98b71981592986e17a4cfe6c7b",
+   "resets": 0,
+   "spaces": "b2e98b622806db8964343d99a66579e6"
+  },
+  "seed=0|obs=global|actions=egocentric": {
+   "checkpoints": [
+    "c3c9cf9d50bd4af48685da4c271c88b7",
+    "d8d75d56dea1c6f7dc282c8c9a2fbdb7",
+    "c45ea7d34369a69fc2cb8c8cd01849f4",
+    "da240a40dbe6ce789b728daff6cb53c6",
+    "93f1f9cd8bbc0454f2ebcdc02cba521c"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "08ff0fbe934c36c45d0db228f5e54350",
+   "resets": 0,
+   "spaces": "b79338f2d6f8c0d57129720d990f7933"
+  },
+  "seed=0|obs=global|actions=fourway": {
+   "checkpoints": [
+    "638ea64aaaefeee5281374f57314f3c6",
+    "06ebf79e5fcfc48b9b896de6c3f5c2ff",
+    "2f4d85b0d726b64af988e7c9aee42318",
+    "ca978664a602dd558b47368e1eaa8899",
+    "b32ea2fde0e63ba9f8cb11361f0f9d98"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "08ff0fbe934c36c45d0db228f5e54350",
+   "resets": 0,
+   "spaces": "51b0774309626126c4c92f2c9eb0c8c1"
+  },
+  "seed=0|obs=local|actions=egocentric": {
+   "checkpoints": [
+    "b64be8797d178740ffe600e7adc9f0f2",
+    "92889010647eff2644a24e864df80895",
+    "e7745dd1fef6643b762ab9fab4a6876c",
+    "c36dbd39f2de86a2897412fe882381b1",
+    "020f54cef8de7376d5272cf7a0c5a2b7"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "39fe4bd9e4b768ed3f7706522798c4f3",
+   "resets": 0,
+   "spaces": "252361ff6bbc6330b75b5e809d3ba0ca"
+  },
+  "seed=0|obs=local|actions=fourway": {
+   "checkpoints": [
+    "d38a3c1e7f1bf600e1e1379b6dd602a1",
+    "5427f335c4ecca5463b280104197918f",
+    "a225456f3ee7dc6ed412dd2e9ce196f0",
+    "7a61cabf2cb4f6525be5f988f5813511",
+    "f4bc839b4103ba033793904a035d16c8"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "39fe4bd9e4b768ed3f7706522798c4f3",
+   "resets": 0,
+   "spaces": "bcafd29bf5d83c55286498d2513cffc6"
+  },
+  "seed=0|obs=vector|actions=egocentric": {
+   "checkpoints": [
+    "547383946f3f1654c6979004d71919b2",
+    "7a5a9e14ab3c43cdb805380735b5f78d",
+    "da5afdfff27daa5ce2546dad124da251",
+    "922122cafd32276642afbf21801a09b3",
+    "ce80ef0cfb3f4edf7f5341bbdac65a9e"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "1fe5e00b0ede71391deb21dda6bd68bf",
+   "resets": 0,
+   "spaces": "8b386cbb1627a07146f622ef404b508f"
+  },
+  "seed=0|obs=vector|actions=fourway": {
+   "checkpoints": [
+    "56410d179cf2aabe925e66b28fb44a2b",
+    "4cb8114c6d20eb258968f8a70e9fe7f7",
+    "a661e1ba2c0a5b4a21e79e41fcbf9cf9",
+    "bb033d4bcec6bef51a32c4b276e6c72a",
+    "75370d5e5451647c768ebf9797164bec"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "1fe5e00b0ede71391deb21dda6bd68bf",
+   "resets": 0,
+   "spaces": "a91cb6dec6cbeff795e8c97f18c45c53"
+  },
+  "seed=1|obs=dict|actions=egocentric": {
+   "checkpoints": [
+    "1f1d9ed5f824ca86541c76cc5457fb80",
+    "e96a6a0aac68b5dfda2295b893ae456d",
+    "5a2dd7d737cc6de0806fed1bcecf91e9",
+    "37ed61c1425218c6b3df7f43967dde5f",
+    "18478374ecc0c7e3abb1cebf6464d878"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "75c46bdcfd4cc5c6e8e7fcec43c5e537",
+   "resets": 0,
+   "spaces": "4e40ff9837d0db40da87f6f8f67fb419"
+  },
+  "seed=1|obs=dict|actions=fourway": {
+   "checkpoints": [
+    "7035d0eeaccaf08f828d9bee0649e684",
+    "5f4a8228e552795ddca2d8da191bfda1",
+    "543124d0efe48db06c8f081402702f4f",
+    "70372ed1977256346fdc3e178e433a31",
+    "b9a0ff61fa0ee2f8c8c63b6ae9dde791"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "75c46bdcfd4cc5c6e8e7fcec43c5e537",
+   "resets": 0,
+   "spaces": "b2e98b622806db8964343d99a66579e6"
+  },
+  "seed=1|obs=global|actions=egocentric": {
+   "checkpoints": [
+    "8b870d02e18c55779673c658e3be4db9",
+    "080f98b30d74abf58515d79ddd774749",
+    "9dd3ac8b7894d0473017235d607bc801",
+    "7a1c0afa991431ee8099c719eaa75d7e",
+    "bd26fbb02f0e38256a372ae9089e36b0"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "1dd12d313fbeb9ed9f8132594983fc7d",
+   "resets": 0,
+   "spaces": "b79338f2d6f8c0d57129720d990f7933"
+  },
+  "seed=1|obs=global|actions=fourway": {
+   "checkpoints": [
+    "3b12e9db937df294cef0c54a17c2c991",
+    "86ad3b89ede9d8f8b3f4cf079eee0449",
+    "aa00d3c629a570ed8823deb0b96cbb1c",
+    "7b4e9568f1b4fc67e297c0b6e0238131",
+    "f81b2bd2e8ed20fd86a1e936dd11b372"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "1dd12d313fbeb9ed9f8132594983fc7d",
+   "resets": 0,
+   "spaces": "51b0774309626126c4c92f2c9eb0c8c1"
+  },
+  "seed=1|obs=local|actions=egocentric": {
+   "checkpoints": [
+    "b44d264be9ada60742915f0549404a74",
+    "dc0a9e3b4826f208d8fc994b12f15cd5",
+    "67f9113e5843e15eb8c857e5258736a7",
+    "44c2459cc7c995ace7d2a262ebccd993",
+    "082b7da90c51f2bc0d52f01ea70f3f6d"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "6ea9d4a64d52037db69b7e50bbf97ea4",
+   "resets": 0,
+   "spaces": "252361ff6bbc6330b75b5e809d3ba0ca"
+  },
+  "seed=1|obs=local|actions=fourway": {
+   "checkpoints": [
+    "d38a3c1e7f1bf600e1e1379b6dd602a1",
+    "5427f335c4ecca5463b280104197918f",
+    "a225456f3ee7dc6ed412dd2e9ce196f0",
+    "7a61cabf2cb4f6525be5f988f5813511",
+    "f4bc839b4103ba033793904a035d16c8"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "6ea9d4a64d52037db69b7e50bbf97ea4",
+   "resets": 0,
+   "spaces": "bcafd29bf5d83c55286498d2513cffc6"
+  },
+  "seed=1|obs=vector|actions=egocentric": {
+   "checkpoints": [
+    "9d72ed65614045a9fae2b484d2e4b329",
+    "6d826144e2aa7b63a2b745f78ed7b3ea",
+    "bafc9330da4d21d90c5178fa68023d84",
+    "a5706444d323079cd076fbbf4a63e6df",
+    "a072eb2dccecbff40f5c0e7249ffa232"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "6d1e6a153139d74d4ad05c8c846fdd85",
+   "resets": 0,
+   "spaces": "8b386cbb1627a07146f622ef404b508f"
+  },
+  "seed=1|obs=vector|actions=fourway": {
+   "checkpoints": [
+    "56410d179cf2aabe925e66b28fb44a2b",
+    "4cb8114c6d20eb258968f8a70e9fe7f7",
+    "a661e1ba2c0a5b4a21e79e41fcbf9cf9",
+    "bb033d4bcec6bef51a32c4b276e6c72a",
+    "75370d5e5451647c768ebf9797164bec"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "6d1e6a153139d74d4ad05c8c846fdd85",
+   "resets": 0,
+   "spaces": "a91cb6dec6cbeff795e8c97f18c45c53"
+  },
+  "seed=2|obs=dict|actions=egocentric": {
+   "checkpoints": [
+    "3bb07bd745a4021107b773be4e506108",
+    "385fd291d08d89d9e97b7921e2f61a7c",
+    "285dcf592482b3448258ea1ddaeae1f8",
+    "bacbc6c67820a9630693e14675732ad8",
+    "c33ef0ea789eb5e5b072530a88cec655"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "21a0198d48069147c8017e530f6f28e7",
+   "resets": 0,
+   "spaces": "4e40ff9837d0db40da87f6f8f67fb419"
+  },
+  "seed=2|obs=dict|actions=fourway": {
+   "checkpoints": [
+    "7035d0eeaccaf08f828d9bee0649e684",
+    "5f4a8228e552795ddca2d8da191bfda1",
+    "543124d0efe48db06c8f081402702f4f",
+    "70372ed1977256346fdc3e178e433a31",
+    "b9a0ff61fa0ee2f8c8c63b6ae9dde791"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "21a0198d48069147c8017e530f6f28e7",
+   "resets": 0,
+   "spaces": "b2e98b622806db8964343d99a66579e6"
+  },
+  "seed=2|obs=global|actions=egocentric": {
+   "checkpoints": [
+    "0b226aba919b0b44f0cf96d6b5ddb4a3",
+    "c96da4368b87941c5be48faf5732d1f4",
+    "4b6db3ca8b240e3c4f7120b6a5f92aaa",
+    "856c428429bbb175a740dd593741e691",
+    "bd70b95c5e6eb8c81fbe9b200be539de"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "c488b23e379fddec47d1e3799e7a29f1",
+   "resets": 0,
+   "spaces": "b79338f2d6f8c0d57129720d990f7933"
+  },
+  "seed=2|obs=global|actions=fourway": {
+   "checkpoints": [
+    "10487263d6d5d9aa24e3d641e5a4ffe5",
+    "2b666993892f1809e1b420e72cc9aafd",
+    "02686561858c864c614234fe9b4f5059",
+    "be07678f8de739ac037e32395845e00b",
+    "2b1f1560e0f04843cdc5871ae14f9af8"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "c488b23e379fddec47d1e3799e7a29f1",
+   "resets": 0,
+   "spaces": "51b0774309626126c4c92f2c9eb0c8c1"
+  },
+  "seed=2|obs=local|actions=egocentric": {
+   "checkpoints": [
+    "b64be8797d178740ffe600e7adc9f0f2",
+    "92889010647eff2644a24e864df80895",
+    "e7745dd1fef6643b762ab9fab4a6876c",
+    "c36dbd39f2de86a2897412fe882381b1",
+    "020f54cef8de7376d5272cf7a0c5a2b7"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "aaf27a10a23d5d84f828639072fec5e4",
+   "resets": 0,
+   "spaces": "252361ff6bbc6330b75b5e809d3ba0ca"
+  },
+  "seed=2|obs=local|actions=fourway": {
+   "checkpoints": [
+    "d38a3c1e7f1bf600e1e1379b6dd602a1",
+    "5427f335c4ecca5463b280104197918f",
+    "a225456f3ee7dc6ed412dd2e9ce196f0",
+    "7a61cabf2cb4f6525be5f988f5813511",
+    "f4bc839b4103ba033793904a035d16c8"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "aaf27a10a23d5d84f828639072fec5e4",
+   "resets": 0,
+   "spaces": "bcafd29bf5d83c55286498d2513cffc6"
+  },
+  "seed=2|obs=vector|actions=egocentric": {
+   "checkpoints": [
+    "547383946f3f1654c6979004d71919b2",
+    "7a5a9e14ab3c43cdb805380735b5f78d",
+    "da5afdfff27daa5ce2546dad124da251",
+    "922122cafd32276642afbf21801a09b3",
+    "ce80ef0cfb3f4edf7f5341bbdac65a9e"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "e48bd67d56f5f810e722e38b6d81abfe",
+   "resets": 0,
+   "spaces": "8b386cbb1627a07146f622ef404b508f"
+  },
+  "seed=2|obs=vector|actions=fourway": {
+   "checkpoints": [
+    "56410d179cf2aabe925e66b28fb44a2b",
+    "4cb8114c6d20eb258968f8a70e9fe7f7",
+    "a661e1ba2c0a5b4a21e79e41fcbf9cf9",
+    "bb033d4bcec6bef51a32c4b276e6c72a",
+    "75370d5e5451647c768ebf9797164bec"
+   ],
+   "info_keys": [
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start",
+     "topology"
+    ],
+    [
+     "chambers_entered",
+     "coverage",
+     "doors_opened",
+     "episode_return",
+     "goal_reached",
+     "h0_merges",
+     "known_components",
+     "lifetime_coverage",
+     "observed_frac",
+     "position",
+     "steps",
+     "teleport_start"
+    ]
+   ],
+   "reset": "e48bd67d56f5f810e722e38b6d81abfe",
+   "resets": 0,
+   "spaces": "a91cb6dec6cbeff795e8c97f18c45c53"
+  }
+ },
+ "spec": "9458bfc6a520a3a51feafa39d4b48835"
+}

@@ -168,6 +168,7 @@ paired by convention (`egocentric` → `local`, `fourway` → `vector`).
 | `local` | `(2r+1, 2r+1)` → `(7,7)` | `uint8 [0,9]` | ⚠️ terrain only — no semantics, no position |
 | `vector` | `(18,)` | `float32` | ⚠️ position + textures **of the current cell only** — no field of view |
 | `global` | `(2, h, w)` | `uint8 [0,9]` | ⚠️ the whole map, unoccluded — not a partial-observability setting |
+| `canonical` | `{observation.images.head, …}` | mixed | opt-in: egocentric RGB, instruction, ego pose, text — see [canonical.md](canonical.md) |
 
 **Prefer `dict`.** The other three are each a projection of it, and
 each drops something a general agent needs:
