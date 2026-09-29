@@ -206,10 +206,167 @@ Rows are decisions: each holds the observation the action was chosen
 from, the action at every level, and `next.reward`, `next.done`,
 `next.success`. Privileged fields ride along as `privileged.*` columns.
 
-**Validated against lerobot 0.4.4** (`LeRobotDataset` loading both a
-one-episode dataset and an assembled multi-episode one): every feature
-decodes with its declared shape and dtype, indices and tasks renumber
-across episodes, PNG frames round-trip bit-exact, and MP4 frames stay
-aligned (mean error about 1% per pixel). Decoding MP4 needs a working
-video backend on the reading side; `video_backend="pyav"` needs nothing
-beyond PyAV. TopoGym does not depend on lerobot.
+## Datasets from any producer
+
+The same writer serves simulators other than TopoGym's grids. Declare
+the features, then add one frame per decision:
+
+```python
+from topogym.canonical import spec
+from topogym.canonical.export import EpisodeWriter
+from topogym.canonical.spec import FeatureSpec
+
+features = [
+    FeatureSpec(spec.HEAD, "uint8", (224, 224, 3), storage="png"),   # or "jpeg", "video"
+    FeatureSpec(spec.depth_key("head"), "float32", (224, 224), storage="depth_png16"),
+    FeatureSpec(spec.segmentation_key("head"), "int32", (224, 224), storage="segmentation_png16"),
+    FeatureSpec(spec.INSTRUCTION, "string", (1,)),
+    FeatureSpec(spec.STATE, "float32", (5,), spec.STATE_NAMES_3D, units=spec.STATE_UNITS_3D),
+    FeatureSpec("action", "float32", (4,), spec.WAYPOINT_NAMES),
+    FeatureSpec("privileged.world_pose", "float32", (4,), spec.WORLD_POSE_NAMES_3D),
+    FeatureSpec("privileged.d_goal", "float32", (1,), info={"units": "m"}),
+    FeatureSpec("privileged.region_id", "int64", (1,), info={"missing": spec.REGION_NONE}),
+    FeatureSpec(spec.privileged_ext_key("myproducer", "wind"), "float32", (3,)),
+]
+writer = EpisodeWriter("episodes/ep-000", features, fps=10, split="train",
+                       licence={"profile": "my-assets", "class": "open", "spdx": "CC-BY-4.0",
+                                "internal_only": False, "attributions": ["..."]})
+for t in range(n):
+    writer.add_frame({...one value per feature...}, task=instruction)
+    for tick in ticks_of_decision_t:                       # optional side stream
+        writer.add_side("controls", {"thrust": ..., "sim_time": ...})
+writer.set_segmentation_table(spec.segmentation_key("head"), {1: {"category": "cave", "label": "cave 1"}})
+writer.close()
+```
+
+- **Storage.** Each feature's `storage` says how it is written:
+  `None` is a parquet column of any fixed shape, with `None` in the
+  shape marking a variable-length axis. `png`, `jpeg` (the `[jpeg]`
+  extra) and `video` (the `[video]` extra) are images.
+  `depth_png16`, `segmentation_png16` and `array_png16` store 2-D
+  arrays as 16-bit PNG images, never as flattened columns, and are
+  declared in `meta/info.json`'s `info`.
+- **Licence.** A licence is required: `{profile, class, spdx,
+  internal_only, attributions}`. Only TopoGym's own environments
+  default to MIT.
+- **Side streams.** These hold what happens between decisions
+  (per-tick native controls, sensor ticks). They are written to
+  `native/<stream>/`, keyed by the decision row (`frame_index`) and a
+  `tick_index`.
+- **Extension points.** Subclasses use public attributes (`features`,
+  `frames`, `episode_record`, `ext`) and hooks (`lerobot_features`,
+  `episode_metadata`, `topo_record`, `on_close`). The grid writer is
+  itself such a subclass.
+- **Low-level writers.** `write_tasks` and `write_episodes` write the
+  metadata files directly. `tasks.parquet` is indexed by task string,
+  as LeRobot reads it.
+
+## Dataset conventions
+
+These hold for every producer, so datasets can be mixed:
+
+- **Rows are decisions.** There is one row per action, holding the
+  observation it was chosen from and `next.*` fields for what
+  followed. Per-tick data goes in side streams.
+- **The clock is regular.** `timestamp = frame_index / fps`. Simulated
+  or wall time goes in a declared feature such as
+  `observation.native.sim_time`, and the writer refuses a `timestamp`
+  in a frame.
+- **Missing values** are NaN in float columns and a declared sentinel
+  in integer columns (`info={"missing": -1}`). JSON metadata uses
+  `null`. The writer refuses `None` in a numeric feature.
+- **Depth** is z-depth in metres, stored as 16-bit PNG codes of 2 mm.
+  Code 0 means no return, and the cap is 32767 (65.534 m): LeRobot
+  decodes 16-bit PNGs as int16, so larger codes would wrap.
+  `codecs.encode_depth` and `codecs.decode_depth` are the reference
+  implementation; `decode_depth` also undoes an int16 wrap.
+- **Segmentation** stores instance ids as 16-bit PNG (0 = none, at most
+  32767). What each id means is a per-episode table,
+  `{id: {category, label}}`, in the episode record.
+- **Privileged extras** go in one namespace,
+  `privileged.ext.<producer>.<field>`. The manifest declares them as
+  `ext.<producer>`, the validator accepts them, and `assemble`
+  preserves them. Any other `privileged.*` key must be a spec field.
+- **Variable-length columns** load in LeRobot per item, but items of
+  different lengths cannot be batched by its default collate. Prefer
+  side streams for per-tick data.
+
+`assemble` refuses to merge episodes whose features differ in name,
+dtype, shape or storage (image or video, PNG or JPEG, depth encoding),
+or whose fps or side streams differ, and names the feature. It copies
+every episode's video and side-stream files. `meta/topo.json` keeps
+each episode's split, licence, `ext` entries, original position and
+(where it differs) manifest.
+
+## Reading
+
+`read_episode(path)` and `read_dataset(path)`, in
+`topogym.canonical.reader`, are the inverse of the writer and of
+`assemble`. They return every row decoded to its declared type:
+- images as uint8;
+- depth as float32 metres, with NaN for no return;
+- segmentation as int32 ids;
+- arrays in their declared shapes.
+
+Along with the rows come the tasks, one metadata row and canonical
+record per episode, `meta/topo.json`, and the side streams.
+
+## Continuous worlds and frames
+
+The 3D conventions sit alongside the grid ones, and data from both
+mixes by name:
+
+| field | grid worlds | continuous worlds |
+|---|---|---|
+| `observation.state` | `STATE_NAMES_2D`, cells | `STATE_NAMES_3D` (`ego.x, y, z, yaw, pitch`), metres |
+| `privileged.world_pose` | `x, y, yaw`, grid cells | `x, y, z, yaw`, metres, REP-103 z-up world |
+| `privileged.goal_pose` | `x, y`, cells | `x, y, z, yaw`, metres |
+| `privileged.d_goal` | int cells (column: `-1` when unreachable) | float metres (column: NaN when unreachable) |
+| `privileged.region_id` | index into `topology.regions` (0 = open) | index into `topology.regions` (`-1` = none) |
+
+Full orientations (cameras, bodies that pitch or roll) use **pose7**
+`(x, y, z, qx, qy, qz, qw)`. `topogym.canonical.transforms` (numpy
+only) provides:
+- REP-103 ↔ OpenCV camera axes;
+- quaternions and Euler angles;
+- pose7 composition, inversion and application;
+- pinhole intrinsics from a field of view;
+- depth back-projection into camera, body or world frames.
+
+The spec also names `observation.depth.<cam>`,
+`observation.segmentation.<cam>`, `observation.language.chat`,
+`observation.map_pose` (an observed pose estimate) and `action.goto`.
+The text grammar speaks metres (`render_text(..., units="metres")`),
+water, obstacles by their category ("a sofa ahead"), and
+covered/underground places.
+
+## Extending the vocabularies
+
+Producers add their own goal categories and instruction templates at
+runtime instead of forking them:
+
+```python
+spec.register_category("sofa", spec.Category("sofa", "sofa.n.01"), producer="myproducer")
+key = spec.register_templates("search", ["Search the area for the {target}."], producer="myproducer")
+spec.instruction(key, 0, target="beacon")
+```
+
+Entries are namespaced (`myproducer:sofa`) and append-only per
+producer. Registering a key again with a different category, or with
+templates that do not extend the existing list, is refused. The word
+vocabulary is append-only too: `spec.vocabulary()` lists the core words
+and then the optional ones (now including `attack`), and a word's id is
+its position.
+
+**Validated against lerobot 0.4.4.** `LeRobotDataset` loads grid
+exports, a continuous-world dataset (3D state, depth and segmentation
+PNGs, NaN floats, a variable-length column), and assembled
+multi-episode datasets of each. Checked:
+- every item reads, and indices and tasks renumber across episodes;
+- PNG frames round-trip bit-exact;
+- depth and segmentation codes arrive exactly, decoded as int16;
+- MP4 frames stay aligned (mean error about 1% per pixel).
+
+Decoding MP4 needs a working video backend on the reading side;
+`video_backend="pyav"` needs nothing beyond PyAV. TopoGym does not
+depend on lerobot.

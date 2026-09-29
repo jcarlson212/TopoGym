@@ -3,6 +3,77 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
+## 0.6.0 (unreleased)
+
+Additive: every existing id, mode and 0.5 export API behaves as before
+(golden suite green). The canonical spec is now version 1.2.0.
+
+### Added
+
+- **A feature-driven dataset writer.** `EpisodeWriter(root,
+  features: list[FeatureSpec], ...)` is independent of any
+  environment. It supports:
+  - arbitrary and variable-length shapes;
+  - per-feature image storage (PNG, JPEG via the new `[jpeg]` extra,
+    or MP4);
+  - depth, segmentation and other 2-D arrays stored as 16-bit PNG;
+  - per-tick side streams (`native/<stream>/`);
+  - `privileged.ext.<producer>.*` fields.
+
+  A licence profile is required. The extension points are public
+  attributes and hooks. `EpisodeWriter(root, env)` still records a grid
+  env, now as the `GridEpisodeWriter` subclass.
+- **A reader.** `read_episode` and `read_dataset` are the inverse of
+  the writer and of `assemble`.
+- **Public metadata writers.** `write_tasks` (indexed by task, as
+  LeRobot reads it) and `write_episodes`.
+- **Dataset conventions** in the spec, validated by the writer:
+  - one row per decision;
+  - a regular clock (`timestamp = frame_index / fps`);
+  - NaN for missing floats, declared sentinels for missing integers,
+    null in JSON;
+  - depth as 16-bit PNG in 2 mm units, capped at 65.534 m, with
+    `codecs.encode_depth`/`decode_depth`;
+  - segmentation as 16-bit instance ids with a per-episode table;
+  - one privileged extension namespace.
+- **3D conventions.** `STATE_NAMES_3D`, pose7, and 3D world and goal
+  poses in metres (REP-103, z up), with float `d_goal` and
+  `region_id = -1` for none.
+- **`topogym.canonical.transforms`** (numpy only): REP-103 ↔ OpenCV,
+  quaternions, pose7 composition, pinhole intrinsics from a field of
+  view, and depth back-projection.
+- **Spec keys and vocabulary:**
+  - keys `observation.depth.<cam>`, `observation.segmentation.<cam>`,
+    `observation.language.chat`, `observation.map_pose` and
+    `action.goto`;
+  - the optional word `attack` (appended);
+  - the categories cave and body of water;
+  - `vocabulary()` and `word_id()`.
+- **Runtime registries.** `register_category` and `register_templates`,
+  namespaced per producer and append-only.
+- **Grammar:**
+  - a water terrain, and obstacles named by their category ("a sofa
+    ahead");
+  - covered and underground tags;
+  - `units="metres"` for continuous views.
+- **The manifest** accepts `ext.<producer>` privileged entries
+  (`manifest(env, ext=...)`).
+
+### Changed
+
+- `assemble` refuses to merge episodes whose features differ in dtype,
+  shape or storage, not only in name, and names the feature. It keeps
+  each episode's licence, `ext` records and (where it differs)
+  manifest, and copies side-stream files.
+- **Grid exports:**
+  - Image features declare `info.storage`, and `privileged.d_goal`
+    declares its `-1` sentinel and units (additive keys).
+  - `topo.json`'s licence gains the profile fields, keeping the 0.5
+    keys.
+  - Stats fixes: the index columns' stats count every frame; all-NaN
+    dimensions (e.g. the goal pose of a goal-less world) report null
+    instead of 0.
+
 ## 0.5.1 (2026-09-29)
 
 ### Fixed

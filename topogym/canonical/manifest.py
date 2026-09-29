@@ -89,6 +89,14 @@ def privileged_features() -> dict:
     }
 
 
+def _ext_entries(ext: dict | None) -> dict:
+    out = {}
+    for producer, fields in (ext or {}).items():
+        spec.privileged_ext_key(producer, "x")  # validates the name
+        out[spec.EXT_PREFIX + producer] = dict(fields)
+    return out
+
+
 def split_info(env) -> dict:
     """The split this world's seed belongs to, and holdout tags.
 
@@ -120,9 +128,15 @@ def split_info(env) -> dict:
     return {"split": split, "tags": tags, "seed": seed}
 
 
-def manifest(env) -> dict:
+def manifest(env, *, ext: dict | None = None) -> dict:
     """The canonical manifest of ``env`` (built with
-    ``obs_mode="canonical"`` or wrapped with :func:`wrap`)."""
+    ``obs_mode="canonical"`` or wrapped with :func:`wrap`).
+
+    ``ext`` declares producer-specific privileged fields: ``{producer:
+    {field: description}}`` becomes ``privileged["ext.<producer>"]``,
+    matching ``privileged.ext.<producer>.<field>`` columns. This package
+    records it and does not interpret it.
+    """
     import topogym
 
     adapter = _adapter(env)
@@ -156,7 +170,7 @@ def manifest(env) -> dict:
         "producer": {"name": "topogym", "version": topogym.__version__},
         "env_id": env_id,
         "features": {k: v.to_dict() for k, v in features(adapter).items()},
-        "privileged": privileged_features(),
+        "privileged": {**privileged_features(), **_ext_entries(ext)},
         "frames": {
             "world": {"axes": "x right, y down", "units": "cell",
                       "yaw": "from +x toward +y"},
