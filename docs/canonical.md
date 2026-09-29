@@ -180,7 +180,10 @@ nothing is re-encoded.
 `meta/info.json` records each episode's split (its seed band, or none
 for a world outside every band), and an assembled dataset one range
 per split. A range needs each split's episodes to be contiguous, so
-`assemble` refuses interleaved splits unless `group_by_split=True`.
+`assemble` groups episodes by split by default (warning when that
+reorders them; each record keeps its `source_position`);
+`group_by_split=False` keeps the given order and leaves out any split
+that is not contiguous, with a warning.
 
 ```python
 from topogym.canonical.export import EpisodeWriter, assemble

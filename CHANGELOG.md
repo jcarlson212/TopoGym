@@ -8,12 +8,17 @@ are additive, and no existing id changes behaviour.
 ### Fixed
 
 - Exported datasets record the episode's real split in
-  `meta/info.json`. 0.5.0 wrote `"train"` for every episode; now a
-  one-episode dataset lists its seed band's split (`train`, `val`,
-  `test`, `tune`), or no split for a world outside every band.
-  `assemble` writes one range per split and refuses episodes whose
-  split is not contiguous, which a range cannot express; the new
-  `group_by_split=True` reorders them instead.
+  `meta/info.json`. 0.5.0 wrote `"train"` for every episode, whatever
+  its seed band; now a one-episode dataset lists its seed band's split
+  (`train`, `val`, `test`, `tune`), or no split for a world outside
+  every band, and `assemble` writes one range per split.
+- `assemble` now groups episodes by split by default, so each split is
+  one contiguous range (a correctness fix: 0.5.0 labelled mixed
+  datasets entirely `train`). It warns when this changes the order, and
+  each episode's record keeps its original `source_position`.
+  `group_by_split=False` keeps the given order and leaves out, with a
+  warning, any split whose episodes are not contiguous. Nothing that
+  assembled under 0.5.0 fails now.
 
 ## 0.5.0 (2026-09-29)
 

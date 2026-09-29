@@ -30,6 +30,7 @@ import json
 import pathlib
 import shutil
 import struct
+import warnings
 import zlib
 
 import numpy as np
@@ -341,7 +342,7 @@ class EpisodeWriter:
             "data_files_size_in_mb": 100, "video_files_size_in_mb": 200,
             "data_path": DATA_PATH,
             "video_path": VIDEO_PATH if self.video else None,
-            "splits": _splits([self.manifest["split"]["split"]]),
+            "splits": _splits([self.manifest["split"]["split"]])[0],
         }
         (root / "meta" / "info.json").write_text(
             json.dumps(info, indent=2))
@@ -450,23 +451,24 @@ def _write_episodes(root: pathlib.Path, episodes: list,
     pq.write_table(table, path)
 
 
-def _splits(names: list) -> dict:
+def _splits(names: list) -> tuple:
     """``meta/info.json`` splits for episodes whose splits are ``names``
     (in episode order): each split maps to its ``"start:end"`` range.
-    Episodes in no split (``None``) are listed under none. A split whose
-    episodes are not contiguous cannot be written as a range."""
+    Episodes in no split (``None``) are listed under none. Returns the
+    map and the splits left out because their episodes are not
+    contiguous, which a range cannot express."""
     ranges: dict = {}
+    broken: list = []
     for i, name in enumerate(names):
-        if name is None:
+        if name is None or name in broken:
             continue
         start, end = ranges.get(name, (i, i))
         if name in ranges and end != i:
-            raise ValueError(
-                f"episodes of split {name!r} are not contiguous, so the "
-                "split cannot be written as one range; pass the episodes "
-                "grouped by split, or assemble(..., group_by_split=True)")
+            broken.append(name)
+            del ranges[name]
+            continue
         ranges[name] = (start, i + 1)
-    return {name: f"{a}:{b}" for name, (a, b) in ranges.items()}
+    return {name: f"{a}:{b}" for name, (a, b) in ranges.items()}, broken
 
 
 def _split_of(src: pathlib.Path):
@@ -476,7 +478,7 @@ def _split_of(src: pathlib.Path):
 
 
 def assemble(episode_dirs: list, out, *,
-             group_by_split: bool = False) -> pathlib.Path:
+             group_by_split: bool = True) -> pathlib.Path:
     """Merge one-episode datasets into one LeRobot v3.0 dataset.
 
     Episodes keep their files: episode ``i`` becomes data file ``i``
@@ -484,22 +486,41 @@ def assemble(episode_dirs: list, out, *,
     re-encoded. Episode, frame and task indices are renumbered; the
     TopoGym extension (``meta/topo.json``) keeps every episode's record.
 
-    ``meta/info.json`` records each split's episode range, so each
-    split's episodes must be contiguous in ``episode_dirs``;
-    ``group_by_split=True`` reorders them to make it so: stably, splits
-    in order of first appearance, episodes in no split last.
+    ``meta/info.json`` records each split's episode range, which needs
+    each split's episodes to be contiguous. By default
+    (``group_by_split=True``) episodes are grouped by split -- stably,
+    splits in order of first appearance, episodes in no split last --
+    with a warning when that changes their order; each episode's record
+    keeps its original position (``source_position``). With
+    ``group_by_split=False`` the given order is kept, and a split whose
+    episodes are not contiguous is left out of ``splits`` with a
+    warning (each episode's record still names its split).
     """
     pa, pq = _pa()
     episode_dirs = [pathlib.Path(d) for d in episode_dirs]
     names = [_split_of(d) for d in episode_dirs]
+    positions = list(range(len(episode_dirs)))
     if group_by_split:
         order = list(dict.fromkeys(n for n in names if n is not None))
         rank = {n: k for k, n in enumerate(order)}
-        pairs = sorted(zip(names, episode_dirs),
-                       key=lambda p: rank.get(p[0], len(order)))
-        names = [n for n, _ in pairs]
-        episode_dirs = [d for _, d in pairs]
-    splits = _splits(names)
+        ranked = sorted(zip(names, episode_dirs, positions),
+                        key=lambda p: rank.get(p[0], len(order)))
+        if [p for _, _, p in ranked] != positions:
+            warnings.warn(
+                "assemble: episodes were reordered to group them by split "
+                "(each record keeps its source_position); pass "
+                "group_by_split=False to keep the given order",
+                stacklevel=2)
+        names = [n for n, _, _ in ranked]
+        episode_dirs = [d for _, d, _ in ranked]
+        positions = [p for _, _, p in ranked]
+    splits, broken = _splits(names)
+    if broken:
+        warnings.warn(
+            f"assemble: splits {broken} are not contiguous in the given "
+            "order, so meta/info.json cannot express them as ranges and "
+            "leaves them out; each episode's record still names its split "
+            "(group_by_split=True groups them)", stacklevel=2)
     out = pathlib.Path(out)
     if out.exists():
         shutil.rmtree(out)
@@ -557,6 +578,7 @@ def assemble(episode_dirs: list, out, *,
         topo = json.loads((src / "meta" / "topo.json").read_text())
         for record in topo.get("episodes", {}).values():
             topo_eps[str(i)] = {**record, "source": src.name,
+                                "source_position": positions[i],
                                 "split": topo.get("split")}
         total += n
     if info is None:
