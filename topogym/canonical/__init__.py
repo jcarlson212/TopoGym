@@ -30,6 +30,7 @@ Nothing here changes an env that does not ask for it.
 
 from __future__ import annotations
 
+from topogym.canonical.manifest import manifest
 from topogym.canonical.spec import CANONICAL_SPEC_VERSION, WORDS
 
 __all__ = ["CANONICAL_SPEC_VERSION", "WORDS", "describe_goal", "manifest",
@@ -41,13 +42,6 @@ def wrap(env, **kwargs):
     from topogym.canonical.wrapper import wrap as _wrap
 
     return _wrap(env, **kwargs)
-
-
-def manifest(env) -> dict:
-    """See :func:`topogym.canonical.manifest.manifest`."""
-    from topogym.canonical.manifest import manifest as _manifest
-
-    return _manifest(env)
 
 
 def describe_goal(env, cell=None, *, phrasing="canonical") -> dict:

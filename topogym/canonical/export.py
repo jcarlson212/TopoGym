@@ -30,6 +30,7 @@ import json
 import pathlib
 import shutil
 import struct
+import warnings
 import zlib
 
 import numpy as np
@@ -341,7 +342,7 @@ class EpisodeWriter:
             "data_files_size_in_mb": 100, "video_files_size_in_mb": 200,
             "data_path": DATA_PATH,
             "video_path": VIDEO_PATH if self.video else None,
-            "splits": {"train": "0:1"},
+            "splits": _splits([self.manifest["split"]["split"]])[0],
         }
         (root / "meta" / "info.json").write_text(
             json.dumps(info, indent=2))
@@ -450,15 +451,76 @@ def _write_episodes(root: pathlib.Path, episodes: list,
     pq.write_table(table, path)
 
 
-def assemble(episode_dirs: list, out) -> pathlib.Path:
+def _splits(names: list) -> tuple:
+    """``meta/info.json`` splits for episodes whose splits are ``names``
+    (in episode order): each split maps to its ``"start:end"`` range.
+    Episodes in no split (``None``) are listed under none. Returns the
+    map and the splits left out because their episodes are not
+    contiguous, which a range cannot express."""
+    ranges: dict = {}
+    broken: list = []
+    for i, name in enumerate(names):
+        if name is None or name in broken:
+            continue
+        start, end = ranges.get(name, (i, i))
+        if name in ranges and end != i:
+            broken.append(name)
+            del ranges[name]
+            continue
+        ranges[name] = (start, i + 1)
+    return {name: f"{a}:{b}" for name, (a, b) in ranges.items()}, broken
+
+
+def _split_of(src: pathlib.Path):
+    topo = json.loads((src / "meta" / "topo.json").read_text())
+    split = topo.get("split")
+    return split.get("split") if isinstance(split, dict) else split
+
+
+def assemble(episode_dirs: list, out, *,
+             group_by_split: bool = True) -> pathlib.Path:
     """Merge one-episode datasets into one LeRobot v3.0 dataset.
 
     Episodes keep their files: episode ``i`` becomes data file ``i``
     (and video file ``i``) in chunk ``i // 1000``, so nothing is
     re-encoded. Episode, frame and task indices are renumbered; the
     TopoGym extension (``meta/topo.json``) keeps every episode's record.
+
+    ``meta/info.json`` records each split's episode range, which needs
+    each split's episodes to be contiguous. By default
+    (``group_by_split=True``) episodes are grouped by split -- stably,
+    splits in order of first appearance, episodes in no split last --
+    with a warning when that changes their order; each episode's record
+    keeps its original position (``source_position``). With
+    ``group_by_split=False`` the given order is kept, and a split whose
+    episodes are not contiguous is left out of ``splits`` with a
+    warning (each episode's record still names its split).
     """
     pa, pq = _pa()
+    episode_dirs = [pathlib.Path(d) for d in episode_dirs]
+    names = [_split_of(d) for d in episode_dirs]
+    positions = list(range(len(episode_dirs)))
+    if group_by_split:
+        order = list(dict.fromkeys(n for n in names if n is not None))
+        rank = {n: k for k, n in enumerate(order)}
+        ranked = sorted(zip(names, episode_dirs, positions),
+                        key=lambda p: rank.get(p[0], len(order)))
+        if [p for _, _, p in ranked] != positions:
+            warnings.warn(
+                "assemble: episodes were reordered to group them by split "
+                "(each record keeps its source_position); pass "
+                "group_by_split=False to keep the given order",
+                stacklevel=2)
+        names = [n for n, _, _ in ranked]
+        episode_dirs = [d for _, d, _ in ranked]
+        positions = [p for _, _, p in ranked]
+    splits, broken = _splits(names)
+    if broken:
+        warnings.warn(
+            f"assemble: splits {broken} are not contiguous in the given "
+            "order, so meta/info.json cannot express them as ranges and "
+            "leaves them out; each episode's record still names its split "
+            "(group_by_split=True groups them)", stacklevel=2)
     out = pathlib.Path(out)
     if out.exists():
         shutil.rmtree(out)
@@ -467,7 +529,7 @@ def assemble(episode_dirs: list, out) -> pathlib.Path:
     episodes, all_stats, topo_eps = [], [], {}
     info = None
     total = 0
-    for i, src in enumerate(map(pathlib.Path, episode_dirs)):
+    for i, src in enumerate(episode_dirs):
         src_info = json.loads((src / "meta" / "info.json").read_text())
         if info is None:
             info = src_info
@@ -516,6 +578,7 @@ def assemble(episode_dirs: list, out) -> pathlib.Path:
         topo = json.loads((src / "meta" / "topo.json").read_text())
         for record in topo.get("episodes", {}).values():
             topo_eps[str(i)] = {**record, "source": src.name,
+                                "source_position": positions[i],
                                 "split": topo.get("split")}
         total += n
     if info is None:
@@ -526,10 +589,9 @@ def assemble(episode_dirs: list, out) -> pathlib.Path:
         json.dumps(_merge_stats(all_stats)))
     info.update({"total_episodes": len(episodes), "total_frames": total,
                  "total_tasks": len(tasks),
-                 "splits": {"train": f"0:{len(episodes)}"}})
+                 "splits": splits})
     (out / "meta" / "info.json").write_text(json.dumps(info, indent=2))
-    topo = json.loads((pathlib.Path(episode_dirs[0]) / "meta" /
-                       "topo.json").read_text())
+    topo = json.loads((episode_dirs[0] / "meta" / "topo.json").read_text())
     topo.pop("split", None)
     topo["episodes"] = topo_eps
     (out / "meta" / "topo.json").write_text(json.dumps(topo, indent=2))

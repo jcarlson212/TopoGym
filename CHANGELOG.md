@@ -3,6 +3,28 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
+## 0.5.1 (unreleased)
+
+### Fixed
+
+- Exported datasets record the episode's real split in
+  `meta/info.json`. 0.5.0 wrote `"train"` for every episode, whatever
+  its seed band; now a one-episode dataset lists its seed band's split
+  (`train`, `val`, `test`, `tune`), or no split for a world outside
+  every band, and `assemble` writes one range per split.
+- `assemble` now groups episodes by split by default, so each split is
+  one contiguous range (a correctness fix: 0.5.0 labelled mixed
+  datasets entirely `train`). It warns when this changes the order, and
+  each episode's record keeps its original `source_position`.
+  `group_by_split=False` keeps the given order and leaves out, with a
+  warning, any split whose episodes are not contiguous. Nothing that
+  assembled under 0.5.0 fails now.
+- `topogym.canonical.manifest(env)` failed with "'module' object is
+  not callable" on every call after the first (or after anything
+  imported `topogym.canonical.manifest`): importing the submodule
+  rebound the package's name to it. The function is now bound when the
+  package is imported.
+
 ## 0.5.0 (2026-09-29)
 
 ### Added

@@ -509,3 +509,16 @@ def test_spec_module_is_standard_library_only():
                if line.startswith(("import ", "from "))]
     assert all(line.split()[1].split(".")[0] in
                ("__future__", "json", "dataclasses") for line in imports)
+
+
+def test_package_manifest_stays_callable():
+    """canonical.manifest is the function, however often it is called
+    and whether or not its submodule has been imported (0.5.0 bound
+    the name to the submodule after the first call)."""
+    import importlib
+
+    env = make(actions="words")
+    first = canonical.manifest(env)
+    importlib.import_module("topogym.canonical.manifest")
+    assert canonical.manifest(env) == first
+    assert callable(canonical.manifest)

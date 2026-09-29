@@ -110,3 +110,58 @@ def test_assemble(tmp_path):
     assert eps[1]["dataset_from_index"] == t0.num_rows
     topo = json.loads((out / "meta" / "topo.json").read_text())
     assert set(topo["episodes"]) == {"0", "1"}
+
+
+# -- splits ---------------------------------------------------------------------------
+
+
+def test_episode_records_its_split(tmp_path):
+    """Split-band seeds carry their split; a world in no band (the
+    canonical seed) is listed under none rather than mislabelled."""
+    for seed, want in ((2001, {"train": "0:1"}), (3001, {"val": "0:1"}),
+                       (0, {})):
+        root = record(tmp_path, f"s{seed}", seed=seed)
+        info = json.loads((root / "meta" / "info.json").read_text())
+        assert info["splits"] == want
+
+
+def test_assemble_writes_split_ranges(tmp_path):
+    eps = [record(tmp_path, f"e{s}", seed=s) for s in (2000, 2001, 3000, 0)]
+    out = assemble(eps, tmp_path / "all")
+    info = json.loads((out / "meta" / "info.json").read_text())
+    assert info["splits"] == {"train": "0:2", "val": "2:3"}
+
+
+def test_assemble_interleaved_splits(tmp_path):
+    """0.5.0 assembled interleaved splits; a patch release must too.
+    By default they are grouped (with a warning, keeping each episode's
+    original position); on request the order is kept and the split that
+    cannot be a range is left out, with a warning."""
+    eps = [record(tmp_path, f"e{s}", seed=s) for s in (2000, 3000, 2001)]
+    with pytest.warns(UserWarning, match="reordered"):
+        out = assemble(eps, tmp_path / "grouped")
+    info = json.loads((out / "meta" / "info.json").read_text())
+    assert info["splits"] == {"train": "0:2", "val": "2:3"}
+    topo = json.loads((out / "meta" / "topo.json").read_text())
+    records = [topo["episodes"][str(i)] for i in range(3)]
+    assert [r["split"]["split"] for r in records] == ["train", "train", "val"]
+    assert [r["source_position"] for r in records] == [0, 2, 1]
+    with pytest.warns(UserWarning, match="not contiguous"):
+        out = assemble(eps, tmp_path / "kept", group_by_split=False)
+    info = json.loads((out / "meta" / "info.json").read_text())
+    assert info["splits"] == {"val": "1:2"}
+    topo = json.loads((out / "meta" / "topo.json").read_text())
+    assert [topo["episodes"][str(i)]["split"]["split"] for i in range(3)] \
+        == ["train", "val", "train"]
+
+
+def test_assemble_grouped_input_is_not_reordered(tmp_path):
+    import warnings
+
+    eps = [record(tmp_path, f"e{s}", seed=s) for s in (2000, 2001, 3000)]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        out = assemble(eps, tmp_path / "all")
+    topo = json.loads((out / "meta" / "topo.json").read_text())
+    assert [topo["episodes"][str(i)]["source_position"] for i in range(3)] \
+        == [0, 1, 2]
