@@ -177,6 +177,11 @@ self-contained one-episode dataset and `assemble` merges any number of
 them into one, keeping one data (and video) file per episode, so
 nothing is re-encoded.
 
+`meta/info.json` records each episode's split (its seed band, or none
+for a world outside every band), and an assembled dataset one range
+per split. A range needs each split's episodes to be contiguous, so
+`assemble` refuses interleaved splits unless `group_by_split=True`.
+
 ```python
 from topogym.canonical.export import EpisodeWriter, assemble
 

@@ -3,6 +3,18 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
+## 0.5.1 (unreleased)
+
+### Fixed
+
+- Exported datasets record the episode's real split in
+  `meta/info.json`. 0.5.0 wrote `"train"` for every episode; now a
+  one-episode dataset lists its seed band's split (`train`, `val`,
+  `test`, `tune`), or no split for a world outside every band.
+  `assemble` writes one range per split and refuses episodes whose
+  split is not contiguous, which a range cannot express; the new
+  `group_by_split=True` reorders them instead.
+
 ## 0.5.0 (2026-09-29)
 
 ### Added

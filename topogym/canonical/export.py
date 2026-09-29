@@ -341,7 +341,7 @@ class EpisodeWriter:
             "data_files_size_in_mb": 100, "video_files_size_in_mb": 200,
             "data_path": DATA_PATH,
             "video_path": VIDEO_PATH if self.video else None,
-            "splits": {"train": "0:1"},
+            "splits": _splits([self.manifest["split"]["split"]]),
         }
         (root / "meta" / "info.json").write_text(
             json.dumps(info, indent=2))
@@ -450,15 +450,56 @@ def _write_episodes(root: pathlib.Path, episodes: list,
     pq.write_table(table, path)
 
 
-def assemble(episode_dirs: list, out) -> pathlib.Path:
+def _splits(names: list) -> dict:
+    """``meta/info.json`` splits for episodes whose splits are ``names``
+    (in episode order): each split maps to its ``"start:end"`` range.
+    Episodes in no split (``None``) are listed under none. A split whose
+    episodes are not contiguous cannot be written as a range."""
+    ranges: dict = {}
+    for i, name in enumerate(names):
+        if name is None:
+            continue
+        start, end = ranges.get(name, (i, i))
+        if name in ranges and end != i:
+            raise ValueError(
+                f"episodes of split {name!r} are not contiguous, so the "
+                "split cannot be written as one range; pass the episodes "
+                "grouped by split, or assemble(..., group_by_split=True)")
+        ranges[name] = (start, i + 1)
+    return {name: f"{a}:{b}" for name, (a, b) in ranges.items()}
+
+
+def _split_of(src: pathlib.Path):
+    topo = json.loads((src / "meta" / "topo.json").read_text())
+    split = topo.get("split")
+    return split.get("split") if isinstance(split, dict) else split
+
+
+def assemble(episode_dirs: list, out, *,
+             group_by_split: bool = False) -> pathlib.Path:
     """Merge one-episode datasets into one LeRobot v3.0 dataset.
 
     Episodes keep their files: episode ``i`` becomes data file ``i``
     (and video file ``i``) in chunk ``i // 1000``, so nothing is
     re-encoded. Episode, frame and task indices are renumbered; the
     TopoGym extension (``meta/topo.json``) keeps every episode's record.
+
+    ``meta/info.json`` records each split's episode range, so each
+    split's episodes must be contiguous in ``episode_dirs``;
+    ``group_by_split=True`` reorders them to make it so: stably, splits
+    in order of first appearance, episodes in no split last.
     """
     pa, pq = _pa()
+    episode_dirs = [pathlib.Path(d) for d in episode_dirs]
+    names = [_split_of(d) for d in episode_dirs]
+    if group_by_split:
+        order = list(dict.fromkeys(n for n in names if n is not None))
+        rank = {n: k for k, n in enumerate(order)}
+        pairs = sorted(zip(names, episode_dirs),
+                       key=lambda p: rank.get(p[0], len(order)))
+        names = [n for n, _ in pairs]
+        episode_dirs = [d for _, d in pairs]
+    splits = _splits(names)
     out = pathlib.Path(out)
     if out.exists():
         shutil.rmtree(out)
@@ -467,7 +508,7 @@ def assemble(episode_dirs: list, out) -> pathlib.Path:
     episodes, all_stats, topo_eps = [], [], {}
     info = None
     total = 0
-    for i, src in enumerate(map(pathlib.Path, episode_dirs)):
+    for i, src in enumerate(episode_dirs):
         src_info = json.loads((src / "meta" / "info.json").read_text())
         if info is None:
             info = src_info
@@ -526,10 +567,9 @@ def assemble(episode_dirs: list, out) -> pathlib.Path:
         json.dumps(_merge_stats(all_stats)))
     info.update({"total_episodes": len(episodes), "total_frames": total,
                  "total_tasks": len(tasks),
-                 "splits": {"train": f"0:{len(episodes)}"}})
+                 "splits": splits})
     (out / "meta" / "info.json").write_text(json.dumps(info, indent=2))
-    topo = json.loads((pathlib.Path(episode_dirs[0]) / "meta" /
-                       "topo.json").read_text())
+    topo = json.loads((episode_dirs[0] / "meta" / "topo.json").read_text())
     topo.pop("split", None)
     topo["episodes"] = topo_eps
     (out / "meta" / "topo.json").write_text(json.dumps(topo, indent=2))
