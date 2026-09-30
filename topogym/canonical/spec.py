@@ -48,7 +48,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 
-CANONICAL_SPEC_VERSION = "1.2.0"
+CANONICAL_SPEC_VERSION = "1.3.0"
 
 # -- observation keys -----------------------------------------------------------
 
@@ -505,6 +505,15 @@ MAP_POSE = "observation.map_pose"
 #: env's planner; the manifest says whether that planner uses a
 #: privileged map (``goto.uses_privileged_map``).
 GOTO = "action.goto"
+#: action.goto's components: a target in the episode (or map) frame.
+GOTO_NAMES_2D = ("x", "y", "yaw")
+GOTO_NAMES_3D = ("x", "y", "z", "yaw")
+GOTO_UNITS = {"x": "m", "y": "m", "z": "m", "yaw": "rad"}
+
+#: Env-specific outcomes of a decision (collisions, contact forces,
+#: native termination reasons), beside next.reward/done/success. Like
+#: observation.native.*, allowed but not portable.
+NEXT_NATIVE_PREFIX = "next.native."
 
 
 def depth_key(cam: str) -> str:
@@ -535,6 +544,13 @@ STATE_NAMES_3D = ("ego.x", "ego.y", "ego.z", "ego.yaw", "ego.pitch")
 STATE_UNITS_3D = {"ego.x": "m", "ego.y": "m", "ego.z": "m",
                   "ego.yaw": "rad", "ego.pitch": "rad"}
 
+#: Body-frame velocities, appended after the pose names when a state
+#: carries them: linear (REP-103 body axes) and yaw rate.
+STATE_VELOCITY_NAMES_2D = ("ego.vx", "ego.vy", "ego.wz")
+STATE_VELOCITY_NAMES_3D = ("ego.vx", "ego.vy", "ego.vz", "ego.wz")
+STATE_VELOCITY_UNITS = {"ego.vx": "m/s", "ego.vy": "m/s", "ego.vz": "m/s",
+                        "ego.wz": "rad/s"}
+
 #: A full 6-DoF pose: position, then a unit quaternion (scalar last),
 #: of the child frame in the parent frame. For cameras and bodies that
 #: pitch or roll (see :mod:`topogym.canonical.transforms`).
@@ -556,6 +572,25 @@ GOAL_POSE_NAMES_3D = ("x", "y", "z", "yaw")
 #: sentinel (int, -1).
 D_GOAL_UNITS = {"grid": "cell", "continuous": "m"}
 
+#: A goal without a heading (reach the place, facing anywhere) still
+#: fills the yaw slot of GOAL_POSE_NAMES_3D -- with 0.0, never NaN, since
+#: NaN != NaN breaks equality-based checks such as Gymnasium's
+#: determinism check -- and says so in a mask named GOAL_POSE_MASK_NAMES
+#: (``privileged.goal_pose_mask``, or ``<key>_mask`` beside an observed
+#: goal).
+GOAL_POSE_MASK_NAMES = ("has_yaw",)
+GOAL_YAW_NONE = 0.0
+
+
+def goal_pose_3d(x: float, y: float, z: float, yaw: float | None = None
+                 ) -> tuple:
+    """``((x, y, z, yaw), (has_yaw,))`` for a goal, headingless when
+    ``yaw`` is None."""
+    if yaw is None:
+        return (float(x), float(y), float(z), GOAL_YAW_NONE), (False,)
+    return (float(x), float(y), float(z), float(yaw)), (True,)
+
+
 #: privileged.region_id is an index into topology.regions. Grids label
 #: every free cell (0 = open space); continuous worlds use -1 for "in
 #: no region".
@@ -564,6 +599,16 @@ REGION_NONE = -1
 
 # -- dataset conventions --------------------------------------------------------------
 #
+# Clocks: CLOCKS says what fps means. "decision" datasets (rows are
+# decisions with no physical rate) use DECISION_FPS, and their
+# timestamps are nominal; "physical" datasets sample at a real rate.
+CLOCKS = ("decision", "physical")
+DECISION_FPS = 10
+#
+# Side streams (native/<stream>/) are part of the canonical format, not
+# of LeRobot's: its loader does not read them. Read them with
+# topogym.canonical.reader, or promote what a policy needs into a
+# decision-row feature.
 # Rows are decisions (one per action, with next.* fields for what
 # followed); per-tick data rides in side streams. The clock is regular:
 # timestamp = frame_index / fps. Missing values: NaN in float columns,
@@ -576,6 +621,11 @@ REGION_NONE = -1
 #: topogym.canonical.codecs.encode_depth / decode_depth.
 DEPTH_UNIT_M = 0.002
 DEPTH_MAX_CODE = 32767
+#: FeatureSpec.info key declaring the value a producer's live depth
+#: observations use for "no return" (0.0 is common; NaN breaks equality
+#: checks). Stored codes are 0 either way; the reader returns the
+#: declared value, so data reads back exactly as it was observed.
+DEPTH_INVALID_VALUE_KEY = "depth.invalid_value"
 
 #: Segmentation images: instance ids (0 = none) as 16-bit PNG, at most
 #: SEGMENTATION_MAX_ID; ids mean what the episode's table says
@@ -634,7 +684,7 @@ _ROW_PREFIXES = ("observation.", "action.", "next.")
 
 #: Privileged per-step fields beyond the grid's, in continuous worlds.
 PRIVILEGED_STEP_FIELDS_EXTRA = ("camera_pose", "object_poses", "phase",
-                                "progress")
+                                "progress", "goal_pose_mask")
 
 
 def check_key(key: str) -> str | None:

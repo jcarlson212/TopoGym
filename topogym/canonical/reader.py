@@ -18,7 +18,7 @@ import pathlib
 
 import numpy as np
 
-from topogym.canonical import codecs
+from topogym.canonical import codecs, spec
 from topogym.canonical.export import (
     SIDE_PATH,
     VIDEO_PATH,
@@ -33,12 +33,21 @@ def _decode(feature: dict, value, *, key: str):
     if dtype == "image":
         data = value["bytes"] if isinstance(value, dict) else value
         storage = info.get("storage", "png")
-        if storage == "depth_png16":
-            return codecs.decode_depth_png(data)
-        if storage == "segmentation_png16":
-            return codecs.decode_segmentation(codecs.decode_png(data))
-        if storage == "array_png16":
-            return codecs.decode_array16(codecs.decode_png(data))
+        if storage in ("depth_png16", "segmentation_png16", "array_png16"):
+            if storage == "depth_png16":
+                # The producer's declared live value for "no depth"
+                # (e.g. 0.0); NaN when undeclared, as in 0.6.0.
+                invalid = info.get(spec.DEPTH_INVALID_VALUE_KEY)
+                arr = codecs.decode_depth_png(
+                    data, float("nan") if invalid is None else invalid)
+            elif storage == "segmentation_png16":
+                arr = codecs.decode_segmentation(codecs.decode_png(data))
+            else:
+                arr = codecs.decode_array16(codecs.decode_png(data))
+            # Back to the shape the producer declared: (H, W) or
+            # (H, W, 1). Datasets from 0.6.0 did not record it: (H, W).
+            declared = info.get("array.declared_shape")
+            return arr.reshape(declared) if declared else arr
         img = codecs.decode_image(data)
         if img.ndim == 2 and feature["shape"][-1] == 1:
             img = img[..., None]

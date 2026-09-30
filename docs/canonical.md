@@ -271,7 +271,14 @@ These hold for every producer, so datasets can be mixed:
 - **The clock is regular.** `timestamp = frame_index / fps`. Simulated
   or wall time goes in a declared feature such as
   `observation.native.sim_time`, and the writer refuses a `timestamp`
-  in a frame.
+  in a frame. Decision datasets have no physical rate, so they declare
+  `clock="decision"` (the default) at `fps=spec.DECISION_FPS` (10), and
+  their timestamps are nominal. `clock="physical"` says fps is a real
+  sampling rate. `meta/topo.json` records which.
+- **Outcomes of a decision** are `next.reward`, `next.done` and
+  `next.success`, plus env-specific ones under `next.native.*`
+  (collisions, contact forces, native termination reasons). Like
+  `observation.native.*`, those are allowed but not portable.
 - **Missing values** are NaN in float columns and a declared sentinel
   in integer columns (`info={"missing": -1}`). JSON metadata uses
   `null`. The writer refuses `None` in a numeric feature.
@@ -279,7 +286,12 @@ These hold for every producer, so datasets can be mixed:
   Code 0 means no return, and the cap is 32767 (65.534 m): LeRobot
   decodes 16-bit PNGs as int16, so larger codes would wrap.
   `codecs.encode_depth` and `codecs.decode_depth` are the reference
-  implementation; `decode_depth` also undoes an int16 wrap.
+  implementation; `decode_depth` also undoes an int16 wrap. Depth
+  reads back in its declared shape, `(H, W)` or `(H, W, 1)`. A producer
+  whose live observations mark "no return" with 0.0 (NaN breaks
+  equality checks) declares it,
+  `info={spec.DEPTH_INVALID_VALUE_KEY: 0.0}`, and the reader returns
+  0.0 there too. Undeclared, "no return" reads back as NaN.
 - **Segmentation** stores instance ids as 16-bit PNG (0 = none, at most
   32767). What each id means is a per-episode table,
   `{id: {category, label}}`, in the episode record.
@@ -290,6 +302,17 @@ These hold for every producer, so datasets can be mixed:
 - **Variable-length columns** load in LeRobot per item, but items of
   different lengths cannot be batched by its default collate. Prefer
   side streams for per-tick data.
+- **Side streams are TopoGym's, not LeRobot's.** LeRobot's loader does
+  not read `native/<stream>/`; `topogym.canonical.reader` does. Promote
+  anything a policy trains on into a decision-row feature.
+
+**Writing safely.** `close()` builds the dataset in a temporary sibling
+directory and swaps it into place, so a failure never leaves a partial
+dataset or destroys an existing one. `abandon()` discards an episode
+without writing anything. After either, the writer refuses more
+frames. Video uses `video_codec="auto"` (the first available of
+libsvtav1, h264 and mpeg4) or any PyAV codec, with `video_options`. The
+encoder's own stderr output is silenced unless `quiet_video=False`.
 
 `assemble` refuses to merge episodes whose features differ in name,
 dtype, shape or storage (image or video, PNG or JPEG, depth encoding),
@@ -324,6 +347,18 @@ mixes by name:
 | `privileged.d_goal` | int cells (column: `-1` when unreachable) | float metres (column: NaN when unreachable) |
 | `privileged.region_id` | index into `topology.regions` (0 = open) | index into `topology.regions` (`-1` = none) |
 
+States that carry velocities append `STATE_VELOCITY_NAMES_3D`
+(`ego.vx, vy, vz, wz`; `STATE_VELOCITY_NAMES_2D` for planar bodies),
+in m/s and rad/s in the body frame. `action.goto` targets are
+`GOTO_NAMES_3D` (`x, y, z, yaw`) or `GOTO_NAMES_2D`, in the episode (or
+map) frame.
+
+A goal without a heading still fills the yaw slot, with 0.0 rather than
+NaN (NaN never equals itself, which breaks Gymnasium's determinism
+check), and says so in a `has_yaw` mask, `privileged.goal_pose_mask`
+(or `<key>_mask` beside an observed goal). `spec.goal_pose_3d(x, y, z,
+yaw=None)` returns both.
+
 Full orientations (cameras, bodies that pitch or roll) use **pose7**
 `(x, y, z, qx, qy, qz, qw)`. `topogym.canonical.transforms` (numpy
 only) provides:
@@ -339,6 +374,12 @@ The spec also names `observation.depth.<cam>`,
 The text grammar speaks metres (`render_text(..., units="metres")`),
 water, obstacles by their category ("a sofa ahead"), and
 covered/underground places.
+
+**Manifests without an env.** `manifest(features, producer={...},
+body=..., actions=..., frames=..., ...)` builds a canonical manifest
+from a list of `FeatureSpec`, for producers that aren't TopoGym envs.
+Observed features go under `features`, `privileged.*` ones under
+`privileged`, and `ext` entries are declared as for grid envs.
 
 ## Extending the vocabularies
 

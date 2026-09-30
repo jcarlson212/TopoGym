@@ -183,13 +183,15 @@ def encode_depth(depth_m) -> np.ndarray:
     return np.where(valid, codes, 0).astype(np.uint16)
 
 
-def decode_depth(codes) -> np.ndarray:
+def decode_depth(codes, invalid: float = float("nan")) -> np.ndarray:
     """uint16 (or int16, as LeRobot decodes them) codes to float32
-    metres, NaN where there is no valid depth."""
+    metres; ``invalid`` (NaN by default) where there is no valid depth.
+    Pass the value your live observations use (e.g. 0.0) to read back
+    exactly what was observed."""
     c = np.asarray(codes).astype(np.int64)
     c = np.where(c < 0, c + 65536, c)  # undo an int16 wrap, if any
     out = c.astype(np.float32) * np.float32(spec.DEPTH_UNIT_M)
-    return np.where(c > 0, out, np.float32(np.nan)).astype(np.float32)
+    return np.where(c > 0, out, np.float32(invalid)).astype(np.float32)
 
 
 def encode_depth_png(depth_m) -> bytes:
@@ -199,8 +201,9 @@ def encode_depth_png(depth_m) -> bytes:
     return encode_png(encode_depth(d))
 
 
-def decode_depth_png(data: bytes) -> np.ndarray:
-    return decode_depth(decode_png(data))
+def decode_depth_png(data: bytes, invalid: float = float("nan")
+                     ) -> np.ndarray:
+    return decode_depth(decode_png(data), invalid)
 
 
 # -- segmentation ---------------------------------------------------------------

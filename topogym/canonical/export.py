@@ -48,8 +48,10 @@ from __future__ import annotations
 import contextlib
 import json
 import math
+import os
 import pathlib
 import shutil
+import uuid
 import warnings
 
 import numpy as np
@@ -207,12 +209,17 @@ class EpisodeWriter:
             return super().__new__(GridEpisodeWriter)
         return super().__new__(cls)
 
-    def __init__(self, root, features, *, fps: int = 10,
+    def __init__(self, root, features, *, fps: int = spec.DECISION_FPS,
                  episode_index: int = 0, robot_type: str | None = None,
                  licence: dict | None = None, split: str | None = None,
                  tags=(), seed=None, manifest: dict | None = None,
-                 ext: dict | None = None):
+                 ext: dict | None = None, clock: str = "decision",
+                 video_codec: str = "auto",
+                 video_options: dict | None = None,
+                 quiet_video: bool = True):
         _pa()
+        if clock not in spec.CLOCKS:
+            raise ValueError(f"clock must be one of {spec.CLOCKS}")
         if not _is_features(features):
             raise TypeError("features must be a list of FeatureSpec")
         if licence is None:
@@ -230,6 +237,15 @@ class EpisodeWriter:
             raise ValueError("invalid features: " + "; ".join(problems))
         self.root = pathlib.Path(root)
         self.fps = int(fps)
+        #: "decision": rows are decisions and timestamps are nominal
+        #: (frame_index / fps); "physical": fps is a real sampling rate.
+        self.clock = clock
+        #: MP4 encoder: "auto" (first available of libsvtav1, h264,
+        #: mpeg4) or a PyAV codec name, with its options.
+        self.video_codec = video_codec
+        self.video_options = dict(video_options or {})
+        #: Silence the encoder's own stderr output (SVT-AV1 is chatty).
+        self.quiet_video = bool(quiet_video)
         self.episode_index = int(episode_index)
         self.robot_type = robot_type
         self.licence = dict(licence)
@@ -248,6 +264,12 @@ class EpisodeWriter:
         self.episode_record: dict = {}
         #: ``stream -> list of tick records``.
         self.side: dict = {}
+        #: None while recording; "closed" or "abandoned" after.
+        self.state: str | None = None
+
+    def _check_open(self) -> None:
+        if self.state is not None:
+            raise RuntimeError(f"this writer is {self.state}")
 
     # -- recording ------------------------------------------------------------
 
@@ -255,6 +277,7 @@ class EpisodeWriter:
         """Record decision row ``len(frames)``. ``frame`` holds one
         value per declared feature; ``timestamp`` and the indices are
         the writer's."""
+        self._check_open()
         clash = _AUTOMATIC & set(frame)
         if clash:
             raise ValueError(
@@ -279,6 +302,7 @@ class EpisodeWriter:
     def add_side(self, stream: str, record: dict) -> None:
         """Record one tick of a side stream (e.g. per-tick native
         controls) under the decision row most recently added."""
+        self._check_open()
         if not self.frames:
             raise RuntimeError("add the decision frame before its ticks")
         if not stream or "/" in stream:
@@ -322,6 +346,8 @@ class EpisodeWriter:
         return {
             "spec_version": spec.CANONICAL_SPEC_VERSION,
             "manifest": self.manifest,
+            "clock": {"kind": self.clock, "fps": self.fps,
+                      "timestamp": "frame_index / fps"},
             "split": self.split,
             "licence": self.licence,
             "ext": self.ext,
@@ -332,18 +358,54 @@ class EpisodeWriter:
         }
 
     def on_close(self, root: pathlib.Path) -> None:
-        """Called after everything is written (e.g. to add files)."""
+        """Called after the dataset is in place at ``root`` (e.g. to add
+        files)."""
 
     # -- writing --------------------------------------------------------------
 
+    def abandon(self) -> None:
+        """Discard the episode: nothing is written, and an existing
+        dataset at :attr:`root` is left as it was."""
+        self._check_open()
+        self.frames.clear()
+        self.tasks.clear()
+        self.side.clear()
+        self.state = "abandoned"
+
     def close(self) -> pathlib.Path:
-        """Write the dataset; returns its directory."""
+        """Write the dataset and return its directory.
+
+        Atomic: the dataset is built in a temporary sibling directory
+        and swapped into :attr:`root` only when complete, so a failure
+        (or an interrupted process) never leaves a partial dataset, and
+        an existing one at ``root`` survives a failed close. The swap
+        itself is a pair of renames on the same filesystem.
+        """
+        self._check_open()
         if not self.frames:
             raise RuntimeError("no frames recorded")
+        final = self.root
+        final.parent.mkdir(parents=True, exist_ok=True)
+        tmp = final.parent / f".{final.name}.tmp-{os.getpid()}-{uuid.uuid4().hex}"
+        try:
+            self._write(tmp)
+            if final.exists():
+                old = final.parent / f".{final.name}.old-{uuid.uuid4().hex}"
+                os.replace(final, old)
+                os.replace(tmp, final)
+                shutil.rmtree(old)
+            else:
+                os.replace(tmp, final)
+        except BaseException:
+            if tmp.exists():
+                shutil.rmtree(tmp)
+            raise
+        self.state = "closed"
+        self.on_close(final)
+        return final
+
+    def _write(self, root: pathlib.Path) -> None:
         pa, pq = _pa()
-        root = self.root
-        if root.exists():
-            shutil.rmtree(root)
         (root / "meta").mkdir(parents=True)
         n = len(self.frames)
         feats = self.lerobot_features()
@@ -382,7 +444,9 @@ class EpisodeWriter:
                                             file_index=0)
             path.parent.mkdir(parents=True)
             codec = _encode_mp4(path, [fr[key] for fr in self.frames],
-                                self.fps)
+                                self.fps, codec=self.video_codec,
+                                options=self.video_options,
+                                quiet=self.quiet_video)
             feats[key]["info"] = {
                 **feats[key].get("info", {}),
                 "video.height": f.shape[0], "video.width": f.shape[1],
@@ -428,8 +492,6 @@ class EpisodeWriter:
         (root / "meta" / "info.json").write_text(json.dumps(info, indent=2))
         (root / "meta" / "topo.json").write_text(
             json.dumps(_jsonable(self.topo_record()), indent=2))
-        self.on_close(root)
-        return root
 
     def _stats(self, feats: dict) -> dict:
         n = len(self.frames)
@@ -475,7 +537,7 @@ def _lerobot_feature(f: FeatureSpec, fps: int) -> dict:
     if f.storage in spec.ARRAY_STORAGES:
         h, w = shape[:2]
         info = {"storage": f.storage, **spec.array_storage_info(f.storage),
-                **f.info}
+                "array.declared_shape": list(f.shape), **f.info}
         return {"dtype": "image", "shape": [h, w, 1],
                 "names": ["height", "width", "channels"], "info": info}
     out = {"dtype": f.dtype, "shape": shape,
@@ -551,20 +613,61 @@ def _side_table(pa, ticks: list, episode_index: int):
     return pa.table(cols)
 
 
-def _encode_mp4(path: pathlib.Path, frames: list, fps: int) -> str:
+@contextlib.contextmanager
+def _quiet_stderr(enabled: bool = True):
+    """Silence writes to file descriptor 2 -- where native encoders such
+    as SVT-AV1 print, below Python's sys.stderr."""
+    if not enabled:
+        yield
+        return
+    try:
+        saved = os.dup(2)
+    except OSError:  # no fd 2 (embedded interpreters)
+        yield
+        return
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull, 2)
+        yield
+    finally:
+        os.dup2(saved, 2)
+        os.close(saved)
+        os.close(devnull)
+
+
+#: Tried in order by video_codec="auto".
+AUTO_VIDEO_CODECS = ("libsvtav1", "h264", "mpeg4")
+
+
+def _available_codec(av, name: str) -> bool:
+    try:
+        av.codec.Codec(name, "w")
+        return True
+    except Exception:  # not built into this PyAV
+        return False
+
+
+def _encode_mp4(path: pathlib.Path, frames: list, fps: int, *,
+                codec: str = "auto", options: dict | None = None,
+                quiet: bool = True) -> str:
     try:
         import av
     except ImportError as exc:
         raise ImportError(
             "video=True needs PyAV: pip install 'topogym[video]'") from exc
-    for codec in ("libsvtav1", "h264", "mpeg4"):
-        try:
-            av.codec.Codec(codec, "w")
-        except Exception:  # codec not built into this PyAV
-            continue
-        break
-    with av.open(str(path), "w") as out:
-        stream = out.add_stream(codec, rate=fps)
+    if codec == "auto":
+        codec = next((c for c in AUTO_VIDEO_CODECS
+                      if _available_codec(av, c)), None)
+        if codec is None:
+            raise RuntimeError(f"none of {AUTO_VIDEO_CODECS} is available "
+                               "in this PyAV build")
+    elif not _available_codec(av, codec):
+        raise ValueError(f"video codec {codec!r} is not available in this "
+                         "PyAV build")
+    with _quiet_stderr(quiet), av.open(str(path), "w") as out:
+        stream = out.add_stream(codec, rate=fps,
+                                options={k: str(v) for k, v in
+                                         (options or {}).items()})
         h, w, _ = frames[0].shape
         stream.width, stream.height = w, h
         stream.pix_fmt = "yuv420p"
