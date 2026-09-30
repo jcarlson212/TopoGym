@@ -17,13 +17,22 @@ pip install pre-commit && pre-commit install   # commit gates (once)
 ```
 
 The last line installs the repo's [pre-commit](https://pre-commit.com)
-hooks: every `git commit` runs `ruff check`, the version-sync check,
-the unit-test gate (at least 90% of the suite must pass), and — when
-the change touches `topogym/` or the generator — a check that the
-Croissant metadata still matches the registry, refusing the commit
-otherwise — so failures surface locally, not on
-CI. Bypass deliberately with `git commit --no-verify`; CI still
-requires 100% green to merge.
+hooks. Every `git commit` runs `ruff check` and the version-sync check.
+
+Two further checks run only when the staged change can affect them:
+- **The unit-test gate** (every test must pass) runs when code, tests,
+  scripts, dependencies or CI configuration change.
+- **The Croissant check** (the metadata still matches the registry)
+  runs when registry, generation or env code changes.
+
+[`scripts/change_scope.py`](scripts/change_scope.py) makes that call,
+the same way for the hooks and for CI. Docs, benchmark artefacts, and
+release commits that only move version strings skip both. CI's test
+matrix, Croissant job and golden replay follow the same rule, and a
+change to the gating itself runs everything. Run
+`python scripts/change_scope.py --staged` to see what a commit will
+run. Bypass deliberately with `git commit --no-verify`; CI still has to
+pass to merge.
 
 ## What to contribute
 

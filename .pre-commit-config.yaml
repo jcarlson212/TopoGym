@@ -17,9 +17,12 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      # The full suite, but only when the staged change can affect it:
+      # scripts/change_scope.py skips docs, artefacts and release
+      # commits that only move version strings (the same rule CI uses).
       - id: test-gate
         name: unit tests (all must pass)
-        entry: python3 scripts/test_gate.py --min-pass 1.0
+        entry: python3 scripts/change_scope.py --staged --need tests -- python3 scripts/test_gate.py --min-pass 1.0
         language: system
         pass_filenames: false
         always_run: true
@@ -35,11 +38,12 @@ repos:
         files: ^(topogym/benchmarks\.(json|py)|docs/splits/|scripts/benchmarks/generate_splits.py)
       # Croissant metadata is generated from the registry, so it can
       # drift silently whenever generation or certification changes.
-      # Scoped to the files that can actually change it -- it makes
-      # 43 environments and plans each one, so it is not free.
+      # It regenerates every environment, so scripts/change_scope.py
+      # runs it only for changes that can alter it (not the canonical
+      # layer, the baselines, or a version bump).
       - id: croissant
         name: croissant metadata is current
-        entry: python3 scripts/generate_croissant.py --check
+        entry: python3 scripts/change_scope.py --staged --need croissant -- python3 scripts/generate_croissant.py --check
         language: system
         pass_filenames: false
-        files: ^(topogym/|scripts/generate_croissant\.py)
+        always_run: true
