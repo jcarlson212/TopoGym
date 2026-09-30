@@ -6,7 +6,32 @@ on:
   pull_request:
 
 jobs:
+  scope:
+    # Decides which expensive checks this change needs (see
+    # scripts/change_scope.py): release bumps, docs and artefacts skip
+    # them; code runs what it can affect.
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.scope.outputs.tests }}
+      croissant: ${{ steps.scope.outputs.croissant }}
+      golden: ${{ steps.scope.outputs.golden }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: scope
+        run: >-
+          python scripts/change_scope.py --github-output
+          --event "${{ github.event_name }}"
+          --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+          --head "${{ github.event.pull_request.head.sha || github.sha }}"
+
   test:
+    needs: scope
+    if: needs.scope.outputs.tests == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -36,6 +61,8 @@ jobs:
 
   metadata:
     name: croissant metadata
+    needs: scope
+    if: needs.scope.outputs.croissant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

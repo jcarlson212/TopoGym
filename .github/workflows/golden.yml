@@ -4,9 +4,10 @@ name: Golden
 # (COMPATIBILITY.md). About an hour of CPU, almost all of it generating
 # the large worlds, so it runs only when a change could alter env
 # behaviour -- the envs, generation, the core, rendering, the registry,
-# or the fixtures -- and on one Python. workflow_dispatch runs it on
-# demand (before a release, or on another version by editing the
-# matrix).
+# or the fixtures -- and on one Python. The path filter is a cheap
+# first cut; the scope job then skips changes that only move version
+# strings (scripts/change_scope.py). workflow_dispatch always runs it
+# (before a release, or on another version by editing the matrix).
 
 on:
   push:
@@ -21,6 +22,8 @@ on:
       - "topogym/spec.py"
       - "topogym/__init__.py"
       - "tests/compat/**"
+      - "scripts/change_scope.py"
+      - ".github/workflows/golden.yml"
   pull_request:
     paths:
       - "topogym/envs/**"
@@ -32,10 +35,37 @@ on:
       - "topogym/spec.py"
       - "topogym/__init__.py"
       - "tests/compat/**"
+      - "scripts/change_scope.py"
+      - ".github/workflows/golden.yml"
   workflow_dispatch:
 
 jobs:
+  scope:
+    # Decides which expensive checks this change needs (see
+    # scripts/change_scope.py): release bumps, docs and artefacts skip
+    # them; code runs what it can affect.
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.scope.outputs.tests }}
+      croissant: ${{ steps.scope.outputs.croissant }}
+      golden: ${{ steps.scope.outputs.golden }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: scope
+        run: >-
+          python scripts/change_scope.py --github-output
+          --event "${{ github.event_name }}"
+          --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+          --head "${{ github.event.pull_request.head.sha || github.sha }}"
+
   golden:
+    needs: scope
+    if: needs.scope.outputs.golden == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
