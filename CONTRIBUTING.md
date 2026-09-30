@@ -26,13 +26,15 @@ Two further checks run only when the staged change can affect them:
   runs when registry, generation or env code changes.
 
 [`scripts/change_scope.py`](scripts/change_scope.py) makes that call,
-the same way for the hooks and for CI. Docs, benchmark artefacts, and
-release commits that only move version strings skip both. CI's test
-matrix, Croissant job and golden replay follow the same rule, and a
-change to the gating itself runs everything. Run
+for the hooks. Docs, benchmark artefacts, and release commits that
+only move version strings skip both; a change to the gating itself
+runs everything. GitHub Actions workflows (the test matrix, lint,
+Croissant, version sync and the golden replay) run only on demand,
+from the Actions tab or `gh workflow run <workflow>.yml`, where a
+manual run runs every job. The local gate is what checks each commit. Run
 `python scripts/change_scope.py --staged` to see what a commit will
-run. Bypass deliberately with `git commit --no-verify`; CI still has to
-pass to merge.
+run. Bypass deliberately with `git commit --no-verify`, and then run the
+suite yourself.
 
 ## What to contribute
 
@@ -97,8 +99,9 @@ access to contribute:
    gh pr create --fill   # or use the "Compare & pull request" button
    ```
 
-   The PR template checklist will guide you; CI runs the same tests and
-   lint on every PR.
+   The PR template checklist will guide you. Your commits were checked
+   locally by the pre-commit gate; a maintainer can also run CI on
+   demand.
 6. **Keep it up to date** if `main` moves under you:
 
    ```bash
@@ -129,8 +132,8 @@ trusted publishing (no tokens). To cut a release:
    `topogym.__version__`, `CITATION.cff`, the README citation, and
    `croissant.json` (its `version` field and `citeAs` bibtex). Update
    `date-released` in `CITATION.cff` by hand. Three guardrails hold
-   the lockstep: the pre-commit hook, the `version-sync` CI workflow,
-   and `tests/test_version_sync.py` — a drifted version cannot be
+   the lockstep: the pre-commit hook, the `version-sync` workflow (on
+   demand), and `tests/test_version_sync.py` — a drifted version cannot be
    committed, merged, or released.
 2. Regenerate whatever the release changed: the gallery and per-env
    pages if registry entries moved

@@ -34,10 +34,11 @@ they are not requested.
 every id, three layout seeds, and every observation and action mode, a
 digest of the registration, the reset observation and info, and 50
 steps of observation, reward, terminated, truncated and info under a
-fixed action sequence. The `Golden` workflow replays them all whenever a
-change touches code that could alter env behaviour (the envs,
-generation, the core, rendering, the registry) or the fixtures, on
-Python 3.13, and can be run on demand before a release.
+fixed action sequence. The `Golden` workflow replays them all on Python
+3.13. It runs on demand (from the Actions tab, or
+`gh workflow run golden.yml`), and should be run before a release and
+after any change to env behaviour. Locally,
+`TOPOGYM_GOLDEN=1 pytest tests/compat` runs the same replay.
 
 A golden failure means the change broke compatibility. It is never
 fixed by re-recording the fixture. The only time a fixture is written is

@@ -1,9 +1,11 @@
 name: CI
 
+# Manual only (Actions tab or `gh workflow run ci.yml`): CI minutes are
+# spent when someone asks, and the pre-commit gate checks every commit
+# locally. A manual run runs every job (scripts/change_scope.py treats
+# workflow_dispatch as "run everything").
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   scope:

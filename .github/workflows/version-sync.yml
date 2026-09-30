@@ -5,12 +5,9 @@ name: Version sync
 # truth). On main, stale files are fixed and committed back; on pull
 # requests, the job fails with instructions instead.
 
+# Manual only; the pre-commit version-sync hook checks every commit.
 on:
-  push:
-    branches: [main]
-    paths: [pyproject.toml]
-  pull_request:
-    paths: [pyproject.toml]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -33,8 +30,8 @@ jobs:
             git commit -am "Sync version metadata with pyproject.toml"
             git push
           fi
-      - name: Check version metadata (PRs)
-        if: github.event_name == 'pull_request'
+      - name: Check version metadata
+        if: github.event_name != 'push'
         run: |
           python scripts/sync_version.py --check || {
             echo "::error::CITATION.cff / __init__.py / README are out of sync with pyproject.toml — run: python scripts/sync_version.py"

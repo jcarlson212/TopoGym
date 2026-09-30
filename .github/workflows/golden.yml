@@ -4,39 +4,11 @@ name: Golden
 # (COMPATIBILITY.md). About an hour of CPU, almost all of it generating
 # the large worlds, so it runs only when a change could alter env
 # behaviour -- the envs, generation, the core, rendering, the registry,
-# or the fixtures -- and on one Python. The path filter is a cheap
-# first cut; the scope job then skips changes that only move version
-# strings (scripts/change_scope.py). workflow_dispatch always runs it
-# (before a release, or on another version by editing the matrix).
+# or the fixtures -- and on one Python.
 
+# Manual only (Actions tab or `gh workflow run golden.yml`), e.g. before
+# a release or after an env change; see COMPATIBILITY.md.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "topogym/envs/**"
-      - "topogym/generation/**"
-      - "topogym/core/**"
-      - "topogym/rendering/**"
-      - "topogym/complexes/**"
-      - "topogym/registry.py"
-      - "topogym/spec.py"
-      - "topogym/__init__.py"
-      - "tests/compat/**"
-      - "scripts/change_scope.py"
-      - ".github/workflows/golden.yml"
-  pull_request:
-    paths:
-      - "topogym/envs/**"
-      - "topogym/generation/**"
-      - "topogym/core/**"
-      - "topogym/rendering/**"
-      - "topogym/complexes/**"
-      - "topogym/registry.py"
-      - "topogym/spec.py"
-      - "topogym/__init__.py"
-      - "tests/compat/**"
-      - "scripts/change_scope.py"
-      - ".github/workflows/golden.yml"
   workflow_dispatch:
 
 jobs:
