@@ -327,7 +327,7 @@ If you use TopoGym in your research, please cite:
              Exploration in Reinforcement Learning},
   year    = {2026},
   url     = {https://github.com/jcarlson212/TopoGym},
-  version = {0.5.1}
+  version = {0.6.0}
 }
 ```
 

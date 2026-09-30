@@ -3,7 +3,7 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
-## 0.6.0 (unreleased)
+## 0.6.0 (2026-09-30)
 
 Additive: every existing id, mode and 0.5 export API behaves as before
 (golden suite green). The canonical spec is now version 1.2.0.

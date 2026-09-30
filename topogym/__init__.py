@@ -42,7 +42,7 @@ from topogym.core.metadata import (
 )
 from topogym.generation import TopoGenConfig2D
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 __all__ = [
     "ActionMode",
     "BettiNumbers",
