@@ -3,7 +3,7 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
-## 0.6.1 (unreleased)
+## 0.7.0 (2026-10-01)
 
 Follow-ups from migrating a continuous-world producer onto the dataset
 layer. Additive: every default is unchanged, and datasets written by

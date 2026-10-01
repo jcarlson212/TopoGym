@@ -4,11 +4,11 @@ title: "TopoGym: Environments and Benchmarks for Topological Exploration in Rein
 authors:
   - family-names: Carlson
     given-names: Jason
-date-released: 2026-09-30
+date-released: 2026-10-01
 url: "https://github.com/jcarlson212/TopoGym"
 repository-code: "https://github.com/jcarlson212/TopoGym"
 license: MIT
-version: 0.6.0
+version: 0.7.0
 keywords:
   - reinforcement learning
   - topology

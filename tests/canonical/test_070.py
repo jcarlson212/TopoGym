@@ -1,4 +1,4 @@
-"""0.6.1: follow-ups from migrating a continuous-world producer."""
+"""0.7.0: follow-ups from migrating a continuous-world producer."""
 
 from __future__ import annotations
 
