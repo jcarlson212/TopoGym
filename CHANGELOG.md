@@ -3,6 +3,46 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
+## 0.7.0 (2026-10-01)
+
+Follow-ups from migrating a continuous-world producer onto the dataset
+layer. Additive: every default is unchanged, and datasets written by
+0.6.0 read back exactly as before. The canonical spec is now 1.3.0.
+
+### Fixed
+
+- The reader returns 2-D array features (depth, segmentation) in their
+  declared shape: `(H, W, 1)` no longer loses its channel axis.
+- Missing depth can read back as observed. A producer declares its live
+  "no return" value (`info={spec.DEPTH_INVALID_VALUE_KEY: 0.0}`), and
+  the reader returns it instead of NaN. `codecs.decode_depth` takes the
+  same `invalid=` value.
+- `EpisodeWriter.close()` is atomic. It builds in a temporary directory
+  and swaps it into place, so a failure leaves no partial dataset and
+  keeps an existing one.
+
+### Added
+
+- `EpisodeWriter.abandon()`, and a writer that refuses frames once
+  closed or abandoned.
+- `clock="decision"|"physical"`, recorded in `meta/topo.json`, with
+  `spec.DECISION_FPS` (10, the writer's default) as the nominal rate for
+  decision datasets.
+- `video_codec` and `video_options` select the MP4 encoder.
+  `quiet_video` (on by default) silences encoder stderr such as
+  SVT-AV1's banner.
+- `manifest(features, producer=..., ...)` and `manifest_from_features`
+  build a manifest from a feature list, with no TopoGym env needed.
+- **Spec 1.3.0 additions:**
+  - `GOTO_NAMES_2D`/`GOTO_NAMES_3D` and `GOTO_UNITS` for `action.goto`;
+  - `STATE_VELOCITY_NAMES_2D`/`STATE_VELOCITY_NAMES_3D` and units;
+  - `NEXT_NATIVE_PREFIX` for env-specific decision outcomes;
+  - the headingless-goal convention: yaw `GOAL_YAW_NONE` plus a
+    `has_yaw` mask, via `goal_pose_3d`;
+  - `CLOCKS`/`DECISION_FPS` and `DEPTH_INVALID_VALUE_KEY`.
+- **Docs:** `next.native.*`, and the fact that LeRobot's loader does
+  not read side streams.
+
 ## 0.6.0 (2026-09-30)
 
 Additive: every existing id, mode and 0.5 export API behaves as before

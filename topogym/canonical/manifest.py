@@ -128,9 +128,63 @@ def split_info(env) -> dict:
     return {"split": split, "tags": tags, "seed": seed}
 
 
-def manifest(env, *, ext: dict | None = None) -> dict:
+def manifest_from_features(features, *, producer: dict,
+                           body: dict | None = None,
+                           actions: dict | None = None,
+                           frames: dict | None = None,
+                           cameras: dict | None = None,
+                           goals: dict | None = None,
+                           instructions: dict | None = None,
+                           split: dict | None = None,
+                           privileged: dict | None = None,
+                           ext: dict | None = None) -> dict:
+    """A canonical manifest for any producer, from its features.
+
+    ``features`` are :class:`FeatureSpec` (observed and privileged
+    alike); ``producer`` names what made the data (``{"name",
+    "version"}``). The remaining sections are the producer's to state
+    (body, actions, frames, cameras, goals, instructions, split) and are
+    recorded as given; ``privileged`` describes privileged fields beyond
+    the spec's, and ``ext`` declares ``privileged.ext.<producer>``
+    fields as :func:`manifest` does.
+    """
+    from topogym.canonical.spec import FeatureSpec
+
+    feats = list(features)
+    if not all(isinstance(f, FeatureSpec) for f in feats):
+        raise TypeError("features must be FeatureSpec")
+    problems = spec.validate_features(feats)
+    if problems:
+        raise ValueError("invalid features: " + "; ".join(problems))
+    if not isinstance(producer, dict) or "name" not in producer:
+        raise ValueError('producer is {"name": ..., "version": ...}')
+    observed = {f.key: f.to_dict() for f in feats
+                if not f.key.startswith(spec.PRIVILEGED_PREFIX)}
+    recorded = {f.key[len(spec.PRIVILEGED_PREFIX):]: f.to_dict()
+                for f in feats if f.key.startswith(spec.PRIVILEGED_PREFIX)}
+    return {
+        "spec_version": spec.CANONICAL_SPEC_VERSION,
+        "producer": dict(producer),
+        "env_id": producer.get("env_id"),
+        "features": observed,
+        "privileged": {**recorded, **(privileged or {}),
+                       **_ext_entries(ext)},
+        "frames": frames or {},
+        "cameras": cameras or {},
+        "body": body or {},
+        "actions": actions or {},
+        "goals": goals or {},
+        "instructions": instructions or {},
+        "split": split or {"split": None, "tags": [], "seed": None},
+    }
+
+
+def manifest(env, *, ext: dict | None = None, **kwargs) -> dict:
     """The canonical manifest of ``env`` (built with
-    ``obs_mode="canonical"`` or wrapped with :func:`wrap`).
+    ``obs_mode="canonical"`` or wrapped with :func:`wrap`), or -- given
+    a list of :class:`FeatureSpec` instead of an env -- of any producer's
+    streams (see :func:`manifest_from_features`, whose keywords it
+    takes).
 
     ``ext`` declares producer-specific privileged fields: ``{producer:
     {field: description}}`` becomes ``privileged["ext.<producer>"]``,
@@ -139,6 +193,10 @@ def manifest(env, *, ext: dict | None = None) -> dict:
     """
     import topogym
 
+    if isinstance(env, (list, tuple)):
+        return manifest_from_features(env, ext=ext, **kwargs)
+    if kwargs:
+        raise TypeError(f"unexpected keywords for an env: {sorted(kwargs)}")
     adapter = _adapter(env)
     base = adapter.env
     n = 2 * base.view_radius + 1

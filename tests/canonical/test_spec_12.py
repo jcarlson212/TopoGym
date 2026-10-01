@@ -190,6 +190,6 @@ def test_manifest_declares_ext_entries():
                    actions="words")
     m = canonical.manifest(env, ext={"acme": {"wind": "gust vector, m/s"}})
     assert m["privileged"]["ext.acme"] == {"wind": "gust vector, m/s"}
-    assert m["spec_version"] == "1.2.0"
+    assert m["spec_version"] == spec.CANONICAL_SPEC_VERSION
     with pytest.raises(ValueError):
         canonical.manifest(env, ext={"bad name": {}})
