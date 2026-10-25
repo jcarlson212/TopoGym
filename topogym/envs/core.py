@@ -45,6 +45,7 @@ from topogym.core.homology import _UnionFind, analyze_2d
 from topogym.core.metadata import HomologyStats, TopologyMetadata
 from topogym.generation.config import TopoGenConfig2D
 from topogym.generation.generator import Layout, generate_2d
+from topogym.rendering import tiles
 
 #: Reward modes shared by every variant (see docs/specs/topo_gym_overview).
 #: "sparse" (default) — +1 terminal on reaching the goal cell.
@@ -104,7 +105,7 @@ class TopoEnvCore(gym.Env):
                  teleport: bool = False, demonstration=(),
                  procedural: bool = False,
                  render_mode: str | None = None, reveal_hidden: bool = False,
-                 **overrides):
+                 theme: str = "classic", **overrides):
         # The registry interface spells the layout seed simply "seed":
         # gym.make("TopoGym/Dilution-50-v0", seed=3). Omitting it gives
         # the canonical specimen -- the layout the docs picture and the
@@ -169,6 +170,9 @@ class TopoEnvCore(gym.Env):
         self.lifetime_visit_counts: dict = {}
         self.render_mode = render_mode
         self.reveal_hidden = reveal_hidden
+        #: How rendered pixels look (``render()`` and canonical images);
+        #: it never touches the world, dynamics or symbolic observations.
+        self.theme = tiles.check_theme(theme)
 
         self._debug = bool(os.environ.get("TOPOGYM_DEBUG"))
         self._overlay = bool(os.environ.get("TOPOGYM_OVERLAY")

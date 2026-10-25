@@ -42,7 +42,7 @@ suite yourself.
 |---|---|
 | a specific environment / registry entry | [docs/contributing_environments.md](docs/contributing_environments.md) — usually zero code |
 | a hole or room shape | `topogym/generation/shapes.py` / `topogym/generation/rooms.py` (one function + registry entry) |
-| a cell mechanic (hazard/wormhole-style) | constants + `TextureGrid2DEnv` hooks in `topogym/envs/texture2d.py` + a tile in `topogym/rendering/tiles.py` |
+| a cell mechanic (hazard/wormhole-style) | constants + `TextureGrid2DEnv` hooks in `topogym/envs/texture2d.py` + a tile in `topogym/rendering/tiles.py` and `tiles_hd.py` |
 | a Texture scenario | a builder in `topogym/generation/scenarios.py` + `registry.TEXTURE_SCENARIOS` |
 | a generation style | `topogym/generation/modes.py` (nested/corridor are the templates) |
 | a base manifold | subclass `BaseMap2D` in `topogym/core/basemap.py`; implement transport + `face_cycle` and the homology engine works unchanged |

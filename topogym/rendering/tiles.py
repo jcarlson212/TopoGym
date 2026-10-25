@@ -5,6 +5,10 @@ resolution in a few seeded variants, then nearest-neighbor scaled to the
 renderer's cell size. Variants are picked per cell coordinate so large
 regions read as textured surfaces instead of flat color — no asset
 files, no extra dependencies, reproducible across processes.
+
+This module is the ``classic`` theme, and its pixels are frozen. Other
+themes (:data:`THEMES`) draw the same tile names their own way; the
+``hd`` set lives in :mod:`topogym.rendering.tiles_hd`.
 """
 
 from __future__ import annotations
@@ -435,9 +439,33 @@ BUILDERS = {
 }
 
 
+#: Rendering themes, by name. ``classic`` is the default everywhere and
+#: never changes; a theme's pixels are fixed once it is released.
+THEMES = ("classic", "hd")
+DEFAULT_THEME = "classic"
+
+
+def check_theme(theme: str) -> str:
+    if theme not in THEMES:
+        raise ValueError(
+            f"unknown theme {theme!r}; expected one of {THEMES}"
+        )
+    return theme
+
+
+def _theme_set(theme: str) -> tuple:
+    """(builders, base resolution) for a theme."""
+    if theme == "classic":
+        return BUILDERS, BASE
+    from topogym.rendering import tiles_hd
+
+    return tiles_hd.BUILDERS, tiles_hd.BASE
+
+
 @cache
-def _variants(name: str) -> tuple:
-    builder = BUILDERS[name]
+def _variants(name: str, theme: str = DEFAULT_THEME) -> tuple:
+    builders, _ = _theme_set(theme)
+    builder = builders[name]
     out = []
     for k in range(_VARIANTS):
         t = builder(_rng(f"{name}:{k}"))
@@ -445,17 +473,44 @@ def _variants(name: str) -> tuple:
     return tuple(out)
 
 
+def _area_matrix(n_out: int, n_in: int) -> np.ndarray:
+    """Row-stochastic box-filter weights resampling n_in pixels to n_out."""
+    edges = np.arange(n_out + 1) * n_in / n_out
+    weights = np.zeros((n_out, n_in), dtype=np.float32)
+    for i in range(n_out):
+        lo, hi = edges[i], edges[i + 1]
+        for j in range(int(lo), min(n_in, int(np.ceil(hi)))):
+            weights[i, j] = min(hi, j + 1) - max(lo, j)
+    return weights / weights.sum(axis=1, keepdims=True)
+
+
 @cache
-def _scaled(name: str, variant: int, px: int) -> np.ndarray:
-    src = _variants(name)[variant]
-    idx = (np.arange(px) * BASE) // px
-    return src[np.ix_(idx, idx)]
+def _scaled(name: str, variant: int, px: int,
+            theme: str = DEFAULT_THEME) -> np.ndarray:
+    src = _variants(name, theme)[variant]
+    _, base = _theme_set(theme)
+    if theme == "classic" or px >= base:
+        idx = (np.arange(px) * base) // px
+        return src[np.ix_(idx, idx)]
+    # Shrinking a detailed tile by dropping pixels aliases badly; average
+    # the pixels each output pixel covers instead.
+    return area_resize(src, px, px)
 
 
-def tile(name: str, px: int, cell: tuple = (0, 0)) -> np.ndarray:
+def area_resize(img: np.ndarray, rows: int, cols: int) -> np.ndarray:
+    """Box-filter resample of an (H, W, 3) image to (rows, cols, 3) uint8."""
+    r = _area_matrix(rows, img.shape[0])
+    c = _area_matrix(cols, img.shape[1])
+    out = np.tensordot(r, img.astype(np.float32), axes=(1, 0))  # (rows, W, 3)
+    out = np.tensordot(out, c, axes=(1, 1)).transpose(0, 2, 1)  # (rows, cols, 3)
+    return np.clip(np.rint(out), 0, 255).astype(np.uint8)
+
+
+def tile(name: str, px: int, cell: tuple = (0, 0),
+         theme: str = DEFAULT_THEME) -> np.ndarray:
     """The (px, px, 3) uint8 tile for a cell (variant keyed by coords)."""
     variant = (cell[0] * 7 + cell[1] * 13) % _VARIANTS
-    return _scaled(name, variant, px)
+    return _scaled(name, variant, px, theme)
 
 
 def tint(region: np.ndarray, color: tuple, strength: float = 0.45) -> None:

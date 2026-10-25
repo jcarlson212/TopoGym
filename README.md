@@ -8,20 +8,20 @@ TopoGym is a [Gymnasium](https://gymnasium.farama.org) environment library where
 
 <table>
 <tr>
-<td align="center"><img src="docs/envs/EnvironmentalIceShip.gif" width="215" height="215"/><br><sub><b>EnvironmentalIceShip</b></sub></td>
-<td align="center"><img src="docs/envs/ClownChase.gif" width="215" height="215"/><br><sub><b>ClownChase</b></sub></td>
-<td align="center"><img src="docs/envs/SpaceWarp.gif" width="215" height="215"/><br><sub><b>SpaceWarp</b></sub></td>
-<td align="center"><img src="docs/envs/DontFall.gif" width="215" height="215"/><br><sub><b>DontFall</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/EnvironmentalIceShip.gif" width="215" height="215"/><br><sub><b>EnvironmentalIceShip</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/ClownChase.gif" width="215" height="215"/><br><sub><b>ClownChase</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/SpaceWarp.gif" width="215" height="215"/><br><sub><b>SpaceWarp</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/DontFall.gif" width="215" height="215"/><br><sub><b>DontFall</b></sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/envs/SearchRescue.gif" width="215" height="215"/><br><sub><b>SearchRescue</b></sub></td>
-<td align="center"><img src="docs/envs/BankRobber.gif" width="215" height="215"/><br><sub><b>BankRobber</b></sub></td>
-<td align="center"><img src="docs/envs/Nested3-50.gif" width="215" height="215"/><br><sub><b>Nested3-50</b></sub></td>
-<td align="center"><img src="docs/envs/TopTorus-50.gif" width="215" height="215"/><br><sub><b>TopTorus-50</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/SearchRescue.gif" width="215" height="215"/><br><sub><b>SearchRescue</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/BankRobber.gif" width="215" height="215"/><br><sub><b>BankRobber</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/Nested3-50.gif" width="215" height="215"/><br><sub><b>Nested3-50</b></sub></td>
+<td align="center"><img src="https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/envs/TopTorus-50.gif" width="215" height="215"/><br><sub><b>TopTorus-50</b></sub></td>
 </tr>
 </table>
 
-*Full gallery and per-environment documentation: [`docs/envs/`](docs/envs/README.md) · [`docs/environments/`](docs/environments/README.md).*
+*Drawn in the opt-in `hd` [rendering theme](#rendering). Full gallery and per-environment documentation: [`docs/envs/`](docs/envs/README.md) · [`docs/environments/`](docs/environments/README.md).*
 
 ## Environments
 
@@ -67,6 +67,22 @@ env.step("move_forward")
 
 See [docs/canonical.md](docs/canonical.md), including per-episode export
 in the LeRobot dataset v3.0 layout.
+
+### Rendering
+
+`render_mode="rgb_array"` draws the world as procedural pixel-art tiles,
+generated in numpy with no asset files. Two themes draw the same tiles:
+
+```python
+env = gym.make("TopoGym/SpaceWarp-v0", render_mode="rgb_array")              # theme="classic" (default)
+env = gym.make("TopoGym/SpaceWarp-v0", render_mode="rgb_array", theme="hd")  # 32-px tiles, lighting, soft shadows
+```
+
+`classic` is the default and its pixels never change, so anything trained
+on rendered frames or canonical images keeps seeing the same input. `hd`
+is what the docs use. A theme changes pixels only: the world, dynamics,
+rewards and symbolic observations are identical under both (see
+[COMPATIBILITY.md](COMPATIBILITY.md#rendering)).
 
 ## Install
 
@@ -188,6 +204,7 @@ Regenerate with `python scripts/benchmarks/generate_splits.py`; browse any split
 ```bash
 python scripts/play.py --list
 python scripts/play.py TopoGym/SpaceWarp-v0
+python scripts/play.py TopoGym/SpaceWarp-v0 --theme classic   # the envs' default look (play uses hd)
 ```
 
 Arrow keys move; `Tab` reveals hidden structure; `r` resets; `Backspace` regenerates the layout. Rendering dims everything outside the agent's current line of sight (reveal mode shows all). Set `TOPOGYM_DEBUG=1` to stream everything the env computes each step to the console, and `TOPOGYM_OVERLAY=1` (alias `OVERLAY_ENABLED=1`) for the live H1 overlay: every step, the known region's holes are drawn on the grid — representative cycles in yellow, enclosed-wall rims in green (a yellow cycle with no green rim is a transient belief), with a legend and live H1 count top-right.
@@ -265,7 +282,7 @@ Builds and rims are linear and `betti` near-linear in both backends; `representa
 
 How fast the environment steps under random actions, and how that scales across `gymnasium.vector.AsyncVectorEnv`:
 
-![Step throughput vs parallelism](docs/env_step_profile.png)
+![Step throughput vs parallelism](https://raw.githubusercontent.com/jcarlson212/TopoGym/main/docs/env_step_profile.png)
 
 A 50×50 world with `actions="egocentric"`. `obs_mode` is the observation — a separate axis from the action space:
 
@@ -327,7 +344,7 @@ If you use TopoGym in your research, please cite:
              Exploration in Reinforcement Learning},
   year    = {2026},
   url     = {https://github.com/jcarlson212/TopoGym},
-  version = {0.7.0}
+  version = {0.8.0}
 }
 ```
 

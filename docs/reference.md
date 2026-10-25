@@ -451,6 +451,12 @@ TOPOGYM_DEBUG=1 TOPOGYM_OVERLAY=1 python scripts/play.py TopoGym/Decoys4-50-v0
 Rendering always dims cells outside the agent's current line of sight
 (reveal mode shows the full map undimmed).
 
+`theme="hd"` draws the same tiles at 32 px with a shared palette, light
+from the top left and soft wall shadows; out-of-sight cells fade toward
+night blue instead of darkening. The default, `theme="classic"`, keeps
+its pixels frozen (COMPATIBILITY.md, "Rendering"). Neither touches the
+world or any symbolic observation.
+
 ## Structure accessors
 
 ```python

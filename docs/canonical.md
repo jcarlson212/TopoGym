@@ -53,6 +53,11 @@ env = canonical.wrap(gym.make("TopoGym/Maze-50-v0"), actions="words")
 | `topdown` | `False` | also render the observed map |
 | `phrasing` | `"canonical"` | `"paraphrase:<k>"` or `"random"` instruction wording |
 
+`theme` (`"classic"` or `"hd"`) is a native kwarg, not a canonical one:
+it picks the tiles the head image is drawn with, exactly as it does for
+`render()`. `classic` is the default and its pixels are frozen; the
+manifest records the theme as `cameras.head.theme`.
+
 The canonical kwargs are rejected unless the canonical layer is on, so a
 typo cannot silently train on a native env.
 
@@ -151,7 +156,8 @@ episode started.
 names, units, frame), the privileged schema, frames
 (`episode_frame: per_world` only when every episode of the world starts
 at the same pose, i.e. fourway actions; egocentric episodes start at a
-random heading), the body, the action vocabulary and its semantics, the
+random heading), the cameras (including the rendering `theme`), the
+body, the action vocabulary and its semantics, the
 goal categories (with WordNet synsets), the instruction templates, and
 the split.
 

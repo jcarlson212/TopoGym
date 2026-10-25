@@ -3,6 +3,10 @@
 
     python scripts/generate_assets.py            # everything
     python scripts/generate_assets.py --no-gifs  # fast: skip animations
+    python scripts/generate_assets.py --theme classic  # the default env look
+
+The docs are drawn in the ``hd`` theme; envs themselves default to
+``classic`` (see COMPATIBILITY.md, "Rendering").
 
 Outputs
 -------
@@ -29,6 +33,7 @@ import gymnasium as gym  # noqa: E402
 import topogym  # noqa: E402,F401
 from topogym import benchmarks, registry  # noqa: E402
 from topogym.core import constants as C  # noqa: E402
+from topogym.rendering import tiles  # noqa: E402
 from topogym.rendering.rgb import render_rgb_2d  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -46,6 +51,7 @@ GIF_SET = [
 
 GIF_PX = 420  # every GIF frame is exactly GIF_PX x GIF_PX
 STILL_PX = 480  # every still is exactly STILL_PX x STILL_PX
+THEME = "hd"  # set by --theme
 
 
 def _fit(frame, px: int):
@@ -61,6 +67,21 @@ def _fit(frame, px: int):
     ys = (np.arange(px) * h) // px
     xs = (np.arange(px) * w) // px
     return frame[np.ix_(ys, xs)]
+
+
+def _frame(env, px: int, reveal: bool = False):
+    """The env rendered to exactly (px, px) in :data:`THEME`.
+
+    ``classic`` renders at the largest tile that fits and stretches
+    (:func:`_fit`), as the docs always have. Other themes render at about
+    twice the target and area-average down: the extra detail survives as
+    anti-aliasing, and a one-cell wall still covers several pixels.
+    """
+    w, h = env.layout.base.layout_size()
+    if THEME == "classic":
+        return _fit(render_rgb_2d(env, tile=max(1, px // max(w, h))), px)
+    tile = max(1, min(32, -(-2 * px // max(w, h))))
+    return tiles.area_resize(render_rgb_2d(env, tile=tile), px, px)
 
 
 # ---------------------------------------------------------------------------
@@ -146,17 +167,16 @@ def record_gif(env_id: str, path: pathlib.Path, seed: int = 0,
     import imageio.v3 as iio
     import numpy as np
 
-    env = gym.make(env_id, seed=seed, reward_mode="none").unwrapped
+    env = gym.make(env_id, seed=seed, reward_mode="none",
+                   theme=THEME).unwrapped
     env.reset(seed=0)
-    w, h = env.layout.base.layout_size()
-    tile = max(1, GIF_PX // max(w, h))  # never downsample: see _fit
-    frames = [_fit(render_rgb_2d(env, tile=tile), GIF_PX)]
+    frames = [_frame(env, GIF_PX)]
     tick = [0]
 
     def emit():
         tick[0] += 1
         if tick[0] % stride == 0:
-            frames.append(_fit(render_rgb_2d(env, tile=tile), GIF_PX))
+            frames.append(_frame(env, GIF_PX))
 
     heading = 0
     for _ in range(max_steps):
@@ -169,7 +189,66 @@ def record_gif(env_id: str, path: pathlib.Path, seed: int = 0,
         )
         emit()
     frames += [frames[-1]] * 6  # hold the final frame
-    iio.imwrite(path, np.stack(frames), duration=90, loop=0)
+    if THEME == "classic":
+        iio.imwrite(path, np.stack(frames), duration=90, loop=0)
+    else:
+        _write_gif(frames, path)
+
+
+def _palette(frames):
+    """One 256-colour palette for a set of frames, as a ``P`` image.
+
+    Part of it is reserved for the tile set itself: median cut weighs
+    colours by area, and small sprites (clowns, chests, the agent) would
+    otherwise lose their hues.
+    """
+    import numpy as np
+    from PIL import Image
+
+    def cut(img, n):
+        q = Image.fromarray(img).quantize(
+            colors=n, method=Image.Quantize.MEDIANCUT,
+            dither=Image.Dither.NONE)
+        return np.asarray(q.getpalette()[:3 * n], dtype=np.uint8)
+
+    scene = np.concatenate(frames[::max(1, len(frames) // 16)], axis=0)
+    sprites = np.concatenate(
+        [tiles.tile(n, 32, (k, 0), THEME) for k, n in
+         enumerate(tiles.BUILDERS)], axis=1)
+    palette = Image.new("P", (1, 1))
+    palette.putpalette(np.concatenate([cut(scene, 192),
+                                       cut(sprites, 64)]).tolist())
+    return palette
+
+
+def _quantize(frame, palette):
+    from PIL import Image
+
+    return Image.fromarray(frame).quantize(palette=palette,
+                                           dither=Image.Dither.NONE)
+
+
+def _write_gif(frames, path: pathlib.Path) -> None:
+    """Encode with one palette for the whole animation and no dithering.
+
+    Smooth hd frames get a fresh dithered palette per frame by default,
+    so no two frames share pixels and the GIF grows ~15x. A shared,
+    undithered palette keeps static regions identical frame to frame.
+    """
+    palette = _palette(frames)
+    images = [_quantize(f, palette) for f in frames]
+    images[0].save(path, save_all=True, append_images=images[1:],
+                   duration=90, loop=0)
+
+
+def _write_still(frame, path: pathlib.Path) -> None:
+    """A still as PNG; hd stills are palettised (~6x smaller)."""
+    if THEME == "classic":
+        import imageio.v3 as iio
+
+        iio.imwrite(path, frame)
+        return
+    _quantize(frame, _palette([frame])).save(path, optimize=True)
 
 
 # ---------------------------------------------------------------------------
@@ -352,15 +431,11 @@ def write_stills_and_gallery() -> dict:
           for n in registry.TOP_TOPOLOGIES],
         *[(n, f"TopoGym/{n}-v0") for n in registry.TEXTURE_SCENARIOS],
     ]:
-        import imageio.v3 as iio
-
-        env = gym.make(env_id, seed=0, reveal_hidden=True).unwrapped
+        env = gym.make(env_id, seed=0, reveal_hidden=True,
+                       theme=THEME).unwrapped
         env.reset(seed=0)
         layout = env.layout
-        w, _h = layout.base.layout_size()
-        iio.imwrite(ENVS_DIR / f"{name}.png",
-                    _fit(render_rgb_2d(env, tile=max(1, STILL_PX // w)),
-                         STILL_PX))
+        _write_still(_frame(env, STILL_PX), ENVS_DIR / f"{name}.png")
         b = list(layout.metadata.betti_z2)
         betti[name] = b
         art = (f"{name}.gif"
@@ -381,10 +456,14 @@ def write_stills_and_gallery() -> dict:
 
 
 def main() -> int:
+    global THEME
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--no-gifs", action="store_true")
     ap.add_argument("--only", default=None, help="single env name")
+    ap.add_argument("--theme", default=THEME, choices=tiles.THEMES,
+                    help="rendering theme for every asset (default: hd)")
     args = ap.parse_args()
+    THEME = args.theme
 
     betti = write_stills_and_gallery()
     print(f"wrote {len(betti)} SVG stills + gallery")

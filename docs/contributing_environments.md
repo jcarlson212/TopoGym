@@ -123,7 +123,9 @@ Hazards and wormholes are the templates: a cell-type constant in
 `topogym/core/constants.py`, runtime semantics in
 `TextureGrid2DEnv._post_move_hook` / `_step_outcome`
 ([`topogym/envs/texture2d.py`](../topogym/envs/texture2d.py)), a tile
-in [`topogym/rendering/tiles.py`](../topogym/rendering/tiles.py), and
+in every theme ([`topogym/rendering/tiles.py`](../topogym/rendering/tiles.py)
+for `classic`, [`topogym/rendering/tiles_hd.py`](../topogym/rendering/tiles_hd.py)
+for `hd`; a test checks both draw the same names), and
 tests for both the mechanic and the (unchanged or documented) homology.
 
 ### New Texture scenario

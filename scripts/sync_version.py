@@ -33,7 +33,7 @@ TARGETS = (
      r"\g<1>{{{v}}}\g<2>"),
     ("croissant.json", r'(?m)^(\s*"version":\s*)"[^"]*"(,?)$',
      r'\g<1>"{v}"\g<2>'),
-    ("croissant.json", r'version=\{{[^}}]*\}}', "version={{{v}}}"),
+    ("croissant.json", r'version=\{[^}]*\}', "version={{{v}}}"),
 )
 
 

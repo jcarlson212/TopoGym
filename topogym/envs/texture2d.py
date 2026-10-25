@@ -371,4 +371,5 @@ class TextureGrid2DEnv(TopoGrid2DEnv):
                 continue
             x, y = self.layout.base.layout_coords(pos)
             img[y * tile:(y + 1) * tile,
-                x * tile:(x + 1) * tile] = tiles.tile("clown", tile)
+                x * tile:(x + 1) * tile] = tiles.tile("clown", tile,
+                                                      theme=self.theme)

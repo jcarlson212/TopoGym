@@ -4,6 +4,7 @@
     python scripts/play.py                              # default env
     python scripts/play.py TopoGym/Decoys4-50-v0 --seed 3
     python scripts/play.py --list                       # all env ids
+    python scripts/play.py --theme classic              # the envs' default look
 
 Controls
 --------
@@ -46,6 +47,8 @@ def parse_args() -> argparse.Namespace:
                     help="none | sparse | coverage | deceptive "
                          "(sparse: reaching the goal ends the episode)")
     ap.add_argument("--p-slip", type=float, default=0.0)
+    ap.add_argument("--theme", default="hd", choices=("classic", "hd"),
+                    help="rendering theme (default: hd)")
     ap.add_argument("--list", action="store_true", help="list env ids")
     return ap.parse_args()
 
@@ -63,7 +66,7 @@ def main() -> int:
     env = gym.make(
         args.env_id, seed=args.seed, render_mode="human",
         reveal_hidden=args.reveal, reward_mode=args.reward_mode,
-        p_slip=args.p_slip,
+        p_slip=args.p_slip, theme=args.theme,
         **({"actions": "fourway"} if args.fourway else {}),
     )
     core = env.unwrapped
@@ -109,6 +112,7 @@ def main() -> int:
                         args.env_id, seed=seed, render_mode="human",
                         reveal_hidden=core.reveal_hidden,
                         reward_mode=args.reward_mode, p_slip=args.p_slip,
+                        theme=args.theme,
                         **({"actions": "fourway"}
                            if args.fourway else {}),
                     )

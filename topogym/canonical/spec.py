@@ -35,7 +35,8 @@ Frames
 - **Camera**: OpenCV (x right, y down, z forward) for perspective
   cameras. Grid envs render an orthographic top-down view centred on
   the agent, facing up; the manifest says so rather than inventing
-  intrinsics.
+  intrinsics. A rendered camera may carry an optional ``theme`` naming
+  how its pixels were drawn (1.4.0).
 
 Versioning
 ----------
@@ -48,7 +49,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 
-CANONICAL_SPEC_VERSION = "1.3.0"
+CANONICAL_SPEC_VERSION = "1.4.0"
 
 # -- observation keys -----------------------------------------------------------
 

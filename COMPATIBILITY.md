@@ -55,6 +55,26 @@ Package versions follow semantic versioning. Minor releases are
 additive. Anything that would break the guarantees above requires a
 major release, and none is planned.
 
+## Rendering
+
+Rendered pixels (`render_mode="rgb_array"`/`"human"` and the canonical
+`observation.images.*`) come from a **theme**, chosen with the `theme`
+kwarg (0.8.0):
+
+- `classic` is the default, and its pixels are frozen like an
+  observation: the same id, seed and actions render the same frames in
+  every later release, so policies trained on rendered frames or
+  canonical images keep seeing the same input.
+- A released theme's pixels are fixed too. A new look ships as a new
+  theme name, never as an edit to an existing one.
+- A theme changes pixels only. The world, dynamics, rewards, info and
+  every symbolic observation mode are identical under all themes.
+- The canonical manifest records the theme
+  (`cameras.head.theme`), so a dataset says how its images were drawn.
+
+The docs (README GIFs, the gallery, per-env pages) are drawn in `hd` and
+may be regenerated at any time; they are illustrations, not fixtures.
+
 ## Deprecation
 
 A public name, kwarg, mode or id is deprecated with a `DeprecationWarning`

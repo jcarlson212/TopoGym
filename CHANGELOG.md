@@ -3,6 +3,37 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
+## 0.8.0 (unreleased)
+
+Rendering themes. Additive: `classic` stays the default and renders
+byte-for-byte as before, and no id, observation or dynamic changes
+(golden suite green). The canonical spec is now 1.4.0.
+
+### Added
+
+- **`theme="hd"`** on every env: 32-px procedural tiles with
+  hue-shifted colour ramps, one light from the top left, outlined
+  sprites, wall front faces and soft drop shadows, and night-blue
+  line-of-sight fog. It applies to `render()` and the canonical
+  `observation.images.head`. Small tiles are area-averaged rather than
+  pixel-dropped. Still pure numpy, no asset files.
+- `tiles.THEMES`, `tiles.check_theme`, and a `theme=` argument on
+  `tiles.tile` and `render_rgb_2d`.
+- The canonical manifest records the theme as `cameras.head.theme`
+  (spec 1.4.0: an optional `theme` on rendered cameras).
+- `--theme` on `scripts/generate_assets.py` and `scripts/play.py`
+  (both default to `hd`).
+- `COMPATIBILITY.md` gains a "Rendering" section: `classic` pixels are
+  frozen, and a released theme never changes.
+
+### Docs
+
+- The README GIFs, gallery stills and per-env pages are redrawn in
+  `hd`.
+- README images use absolute `raw.githubusercontent.com` URLs, so they
+  display on PyPI (relative paths never resolved there) and follow
+  `main` without a release.
+
 ## 0.7.0 (2026-10-01)
 
 Follow-ups from migrating a continuous-world producer onto the dataset

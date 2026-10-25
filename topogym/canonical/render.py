@@ -18,7 +18,7 @@ import numpy as np
 
 from topogym.core import constants as C
 from topogym.rendering import tiles
-from topogym.rendering.rgb import AGENT_COLOR, CODE_TILES, _agent_arrow
+from topogym.rendering.rgb import AGENT_COLOR, CODE_TILES, draw_agent
 
 #: Background for pixels outside the tiled patch.
 _PAD = (0, 0, 0)
@@ -80,10 +80,11 @@ _SPRITES: dict = {}
 _TILE_CATEGORIES = {"treasure": "chest", "person": "person"}
 
 
-def _draw_object(region: np.ndarray, label: str, px: int) -> None:
+def _draw_object(region: np.ndarray, label: str, px: int,
+                 theme: str = tiles.DEFAULT_THEME) -> None:
     name = _TILE_CATEGORIES.get(label)
     if name is not None:
-        region[:] = tiles.tile(name, px)
+        region[:] = tiles.tile(name, px, theme=theme)
         return
     rgb, mask = _sprite(label, px)
     region[mask] = rgb[mask]
@@ -91,7 +92,9 @@ def _draw_object(region: np.ndarray, label: str, px: int) -> None:
 
 def render_head(env, objects: dict, size: int) -> np.ndarray:
     """The egocentric image. ``objects`` maps world cell -> category
-    label for goal objects (drawn when their cell is visible)."""
+    label for goal objects (drawn when their cell is visible). Tiles
+    follow the env's ``theme``."""
+    theme = getattr(env, "theme", tiles.DEFAULT_THEME)
     n = 2 * env.view_radius + 1
     px = max(1, size // n)
     pad = (size - px * n) // 2
@@ -112,17 +115,21 @@ def render_head(env, objects: dict, size: int) -> np.ndarray:
                 name = CODE_TILES[code]
             y0, x0 = pad + i * px, pad + j * px
             region = img[y0:y0 + px, x0:x0 + px]
-            region[:] = tiles.tile(name, px, cell or (0, 0))
+            region[:] = tiles.tile(name, px, cell or (0, 0), theme)
             if cell is None or cell not in visible:
                 continue
             label = objects.get(cell)
             if label is not None:
-                _draw_object(region, label, px)
+                _draw_object(region, label, px, theme)
             if cell in clowns and (i, j) != (n // 2, n // 2):
-                region[:] = tiles.tile("clown", px)
+                region[:] = tiles.tile("clown", px, theme=theme)
+    if theme != "classic":
+        from topogym.rendering import tiles_hd
+
+        tiles_hd.drop_shadows(img[pad:pad + n * px, pad:pad + n * px],
+                              np.asarray(patch) == C.OBS_WALL, px)
     c0 = pad + (n // 2) * px
-    agent = img[c0:c0 + px, c0:c0 + px]
-    agent[_agent_arrow(px)] = AGENT_COLOR
+    draw_agent(img[c0:c0 + px, c0:c0 + px], px, 0, theme)
     return img
 
 

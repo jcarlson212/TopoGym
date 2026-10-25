@@ -209,6 +209,7 @@ def manifest(env, *, ext: dict | None = None, **kwargs) -> dict:
         "head": {
             "model": "orthographic_topdown", "facing": "up",
             "cells": [n, n], "px_per_cell": px,
+            "theme": getattr(base, "theme", "classic"),
             "intrinsics": None, "T_body_cam": None,
             "note": "a rendered occupancy view, not a perspective camera",
         },

@@ -126,10 +126,48 @@ def _draw_identifications(img: np.ndarray, base, tile: int) -> None:
                            (-1 if flip else 1, 0), IDENT_Y_COLOR)
 
 
-def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
+def draw_agent(region: np.ndarray, px: int, quarter_turns: int = 0,
+               theme: str = tiles.DEFAULT_THEME) -> None:
+    """The MiniGrid-style agent arrow, rotated to the heading, in place."""
+    mask = _agent_arrow(px)
+    if theme == "classic":
+        if quarter_turns:
+            mask = np.rot90(mask, quarter_turns)
+        region[mask] = AGENT_COLOR
+        return
+    from topogym.rendering import tiles_hd
+
+    rgb, mask = tiles_hd.agent_sprite(px, mask)
+    if quarter_turns:
+        rgb, mask = np.rot90(rgb, quarter_turns), np.rot90(mask, quarter_turns)
+    region[mask] = rgb[mask]
+
+
+def _overlays(env, img: np.ndarray, tile: int) -> None:
+    overlay = getattr(env, "_render_overlay", None)
+    if overlay is not None:
+        overlay(img, tile)
+    if getattr(env, "_ricci_overlay", False):
+        from topogym.rendering.overlay import draw_ricci_heatmap
+
+        draw_ricci_heatmap(env, img, tile)
+    if getattr(env, "_overlay", False):
+        from topogym.rendering.overlay import draw_h1_overlay
+
+        draw_h1_overlay(env, img, tile)
+
+
+def render_rgb_2d(env: TopoEnvCore, tile: int = 14,
+                  theme: str | None = None) -> np.ndarray:
+    """The env as an RGB image, ``tile`` pixels per cell. ``theme``
+    defaults to the env's own (``env.theme``, itself ``"classic"``)."""
+    if theme is None:
+        theme = getattr(env, "theme", tiles.DEFAULT_THEME)
+    classic = theme == "classic"
     base = env.layout.base
     w, h = base.layout_size()
-    img = np.tile(tiles.tile("out", tile), (h, w, 1))
+    img = np.tile(tiles.tile("out", tile, theme=theme), (h, w, 1))
+    solid = np.zeros((h, w), dtype=bool)
     namer = getattr(env, "_tile_name", None)
     # Line-of-sight dimming: cells the agent cannot currently see render
     # darker (skipped in reveal mode, which exists for documentation).
@@ -138,12 +176,17 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
         vis_fn = getattr(env, "visible_cells", None)
         if vis_fn is not None:
             visible = vis_fn()
+    hidden = []
+    goals = []
     for cell in base.cells():
         x, y = base.layout_coords(cell)
         code = env._obs_code(cell)
+        solid[y, x] = code == C.OBS_WALL
         name = namer(cell, code) if namer is not None else CODE_TILES[code]
         region = img[y * tile:(y + 1) * tile, x * tile:(x + 1) * tile]
-        region[:] = tiles.tile(name, tile, (x, y))
+        region[:] = tiles.tile(name, tile, (x, y), theme)
+        if code == C.OBS_GOAL:
+            goals.append((x, y))
         if code == C.OBS_GOAL and tile < 8:
             # The chest sprite is unreadable at tiny tiles (large
             # worlds): mark the goal with a solid high-contrast block.
@@ -152,7 +195,22 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
         if color is not None:
             tiles.tint(region, color)
         if visible is not None and cell not in visible:
-            region[:] = (region * 0.55).astype(np.uint8)
+            if classic:
+                region[:] = (region * 0.55).astype(np.uint8)
+            else:
+                hidden.append(region)
+
+    if not classic:
+        from topogym.rendering import tiles_hd
+
+        # Shadows and the goal marker first, then fog, so the fog stays
+        # one even tone and a goal out of sight dims like everything else.
+        tiles_hd.drop_shadows(img, solid, tile)
+        if tile < 20:
+            for x, y in goals:
+                tiles_hd.goal_marker(img, x, y, tile)
+        for region in hidden:
+            tiles_hd.fog(region)
 
     _draw_identifications(img, base, tile)
 
@@ -166,31 +224,9 @@ def render_rgb_2d(env: TopoEnvCore, tile: int = 14) -> np.ndarray:
     sprite_name = sprite() if sprite is not None else None
     if sprite_name is not None:
         img[y0:y0 + tile, x0:x0 + tile] = np.rot90(
-            tiles.tile(sprite_name, tile), k
+            tiles.tile(sprite_name, tile, theme=theme), k
         )
-        overlay = getattr(env, "_render_overlay", None)
-        if overlay is not None:
-            overlay(img, tile)
-        if getattr(env, "_ricci_overlay", False):
-            from topogym.rendering.overlay import draw_ricci_heatmap
-
-            draw_ricci_heatmap(env, img, tile)
-        if getattr(env, "_overlay", False):
-            from topogym.rendering.overlay import draw_h1_overlay
-
-            draw_h1_overlay(env, img, tile)
-        return img
-    mask = np.rot90(_agent_arrow(tile), k) if k else _agent_arrow(tile)
-    img[y0:y0 + tile, x0:x0 + tile][mask] = AGENT_COLOR
-    overlay = getattr(env, "_render_overlay", None)
-    if overlay is not None:
-        overlay(img, tile)
-    if getattr(env, "_ricci_overlay", False):
-        from topogym.rendering.overlay import draw_ricci_heatmap
-
-        draw_ricci_heatmap(env, img, tile)
-    if getattr(env, "_overlay", False):
-        from topogym.rendering.overlay import draw_h1_overlay
-
-        draw_h1_overlay(env, img, tile)
+    else:
+        draw_agent(img[y0:y0 + tile, x0:x0 + tile], tile, k, theme)
+    _overlays(env, img, tile)
     return img
