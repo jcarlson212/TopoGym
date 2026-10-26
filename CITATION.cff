@@ -4,7 +4,7 @@ title: "TopoGym: Environments and Benchmarks for Topological Exploration in Rein
 authors:
   - family-names: Carlson
     given-names: Jason
-date-released: 2026-10-01
+date-released: 2026-10-25
 url: "https://github.com/jcarlson212/TopoGym"
 repository-code: "https://github.com/jcarlson212/TopoGym"
 license: MIT

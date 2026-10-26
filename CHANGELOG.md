@@ -3,7 +3,7 @@
 Releases follow [COMPATIBILITY.md](COMPATIBILITY.md): minor versions
 are additive, and no existing id changes behaviour.
 
-## 0.8.0 (unreleased)
+## 0.8.0 (2026-10-25)
 
 Rendering themes. Additive: `classic` stays the default and renders
 byte-for-byte as before, and no id, observation or dynamic changes
