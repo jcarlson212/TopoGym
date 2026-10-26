@@ -20,6 +20,8 @@ import zlib
 import golden_harness as gh
 import pytest
 
+import topogym  # noqa: F401  (registers the ids: each xdist worker starts fresh)
+
 RECORDED = sorted(p.stem.replace("__", "/")
                   for p in gh.FIXTURES.glob("*.json"))
 

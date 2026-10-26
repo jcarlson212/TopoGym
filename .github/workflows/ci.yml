@@ -47,7 +47,7 @@ jobs:
       - name: Install
         run: pip install -e ".[testing]"
       - name: Test
-        run: pytest -q
+        run: pytest -q -n auto
 
   lint:
     runs-on: ubuntu-latest

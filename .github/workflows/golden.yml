@@ -54,4 +54,4 @@ jobs:
         env:
           TOPOGYM_GOLDEN: "1"
           GOLDEN_SHARD: ${{ matrix.shard }}/6
-        run: pytest -q tests/compat
+        run: pytest -q -n auto tests/compat

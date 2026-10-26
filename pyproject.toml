@@ -30,7 +30,7 @@ classifiers = [
 dependencies = ["gymnasium>=0.29", "numpy>=1.21", "gudhi>=3.8"]
 
 [project.optional-dependencies]
-testing = ["pytest>=7.0", "networkx>=3.0", "pyarrow>=12"]  # pyarrow: export tests
+testing = ["pytest>=7.0", "pytest-xdist>=3.5", "networkx>=3.0", "pyarrow>=12"]  # pyarrow: export tests; xdist: parallel runs
 play = ["pygame>=2.1"]
 assets = ["imageio>=2.31"]  # GIF generation for the docs gallery
 # Baseline/benchmark runs; never core deps. Ray RLlib supplies the

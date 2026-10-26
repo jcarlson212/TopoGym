@@ -38,7 +38,8 @@ fixed action sequence. The `Golden` workflow replays them all on Python
 3.13. It runs on demand (from the Actions tab, or
 `gh workflow run golden.yml`), and should be run before a release and
 after any change to env behaviour. Locally,
-`TOPOGYM_GOLDEN=1 pytest tests/compat` runs the same replay.
+`TOPOGYM_GOLDEN=1 pytest -n auto tests/compat` runs the same replay on
+every core (about 40 minutes serially).
 
 A golden failure means the change broke compatibility. It is never
 fixed by re-recording the fixture. The only time a fixture is written is

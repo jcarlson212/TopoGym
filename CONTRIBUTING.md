@@ -11,7 +11,7 @@ git clone https://github.com/<you>/TopoGym.git
 cd TopoGym
 pip install -e ".[testing]"
 pip install ruff            # linting
-pytest -q                   # a few hundred tests, ~30 seconds
+pytest -q -n auto           # the suite on every core (pytest-xdist, in [testing])
 ruff check .
 pip install pre-commit && pre-commit install   # commit gates (once)
 ```
